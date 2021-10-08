@@ -426,6 +426,16 @@ class EEGDropPhoticChannel(object):
         return sample
 
 
+class EEGDropSpecificChannel(object):
+    """Drop the specified channel from EEG signal."""
+    def __init__(self, drop_channel):
+        self.drop_channel = drop_channel
+
+    def __call__(self, sample):
+        sample['signal'] = np.delete(sample['signal'], self.drop_channel, 0)
+        return sample
+
+
 class EEGToTensor(object):
     """Convert EEG numpy array in sample to Tensors."""
 
