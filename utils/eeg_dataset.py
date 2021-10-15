@@ -391,6 +391,26 @@ class EEGNormalizePerSignal(object):
         return sample
 
 
+class EEGAddGaussianNoise(object):
+    """Additive white Gaussian noise."""
+
+    def __init__(self, mean=0.0, std=1e-2):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, sample):
+        signal = sample['signal']
+
+        if torch.is_tensor(signal):
+            noise = torch.normal(mean=torch.ones_like(signal)*self.mean,
+                                 std=torch.ones_like(signal)*self.std)
+        else:
+            noise = np.random.normal(loc=self.mean, scale=self.std, size=signal.shape)
+
+        sample['signal'] = signal + noise
+        return sample
+
+
 class EEGNormalizeAge(object):
     """Normalize age of EEG metadata by the calculated statistics.
 
@@ -494,9 +514,9 @@ def eeg_collate_fn(batch):
         class_label += [sample['class_label']]
         metadata += [sample['metadata']]
 
-    batched_sample = {'signal': torch.stack(signal),
-                      'age': torch.stack(age),
-                      'class_label': torch.stack(class_label),
+    batched_sample = {'signal': torch.stack(signal).contiguous(),
+                      'age': torch.stack(age).contiguous(),
+                      'class_label': torch.stack(class_label).contiguous(),
                       'metadata': metadata}
     return batched_sample
 
