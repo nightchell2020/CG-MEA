@@ -391,6 +391,21 @@ class EEGNormalizePerSignal(object):
         return sample
 
 
+class EEGNormalizeMeanStd(object):
+    """Normalize multi-channel EEG signal by pre-calculated statistics."""
+
+    def __init__(self, mean, std, eps=1e-8):
+        self.mean = mean
+        self.std = std
+        self.eps = eps
+
+    def __call__(self, sample):
+        signal = sample['signal']
+
+        sample['signal'] = (signal - self.mean) / (self.std + self.eps)
+        return sample
+
+
 class EEGAddGaussianNoise(object):
     """Additive white Gaussian noise."""
 
