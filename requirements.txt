@@ -8,3 +8,7 @@ jupyterlab
 torch==1.9.0+cu102
 tensorboard
 ipynbname
+wandb
+pandas
+h5py
+plotly

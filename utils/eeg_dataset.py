@@ -373,7 +373,7 @@ class EEGEyeClosedCrop(object):
 
 
 class EEGNormalizePerSignal(object):
-    """Normalize multi-channel EEG signal by its statistics."""
+    """Normalize multi-channel EEG signal by its internal statistics."""
 
     def __init__(self, eps=1e-8):
         self.eps = eps
@@ -486,8 +486,8 @@ class EEGSpectrogram(object):
     (a.k.a. Spectrogram) """
 
     def __init__(self, n_fft, complex_mode='as_real', **kwargs):
-        if complex_mode not in ('as_real', 'complex', 'remove'):
-            raise ValueError('complex_mode must be set to one of ("as_real", "complex", "remove")')
+        if complex_mode not in ('as_real', 'power', 'remove'):
+            raise ValueError('complex_mode must be set to one of ("as_real", "power", "remove")')
 
         self.n_fft = n_fft
         self.complex_mode = complex_mode
@@ -508,8 +508,9 @@ class EEGSpectrogram(object):
             signal_f2 = torch.view_as_real(signal_f)[..., 1]
             signal_f = torch.cat((signal_f1, signal_f2), dim=0)
         elif self.complex_mode == 'complex':
-            signal_f = signal_f.abs()
             pass
+        elif self.complex_mode == 'power':
+            signal_f = signal_f.abs()
         elif self.complex_mode == 'remove':
             signal_f = torch.real(signal_f)
 
