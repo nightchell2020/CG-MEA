@@ -146,6 +146,7 @@ class ResNet2D(nn.Module):
             in_channels,
             out_dims,
             use_age,
+            final_pool,
             base_channels,
             n_fft,
             complex_mode,
@@ -158,12 +159,19 @@ class ResNet2D(nn.Module):
             **kwargs
     ) -> None:
         super(ResNet2D, self).__init__()
-        if norm_layer is None:
-            norm_layer = nn.BatchNorm2d
-        self._norm_layer = norm_layer
+
+        if use_age not in {'fc', 'conv', None}:
+            raise ValueError("use_age must be set to one of ['fc', 'conv', None]")
+
+        if final_pool not in {'average', 'max'}:
+            raise ValueError("final_pool must be set to one of ['average', 'max']")
 
         self.use_age = use_age
         self.final_shape = None
+
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        self._norm_layer = norm_layer
 
         self.dilation = 1
         self.zero_init_residual = zero_init_residual
@@ -187,6 +195,7 @@ class ResNet2D(nn.Module):
 
         if complex_mode == 'as_real':
             in_channels *= 2
+        in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
 
         self.conv1 = nn.Conv2d(in_channels, self.current_channels, kernel_size=7, stride=2, padding=3,
                                bias=False)
@@ -200,12 +209,16 @@ class ResNet2D(nn.Module):
                                        dilate=replace_stride_with_dilation[1])
         self.layer4 = self._make_layer(block, 512, conv_layers[3], stride=2,
                                        dilate=replace_stride_with_dilation[2])
-        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+
+        if final_pool == 'average':
+            self.final_pool = nn.AdaptiveAvgPool2d((1, 1))
+        elif final_pool == 'max':
+            self.final_pool = nn.AdaptiveMaxPool2d((1, 1))
 
         fc_conv_layers = []
         n_current = 512 * block.expansion
 
-        if self.use_age:
+        if self.use_age == 'fc':
             n_current = n_current + 1
 
         for l in range(fc_stages):
@@ -268,7 +281,7 @@ class ResNet2D(nn.Module):
 
     def _forward_impl(self, x: torch.Tensor, age: torch.Tensor) -> torch.Tensor:
         # See note [TorchScript super()]
-        N, C, L = x.shape
+        N = x.shape[0]
 
         for i in range(N):
             xf = torch.stft(x[i], n_fft=self.n_fft, return_complex=True)
@@ -289,6 +302,10 @@ class ResNet2D(nn.Module):
                 x_out[i] = torch.real(xf)
         x = x_out
 
+        if self.use_age == 'conv':
+            age = torch.ones_like(x) * age.reshape((N, 1, 1, 1))
+            x = torch.cat((x, age), dim=1)
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -302,9 +319,9 @@ class ResNet2D(nn.Module):
         if self.final_shape is None:
             self.final_shape = x.shape
 
-        x = self.avgpool(x)
+        x = self.final_pool(x)
         x = torch.flatten(x, 1)
-        if self.use_age:
+        if self.use_age == 'fc':
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)
         x = self.fc_stage(x)
 

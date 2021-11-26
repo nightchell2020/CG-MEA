@@ -445,6 +445,31 @@ class EEGNormalizeAge(object):
         return sample
 
 
+class EEGAddGaussianNoiseAge(object):
+    """Add a Gaussian noise to the age value
+
+    Args:
+        - mean: Desired mean of noise level for the age value.
+        - std: Desired standard deviation of noise level for the age value.
+    """
+
+    def __init__(self, mean=0.0, std=1e-2):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, sample):
+        age = sample['age']
+
+        if torch.is_tensor(age):
+            noise = torch.normal(mean=torch.ones_like(age)*self.mean,
+                                 std=torch.ones_like(age)*self.std)
+        else:
+            noise = np.random.normal(loc=self.mean, scale=self.std)
+
+        sample['age'] = age + noise
+        return sample
+
+
 class EEGDropEKGChannel(object):
     """Drop the EKG channel from EEG signal."""
 
