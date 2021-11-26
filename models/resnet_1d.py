@@ -237,9 +237,9 @@ class ResNet1D(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, age):
-        N = x.size()[0]
+        N, _, L = x.size()
         if self.use_age == 'conv':
-            age = torch.ones_like(x) * age.reshape((N, 1, 1))
+            age = age.reshape((N, 1, 1)).expand(N, 1, L)
             x = torch.cat((x, age), dim=1)
 
         x = self.input_stage(x)

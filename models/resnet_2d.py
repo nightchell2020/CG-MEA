@@ -303,7 +303,8 @@ class ResNet2D(nn.Module):
         x = x_out
 
         if self.use_age == 'conv':
-            age = torch.ones_like(x) * age.reshape((N, 1, 1, 1))
+            N, _, H, W = x.size()
+            age = age.reshape((N, 1, 1, 1)).expand(N, 1, H, W)
             x = torch.cat((x, age), dim=1)
 
         x = self.conv1(x)
