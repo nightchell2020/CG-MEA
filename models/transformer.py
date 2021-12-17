@@ -28,7 +28,7 @@ class PositionalEncoding(nn.Module):
 
 
 class CNNTransformer(nn.Module):
-    def __init__(self, in_channels, out_dims, use_age, final_pool,
+    def __init__(self, in_channels, out_dims, fc_stages, use_age, final_pool,
                  base_channels=256, n_encoders=4, n_heads=2, dropout=0.2, **kwargs):
         super().__init__()
 
@@ -65,14 +65,19 @@ class CNNTransformer(nn.Module):
         elif final_pool == 'max':
             self.final_pool = nn.AdaptiveMaxPool1d(1)
 
+        fc_stage = []
         if self.use_age == 'fc':
-            self.fc1 = nn.Linear(base_channels + 1, base_channels)
-        else:
-            self.fc1 = nn.Linear(base_channels, base_channels)
+            base_channels = base_channels + 1
 
-        self.dropout = nn.Dropout(p=dropout)
-        self.bnfc1 = nn.BatchNorm1d(base_channels)
-        self.fc2 = nn.Linear(base_channels, out_dims)
+        for l in range(fc_stages):
+            layer = nn.Sequential(nn.Linear(base_channels, base_channels // 2, bias=False),
+                                  nn.Dropout(p=dropout),
+                                  nn.BatchNorm1d(base_channels // 2),
+                                  nn.ReLU())
+            base_channels = base_channels // 2
+            fc_stage.append(layer)
+        fc_stage.append(nn.Linear(base_channels, out_dims))
+        self.fc_stage = nn.Sequential(*fc_stage)
 
     def reset_weights(self):
         for m in self.modules():
@@ -116,15 +121,10 @@ class CNNTransformer(nn.Module):
             self.final_shape = x.shape
         x = self.final_pool(x).reshape((N, -1))
 
+        # fully-connected layers
         if self.use_age == 'fc':
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)
-
-        # fc-bn-dropout-relu-fc
-        x = self.fc1(x)
-        x = self.bnfc1(x)
-        x = self.dropout(x)
-        x = F.relu(x)
-        x = self.fc2(x)
+        x = self.fc_stage(x)
 
         # return F.log_softmax(x, dim=1)
         return x

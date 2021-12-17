@@ -162,6 +162,10 @@ class ResNet1D(nn.Module):
                  use_age,
                  final_pool,
                  base_channels=64,
+                 first_stride=2,
+                 first_dilation=1,
+                 base_stride=3,
+                 dropout=0.1,
                  groups=1,
                  kernel_size=9,
                  **kwargs) -> None:
@@ -183,16 +187,16 @@ class ResNet1D(nn.Module):
 
         self.input_stage = nn.Sequential(
             nn.Conv1d(in_channels=in_channels, out_channels=base_channels,
-                      kernel_size=kernel_size * 3, stride=2,
+                      kernel_size=kernel_size * 3, stride=first_stride, dilation=first_dilation,
                       padding=(kernel_size * 3) // 2, bias=False),
             nn.BatchNorm1d(base_channels),
             nn.ReLU(),
         )
 
-        self.conv_stage1 = self._make_conv_layer(block, conv_layers[0], base_channels, kernel_size, stride=3)
-        self.conv_stage2 = self._make_conv_layer(block, conv_layers[1], base_channels * 2, kernel_size, stride=3)
-        self.conv_stage3 = self._make_conv_layer(block, conv_layers[2], base_channels * 4, kernel_size, stride=3)
-        self.conv_stage4 = self._make_conv_layer(block, conv_layers[3], base_channels * 8, kernel_size, stride=3)
+        self.conv_stage1 = self._make_conv_layer(block, conv_layers[0], base_channels, kernel_size, stride=base_stride)
+        self.conv_stage2 = self._make_conv_layer(block, conv_layers[1], base_channels * 2, kernel_size, stride=base_stride)
+        self.conv_stage3 = self._make_conv_layer(block, conv_layers[2], base_channels * 4, kernel_size, stride=base_stride)
+        self.conv_stage4 = self._make_conv_layer(block, conv_layers[3], base_channels * 8, kernel_size, stride=base_stride)
 
         if final_pool == 'average':
             self.final_pool = nn.AdaptiveAvgPool1d(1)
@@ -205,7 +209,7 @@ class ResNet1D(nn.Module):
 
         for l in range(fc_stages):
             layer = nn.Sequential(nn.Linear(self.current_channels, self.current_channels // 2, bias=False),
-                                  nn.Dropout(p=0.1),
+                                  nn.Dropout(p=dropout),
                                   nn.BatchNorm1d(self.current_channels // 2),
                                   nn.ReLU())
             self.current_channels = self.current_channels // 2

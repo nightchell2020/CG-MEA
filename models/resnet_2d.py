@@ -151,6 +151,7 @@ class ResNet2D(nn.Module):
             n_fft,
             complex_mode,
             hop_length,
+            dropout=0.1,
             zero_init_residual: bool = False,
             groups: int = 1,
             width_per_group: int = 64,
@@ -197,8 +198,8 @@ class ResNet2D(nn.Module):
             in_channels *= 2
         in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
 
-        self.conv1 = nn.Conv2d(in_channels, self.current_channels, kernel_size=7, stride=2, padding=3,
-                               bias=False)
+        self.conv1 = nn.Conv2d(in_channels, self.current_channels, kernel_size=7,
+                               stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.current_channels)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -223,7 +224,7 @@ class ResNet2D(nn.Module):
 
         for l in range(fc_stages):
             layer = nn.Sequential(nn.Linear(n_current, n_current // 2, bias=False),
-                                  nn.Dropout(p=0.1),
+                                  nn.Dropout(p=dropout),
                                   nn.BatchNorm1d(n_current // 2),
                                   nn.ReLU())
             n_current = n_current // 2

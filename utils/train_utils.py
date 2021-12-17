@@ -6,8 +6,35 @@ import torch.optim as optim
 from sklearn.metrics import roc_curve, auc, roc_auc_score
 from sklearn.preprocessing import label_binarize
 from itertools import cycle
-from tqdm.auto import tqdm
+from torch.utils.tensorboard import SummaryWriter
 import wandb
+
+
+def count_parameters(model):
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+
+def calculate_final_shape(model, train_loader, device):
+    for sample_batched in train_loader:
+        x = torch.zeros_like(sample_batched['signal']).to(device)
+        model(x, age=sample_batched['age'].to(device))
+        return model.get_final_shape()
+
+
+def visualize_network_tensorboard(model, train_loader, device, nb_fname, name):
+    # default `log_dir` is "runs" - we'll be more specific here
+    writer = SummaryWriter('runs/' + nb_fname + '_' + name)
+
+    for batch_i, sample_batched in enumerate(train_loader):
+        # pull up the batch data
+        x = sample_batched['signal'].to(device)
+        age = sample_batched['age'].to(device)
+
+        # apply model on whole batch directly on device
+        writer.add_graph(model, (x, age))
+        break
+
+    writer.close()
 
 
 def train_multistep(model, loader, optimizer, scheduler, config, steps):
@@ -215,13 +242,13 @@ def check_accuracy(model, loader, config, repeat=1):
     return accuracy, confusion_matrix, debug_table, score, target
 
 
-def learning_rate_search(model, train_loader, min_log_lr, max_log_lr, trials, config, steps):
+def learning_rate_search(config, train_loader, min_log_lr, max_log_lr, trials, steps):
     learning_rate_record = []
 
-    for log_lr in tqdm(np.linspace(min_log_lr, max_log_lr, num=trials)):
+    for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
 
-        model.reset_weights()
+        model = config['generator'](**config).to(config['device'])
         model.train()
 
         optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
@@ -233,7 +260,8 @@ def learning_rate_search(model, train_loader, min_log_lr, max_log_lr, trials, co
         # Train accuracy for the final epoch is stored
         learning_rate_record.append((log_lr, train_accuracy))
 
-    return learning_rate_record
+    best_log_lr = learning_rate_record[np.argmax(np.array([v for lr, v in learning_rate_record]))][0]
+    return 10 ** best_log_lr, learning_rate_record
 
 
 def draw_loss_plot(losses, lr_decay_step=None):
