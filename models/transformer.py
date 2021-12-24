@@ -29,7 +29,8 @@ class PositionalEncoding(nn.Module):
 
 class CNNTransformer(nn.Module):
     def __init__(self, in_channels, out_dims, fc_stages, use_age, final_pool,
-                 base_channels=256, n_encoders=4, n_heads=2, dropout=0.2, **kwargs):
+                 first_dilation=1, base_channels=256,
+                 n_encoders=4, n_heads=2, dropout=0.2, **kwargs):
         super().__init__()
 
         if use_age not in {'fc', 'conv', None}:
@@ -42,7 +43,7 @@ class CNNTransformer(nn.Module):
         self.final_shape = None
 
         in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
-        self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=21, stride=11)
+        self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=21, stride=7, dilation=first_dilation)
         self.bn1 = nn.BatchNorm1d(base_channels)
 
         self.conv2 = nn.Conv1d(base_channels, base_channels, kernel_size=9, stride=3)
