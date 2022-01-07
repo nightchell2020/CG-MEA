@@ -41,9 +41,8 @@ class CNNTransformer(nn.Module):
 
         self.use_age = use_age
         self.final_shape = None
-
         in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
-        self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=21, stride=7, dilation=first_dilation)
+        self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=21, stride=9, dilation=first_dilation)
         self.bn1 = nn.BatchNorm1d(base_channels)
 
         self.conv2 = nn.Conv1d(base_channels, base_channels, kernel_size=9, stride=3)
