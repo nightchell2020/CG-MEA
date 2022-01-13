@@ -30,7 +30,7 @@ class PositionalEncoding(nn.Module):
 class CNNTransformer(nn.Module):
     def __init__(self, in_channels, out_dims, fc_stages, use_age, final_pool,
                  first_dilation=1, base_channels=256,
-                 n_encoders=4, n_heads=2, dropout=0.2, **kwargs):
+                 n_encoders=4, n_heads=2, dropout=0.2, activation='relu', **kwargs):
         super().__init__()
 
         if use_age not in {'fc', 'conv', None}:
@@ -41,6 +41,19 @@ class CNNTransformer(nn.Module):
 
         self.use_age = use_age
         self.final_shape = None
+
+        if activation == 'relu':
+            self.nn_act = nn.ReLU
+            self.F_act = F.relu
+        elif activation == 'gelu':
+            self.nn_act = nn.GELU
+            self.F_act = F.gelu
+        elif activation == 'mish':
+            self.nn_act = nn.Mish
+            self.F_act = F.mish
+        else:
+            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
+
         in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
         self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=21, stride=9, dilation=first_dilation)
         self.bn1 = nn.BatchNorm1d(base_channels)
@@ -73,7 +86,7 @@ class CNNTransformer(nn.Module):
             layer = nn.Sequential(nn.Linear(base_channels, base_channels // 2, bias=False),
                                   nn.Dropout(p=dropout),
                                   nn.BatchNorm1d(base_channels // 2),
-                                  nn.ReLU())
+                                  self.nn_act())
             base_channels = base_channels // 2
             fc_stage.append(layer)
         fc_stage.append(nn.Linear(base_channels, out_dims))
@@ -95,13 +108,13 @@ class CNNTransformer(nn.Module):
             age = torch.cat([age for i in range(L)], dim=2)
             x = torch.cat((x, age), dim=1)
 
-        # conv-bn-relu
+        # conv-bn-act
         x = self.conv1(x)
-        x = F.relu(self.bn1(x))
+        x = self.F_act(self.bn1(x))
 
-        # conv-bn-relu
+        # conv-bn-act
         x = self.conv2(x)
-        x = F.relu(self.bn2(x))
+        x = self.F_act(self.bn2(x))
 
         # transformer encoder layers
         x = x.permute(2, 0, 1)  # minibatch, dimension, length --> length, minibatch, dimension
@@ -109,13 +122,13 @@ class CNNTransformer(nn.Module):
         x = self.transformer_encoder(x)
         x = x.permute(1, 2, 0)  # length, minibatch, dimension --> minibatch, dimension, length
 
-        # conv-bn-relu again
+        # conv-bn-act again
         x = self.conv3(x)
-        x = F.relu(self.bn3(x))
+        x = self.F_act(self.bn3(x))
 
-        # conv-bn-relu again
+        # conv-bn-act again
         x = self.conv4(x)
-        x = F.relu(self.bn4(x))
+        x = self.F_act(self.bn4(x))
 
         if self.final_shape is None:
             self.final_shape = x.shape

@@ -42,7 +42,8 @@ class BasicBlock2D(nn.Module):
             groups: int = 1,
             base_width: int = 64,
             dilation: int = 1,
-            norm_layer: Optional[Callable[..., nn.Module]] = None
+            norm_layer: Optional[Callable[..., nn.Module]] = None,
+            activation: Optional[Callable[..., nn.Module]] = nn.ReLU
     ) -> None:
         super(BasicBlock2D, self).__init__()
         if norm_layer is None:
@@ -54,7 +55,7 @@ class BasicBlock2D(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(current_channels, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.relu = nn.ReLU(inplace=True)
+        self.nn_act = activation(inplace=True)
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
@@ -65,7 +66,7 @@ class BasicBlock2D(nn.Module):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.nn_act(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
@@ -74,7 +75,7 @@ class BasicBlock2D(nn.Module):
             identity = self.downsample(x)
 
         out += identity
-        out = self.relu(out)
+        out = self.nn_act(out)
 
         return out
 
@@ -97,7 +98,8 @@ class Bottleneck2D(nn.Module):
             groups: int = 1,
             base_width: int = 64,
             dilation: int = 1,
-            norm_layer: Optional[Callable[..., nn.Module]] = None
+            norm_layer: Optional[Callable[..., nn.Module]] = None,
+            activation: Optional[Callable[..., nn.Module]] = nn.ReLU
     ) -> None:
         super(Bottleneck2D, self).__init__()
         if norm_layer is None:
@@ -110,7 +112,7 @@ class Bottleneck2D(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        self.nn_act = activation(inplace=True)
         self.downsample = downsample
         self.stride = stride
 
@@ -119,11 +121,11 @@ class Bottleneck2D(nn.Module):
 
         out = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.nn_act(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
-        out = self.relu(out)
+        out = self.nn_act(out)
 
         out = self.conv3(out)
         out = self.bn3(out)
@@ -132,7 +134,7 @@ class Bottleneck2D(nn.Module):
             identity = self.downsample(x)
 
         out += identity
-        out = self.relu(out)
+        out = self.nn_act(out)
 
         return out
 
@@ -157,6 +159,7 @@ class ResNet2D(nn.Module):
             width_per_group: int = 64,
             replace_stride_with_dilation: Optional[List[bool]] = None,
             norm_layer: Optional[Callable[..., nn.Module]] = None,
+            activation='relu',
             **kwargs
     ) -> None:
         super(ResNet2D, self).__init__()
@@ -169,6 +172,15 @@ class ResNet2D(nn.Module):
 
         self.use_age = use_age
         self.final_shape = None
+
+        if activation == 'relu':
+            self.nn_act = nn.ReLU
+        elif activation == 'gelu':
+            self.nn_act = nn.GELU
+        elif activation == 'mish':
+            self.nn_act = nn.Mish
+        else:
+            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -201,15 +213,15 @@ class ResNet2D(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, self.current_channels, kernel_size=7,
                                stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.current_channels)
-        self.relu = nn.ReLU(inplace=True)
+        self.act1 = self.nn_act(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        self.layer1 = self._make_layer(block, 64, conv_layers[0])
+        self.layer1 = self._make_layer(block, 64, conv_layers[0], activation=self.nn_act)
         self.layer2 = self._make_layer(block, 128, conv_layers[1], stride=2,
-                                       dilate=replace_stride_with_dilation[0])
+                                       dilate=replace_stride_with_dilation[0], activation=self.nn_act)
         self.layer3 = self._make_layer(block, 256, conv_layers[2], stride=2,
-                                       dilate=replace_stride_with_dilation[1])
+                                       dilate=replace_stride_with_dilation[1], activation=self.nn_act)
         self.layer4 = self._make_layer(block, 512, conv_layers[3], stride=2,
-                                       dilate=replace_stride_with_dilation[2])
+                                       dilate=replace_stride_with_dilation[2], activation=self.nn_act)
 
         if final_pool == 'average':
             self.final_pool = nn.AdaptiveAvgPool2d((1, 1))
@@ -226,7 +238,7 @@ class ResNet2D(nn.Module):
             layer = nn.Sequential(nn.Linear(n_current, n_current // 2, bias=False),
                                   nn.Dropout(p=dropout),
                                   nn.BatchNorm1d(n_current // 2),
-                                  nn.ReLU())
+                                  self.nn_act())
             n_current = n_current // 2
             fc_conv_layers.append(layer)
         fc_conv_layers.append(nn.Linear(n_current, out_dims))
@@ -256,7 +268,7 @@ class ResNet2D(nn.Module):
         return self.final_shape
 
     def _make_layer(self, block: Type[Union[BasicBlock2D, Bottleneck2D]], planes: int, blocks: int,
-                    stride: int = 1, dilate: bool = False) -> nn.Sequential:
+                    stride: int = 1, dilate: bool = False, activation=nn.ReLU) -> nn.Sequential:
         norm_layer = self._norm_layer
         downsample = None
         previous_dilation = self.dilation
@@ -271,12 +283,12 @@ class ResNet2D(nn.Module):
 
         conv_layers = []
         conv_layers.append(block(self.current_channels, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, norm_layer))
+                            self.base_width, previous_dilation, norm_layer, activation=activation))
         self.current_channels = planes * block.expansion
         for _ in range(1, blocks):
             conv_layers.append(block(self.current_channels, planes, groups=self.groups,
                                 base_width=self.base_width, dilation=self.dilation,
-                                norm_layer=norm_layer))
+                                norm_layer=norm_layer, activation=activation))
 
         return nn.Sequential(*conv_layers)
 
@@ -310,7 +322,7 @@ class ResNet2D(nn.Module):
 
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)
+        x = self.act1(x)
         x = self.maxpool(x)
 
         x = self.layer1(x)

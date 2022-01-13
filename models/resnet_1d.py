@@ -8,7 +8,7 @@ import torch.nn as nn
 class BasicBlock1D(nn.Module):
     expansion: int = 1
 
-    def __init__(self, c_in, c_out, kernel_size, stride, groups=1) -> None:
+    def __init__(self, c_in, c_out, kernel_size, stride, groups=1, activation=nn.ReLU) -> None:
         super().__init__()
         self.conv1 = nn.Conv1d(in_channels=c_in, out_channels=c_out,
                                kernel_size=kernel_size, stride=stride,
@@ -20,7 +20,7 @@ class BasicBlock1D(nn.Module):
                                padding=kernel_size // 2, bias=False)
         self.bn2 = nn.BatchNorm1d(c_out)
 
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = activation(inplace=True)
 
         self.downsample = None
         if stride != 1 or c_in != c_out:
@@ -35,13 +35,13 @@ class BasicBlock1D(nn.Module):
 
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)
+        x = self.activation(x)
 
         x = self.conv2(x)
         x = self.bn2(x)
         if self.downsample is not None:
             identity = self.downsample(identity)
-        x = self.relu(x + identity)
+        x = self.activation(x + identity)
 
         return x
 
@@ -49,7 +49,7 @@ class BasicBlock1D(nn.Module):
 class BottleneckBlock1D(nn.Module):
     expansion: int = 4
 
-    def __init__(self, c_in, c_out, kernel_size, stride, groups=1) -> None:
+    def __init__(self, c_in, c_out, kernel_size, stride, groups=1, activation=nn.ReLU) -> None:
         super().__init__()
         width = c_out
         self.conv1 = nn.Conv1d(in_channels=c_in, out_channels=width,
@@ -65,7 +65,7 @@ class BottleneckBlock1D(nn.Module):
                                kernel_size=1, stride=1, bias=False)
         self.bn3 = nn.BatchNorm1d(c_out * self.expansion)
 
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = activation(inplace=True)
 
         self.downsample = None
         if stride != 1 or c_in != c_out * self.expansion:
@@ -80,18 +80,18 @@ class BottleneckBlock1D(nn.Module):
 
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)
+        x = self.activation(x)
 
         x = self.conv2(x)
         x = self.bn2(x)
-        x = self.relu(x)
+        x = self.activation(x)
 
         x = self.conv3(x)
         x = self.bn3(x)
         if self.downsample is not None:
             identity = self.downsample(identity)
 
-        x = self.relu(x + identity)
+        x = self.activation(x + identity)
 
         return x
 
@@ -99,7 +99,7 @@ class BottleneckBlock1D(nn.Module):
 class MultiBottleneckBlock1D(nn.Module):
     expansion: int = 4
 
-    def __init__(self, c_in, c_out, kernel_size, stride, groups=1) -> None:
+    def __init__(self, c_in, c_out, kernel_size, stride, groups=1, activation=nn.ReLU) -> None:
         super().__init__()
         width = c_out
 
@@ -119,7 +119,7 @@ class MultiBottleneckBlock1D(nn.Module):
                                dilation=1, stride=1, bias=False)
         self.bn3 = nn.BatchNorm1d(c_out * self.expansion)
 
-        self.relu = nn.ReLU(inplace=True)
+        self.activation = activation(inplace=True)
 
         self.downsample = None
         if stride != 1 or c_in != c_out * self.expansion:
@@ -134,13 +134,13 @@ class MultiBottleneckBlock1D(nn.Module):
 
         x = self.conv1(x)
         x = self.bn1(x)
-        x = self.relu(x)
+        x = self.activation(x)
 
         x1 = self.conv2_1(x)
         x2 = self.conv2_2(x)
         x = torch.cat((x1, x2), dim=1)
         x = self.bn2(x)
-        x = self.relu(x)
+        x = self.activation(x)
 
         x = self.conv3(x)
         x = self.bn3(x)
@@ -148,13 +148,13 @@ class MultiBottleneckBlock1D(nn.Module):
         if self.downsample is not None:
             identity = self.downsample(identity)
 
-        x = self.relu(x + identity)
+        x = self.activation(x + identity)
         return x
 
 
 class ResNet1D(nn.Module):
     def __init__(self,
-                 block: Type[Union[BasicBlock1D, BottleneckBlock1D]],
+                 block: Type[Union[BasicBlock1D, BottleneckBlock1D, MultiBottleneckBlock1D]],
                  conv_layers: List[int],
                  fc_stages: int,
                  in_channels: int,
@@ -168,6 +168,7 @@ class ResNet1D(nn.Module):
                  dropout=0.1,
                  groups=1,
                  kernel_size=9,
+                 activation='relu',
                  **kwargs) -> None:
 
         super().__init__()
@@ -181,6 +182,15 @@ class ResNet1D(nn.Module):
         self.use_age = use_age
         self.final_shape = None
 
+        if activation == 'relu':
+            self.nn_act = nn.ReLU
+        elif activation == 'gelu':
+            self.nn_act = nn.GELU
+        elif activation == 'mish':
+            self.nn_act = nn.Mish
+        else:
+            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
+
         self.groups = groups
         self.current_channels = base_channels
         in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
@@ -190,13 +200,17 @@ class ResNet1D(nn.Module):
                       kernel_size=kernel_size * 3, stride=first_stride, dilation=first_dilation,
                       padding=(kernel_size * 3) // 2, bias=False),
             nn.BatchNorm1d(base_channels),
-            nn.ReLU(),
+            self.nn_act(),
         )
 
-        self.conv_stage1 = self._make_conv_layer(block, conv_layers[0], base_channels, kernel_size, stride=base_stride)
-        self.conv_stage2 = self._make_conv_layer(block, conv_layers[1], base_channels * 2, kernel_size, stride=base_stride)
-        self.conv_stage3 = self._make_conv_layer(block, conv_layers[2], base_channels * 4, kernel_size, stride=base_stride)
-        self.conv_stage4 = self._make_conv_layer(block, conv_layers[3], base_channels * 8, kernel_size, stride=base_stride)
+        self.conv_stage1 = self._make_conv_layer(block, conv_layers[0], base_channels,
+                                                 kernel_size, stride=base_stride, activation=self.nn_act)
+        self.conv_stage2 = self._make_conv_layer(block, conv_layers[1], base_channels * 2,
+                                                 kernel_size, stride=base_stride, activation=self.nn_act)
+        self.conv_stage3 = self._make_conv_layer(block, conv_layers[2], base_channels * 4,
+                                                 kernel_size, stride=base_stride, activation=self.nn_act)
+        self.conv_stage4 = self._make_conv_layer(block, conv_layers[3], base_channels * 8,
+                                                 kernel_size, stride=base_stride, activation=self.nn_act)
 
         if final_pool == 'average':
             self.final_pool = nn.AdaptiveAvgPool1d(1)
@@ -211,7 +225,7 @@ class ResNet1D(nn.Module):
             layer = nn.Sequential(nn.Linear(self.current_channels, self.current_channels // 2, bias=False),
                                   nn.Dropout(p=dropout),
                                   nn.BatchNorm1d(self.current_channels // 2),
-                                  nn.ReLU())
+                                  self.nn_act())
             self.current_channels = self.current_channels // 2
             fc_stage.append(layer)
         fc_stage.append(nn.Linear(self.current_channels, out_dims))
@@ -225,16 +239,16 @@ class ResNet1D(nn.Module):
     def get_final_shape(self):
         return self.final_shape
 
-    def _make_conv_layer(self, block: Type[Union[BasicBlock1D, BottleneckBlock1D]],
-                         n_block: int, c_out: int, kernel_size: int, stride: int = 1) -> nn.Sequential:
+    def _make_conv_layer(self, block: Type[Union[BasicBlock1D, BottleneckBlock1D]], n_block: int,
+                         c_out: int, kernel_size: int, stride: int = 1, activation=nn.ReLU) -> nn.Sequential:
         layers = []
         c_in = self.current_channels
-        layers.append(block(c_in, c_out, kernel_size, groups=self.groups, stride=1))
+        layers.append(block(c_in, c_out, kernel_size, groups=self.groups, stride=1, activation=activation))
 
         c_in = c_out * block.expansion
         self.current_channels = c_in
         for _ in range(1, n_block):
-            layers.append(block(c_in, c_out, kernel_size, groups=self.groups, stride=1))
+            layers.append(block(c_in, c_out, kernel_size, groups=self.groups, stride=1, activation=activation))
 
         layers.append(nn.MaxPool1d(kernel_size=stride))
 

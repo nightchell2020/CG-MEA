@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 class TinyCNN1D(nn.Module):
     def __init__(self, in_channels, out_dims, fc_stages, use_age, final_pool,
-                 stride=7, base_channels=64, dropout=0.3, **kwargs):
+                 stride=7, base_channels=64, dropout=0.3, activation='relu', **kwargs):
         super().__init__()
 
         if use_age not in {'fc', 'conv', None}:
@@ -18,6 +18,18 @@ class TinyCNN1D(nn.Module):
 
         self.use_age = use_age
         self.final_shape = None
+
+        if activation == 'relu':
+            self.F_act = F.relu
+            self.nn_act = nn.ReLU
+        elif activation == 'gelu':
+            self.F_act = F.gelu
+            self.nn_act = nn.GELU
+        elif activation == 'mish':
+            self.F_act = F.mish
+            self.nn_act = nn.Mish
+        else:
+            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
 
         in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
         self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=35, stride=stride)
@@ -41,7 +53,7 @@ class TinyCNN1D(nn.Module):
             layer = nn.Sequential(nn.Linear(base_channels, base_channels // 2, bias=False),
                                   nn.Dropout(p=dropout),
                                   nn.BatchNorm1d(base_channels // 2),
-                                  nn.ReLU())
+                                  self.nn_act())
             base_channels = base_channels // 2
             fc_stage.append(layer)
         fc_stage.append(nn.Linear(base_channels, out_dims))
@@ -63,13 +75,13 @@ class TinyCNN1D(nn.Module):
             age = torch.cat([age for i in range(L)], dim=2)
             x = torch.cat((x, age), dim=1)
 
-        # conv-bn-relu-pool
+        # conv-bn-act-pool
         x = self.conv1(x)
-        x = F.relu(self.bn1(x))
+        x = self.F_act(self.bn1(x))
         x = self.pool1(x)
 
         x = self.conv2(x)
-        x = F.relu(self.bn2(x))
+        x = self.F_act(self.bn2(x))
         x = self.pool2(x)
 
         if self.final_shape is None:
@@ -86,7 +98,7 @@ class TinyCNN1D(nn.Module):
 
 class M7(nn.Module):
     def __init__(self, in_channels, out_dims, fc_stages, use_age, final_pool,
-                 base_channels=256, dropout=0.3, **kwargs):
+                 base_channels=256, dropout=0.3, activation='relu', **kwargs):
         super().__init__()
 
         if use_age not in {'fc', 'conv', None}:
@@ -97,6 +109,18 @@ class M7(nn.Module):
 
         self.use_age = use_age
         self.final_shape = None
+
+        if activation == 'relu':
+            self.F_act = F.relu
+            self.nn_act = nn.ReLU
+        elif activation == 'gelu':
+            self.F_act = F.gelu
+            self.nn_act = nn.GELU
+        elif activation == 'mish':
+            self.F_act = F.mish
+            self.nn_act = nn.Mish
+        else:
+            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
 
         in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
         self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=41, stride=2)
@@ -133,7 +157,7 @@ class M7(nn.Module):
             layer = nn.Sequential(nn.Linear(base_channels, base_channels // 2, bias=False),
                                   nn.Dropout(p=dropout),
                                   nn.BatchNorm1d(base_channels // 2),
-                                  nn.ReLU())
+                                  self.nn_act())
             base_channels = base_channels // 2
             fc_stage.append(layer)
         fc_stage.append(nn.Linear(base_channels, out_dims))
@@ -155,25 +179,25 @@ class M7(nn.Module):
             age = torch.cat([age for i in range(L)], dim=2)
             x = torch.cat((x, age), dim=1)
 
-        # conv-bn-relu-pool
+        # conv-bn-act-pool
         x = self.conv1(x)
-        x = F.relu(self.bn1(x))
+        x = self.F_act(self.bn1(x))
         x = self.pool1(x)
 
         x = self.conv2(x)
-        x = F.relu(self.bn2(x))
+        x = self.F_act(self.bn2(x))
         x = self.pool2(x)
 
         x = self.conv3(x)
-        x = F.relu(self.bn3(x))
+        x = self.F_act(self.bn3(x))
         x = self.pool3(x)
 
         x = self.conv4(x)
-        x = F.relu(self.bn4(x))
+        x = self.F_act(self.bn4(x))
         x = self.pool4(x)
 
         x = self.conv5(x)
-        x = F.relu(self.bn5(x))
+        x = self.F_act(self.bn5(x))
         x = self.pool5(x)
 
         if self.final_shape is None:
