@@ -20,7 +20,7 @@ class BasicBlock1D(nn.Module):
                                padding=kernel_size // 2, bias=False)
         self.bn2 = nn.BatchNorm1d(c_out)
 
-        self.activation = activation(inplace=True)
+        self.activation = activation()
 
         self.downsample = None
         if stride != 1 or c_in != c_out:
@@ -65,7 +65,7 @@ class BottleneckBlock1D(nn.Module):
                                kernel_size=1, stride=1, bias=False)
         self.bn3 = nn.BatchNorm1d(c_out * self.expansion)
 
-        self.activation = activation(inplace=True)
+        self.activation = activation()
 
         self.downsample = None
         if stride != 1 or c_in != c_out * self.expansion:
@@ -119,7 +119,7 @@ class MultiBottleneckBlock1D(nn.Module):
                                dilation=1, stride=1, bias=False)
         self.bn3 = nn.BatchNorm1d(c_out * self.expansion)
 
-        self.activation = activation(inplace=True)
+        self.activation = activation()
 
         self.downsample = None
         if stride != 1 or c_in != c_out * self.expansion:

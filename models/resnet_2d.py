@@ -55,7 +55,7 @@ class BasicBlock2D(nn.Module):
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(current_channels, planes, stride)
         self.bn1 = norm_layer(planes)
-        self.nn_act = activation(inplace=True)
+        self.nn_act = activation()
         self.conv2 = conv3x3(planes, planes)
         self.bn2 = norm_layer(planes)
         self.downsample = downsample
@@ -112,7 +112,7 @@ class Bottleneck2D(nn.Module):
         self.bn2 = norm_layer(width)
         self.conv3 = conv1x1(width, planes * self.expansion)
         self.bn3 = norm_layer(planes * self.expansion)
-        self.nn_act = activation(inplace=True)
+        self.nn_act = activation()
         self.downsample = downsample
         self.stride = stride
 
@@ -213,7 +213,7 @@ class ResNet2D(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, self.current_channels, kernel_size=7,
                                stride=2, padding=3, bias=False)
         self.bn1 = norm_layer(self.current_channels)
-        self.act1 = self.nn_act(inplace=True)
+        self.act1 = self.nn_act()
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, conv_layers[0], activation=self.nn_act)
         self.layer2 = self._make_layer(block, 128, conv_layers[1], stride=2,
