@@ -1,9 +1,12 @@
-# Modified from
-# https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
+"""
+Modified from:
+    - https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
+"""
+
+from typing import Callable, Optional, Type, Union, List, Any
 
 import torch
 import torch.nn as nn
-from typing import Callable, Optional, Type, Union, List, Any
 
 __all__ = ["ResNet2D",
            "resnet18_2d",

@@ -1,12 +1,13 @@
 import os
 import json
+from copy import deepcopy
+from dataclasses import dataclass, asdict
+
 import numpy as np
+import random
 import torch
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
-from copy import deepcopy
-from dataclasses import dataclass, asdict
-import random
 
 
 @dataclass
@@ -310,267 +311,6 @@ def shuffle_splitted_metadata(config, splitted_metadata, class_label_to_type, ve
     return metadata_train, metadata_val, metadata_test
 
 
-def calculate_age_statistics(config, metadata_train, verbose=False):
-    ages = np.array([m['age'] for m in metadata_train])
-    age_mean = np.mean(ages)
-    age_std = np.std(ages)
-
-    if verbose:
-        print('Age mean and standard deviation:')
-        print(age_mean, age_std)
-        print('\n' + '-' * 100 + '\n')
-
-    return age_mean, age_std
-
-
-def calculate_signal_statistics(config, metadata_train, repeats=5, verbose=False):
-    composed = transforms.Compose([EEGRandomCrop(crop_length=config['crop_length'])])
-    train_dataset = EEGDataset(config['data_path'], metadata_train, composed)
-
-    signal_means = []
-    signal_stds = []
-
-    for i in range(repeats):
-        for d in train_dataset:
-            signal_means.append(d['signal'].mean(axis=1, keepdims=True))
-            signal_stds.append(d['signal'].std(axis=1, keepdims=True))
-
-    signal_mean = np.mean(np.array(signal_means), axis=0)
-    signal_std = np.mean(np.array(signal_stds), axis=0)
-
-    if verbose:
-        print('Mean and standard deviation for signal:')
-        print(signal_mean, '\n\n', signal_std)
-        print('\n' + '-' * 100 + '\n')
-
-    return signal_mean, signal_std
-
-
-def compose_datasets(config, metadata_train, metadata_val, metadata_test, verbose=False):
-    composed_train = []
-    composed_test = []
-
-    ###############
-    # signal crop #
-    ###############
-    composed_train += [EEGRandomCrop(crop_length=config['crop_length'])]
-    composed_test += [EEGRandomCrop(crop_length=config['crop_length'])]
-
-    ###############################
-    # data normalization (signal) #
-    ###############################
-    if config['input_norm'] == 'dataset':
-        config['signal_mean'], config['signal_std'] = calculate_signal_statistics(config, metadata_train,
-                                                                                  repeats=5, verbose=False)
-        composed_train += [EEGNormalizeMeanStd(mean=config['signal_mean'],
-                                               std=config['signal_std'])]
-        composed_test += [EEGNormalizeMeanStd(mean=config['signal_mean'],
-                                              std=config['signal_std'])]
-    elif config['input_norm'] == 'datapoint':
-        composed_train += [EEGNormalizePerSignal()]
-        composed_test += [EEGNormalizePerSignal()]
-    elif config['input_norm'] == 'no':
-        pass
-    else:
-        raise ValueError(f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']")
-
-    ############################
-    # data normalization (age) #
-    ############################
-    config['age_mean'], config['age_std'] = calculate_age_statistics(config, metadata_train, verbose=False)
-    composed_train += [EEGNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
-    composed_test += [EEGNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
-
-    ########################
-    # usage of EEG channel #
-    ########################
-    if config['EKG'] == 'O':
-        pass
-    elif config['EKG'] == 'X':
-        composed_train += [EEGDropEKGChannel()]
-        composed_test += [EEGDropEKGChannel()]
-    else:
-        raise ValueError(f"config['EKG'] have to be set to one of ['O', 'X']")
-
-    ###########################
-    # usage of Photic channel #
-    ###########################
-    if config['photic'] == 'O':
-        pass
-    elif config['photic'] == 'X':
-        composed_train += [EEGDropPhoticChannel()]
-        composed_test += [EEGDropPhoticChannel()]
-    else:
-        raise ValueError(f"config['photic'] have to be set to one of ['O', 'X']")
-
-    #######################################################
-    # additive Gaussian noise for regularization (signal) #
-    #######################################################
-    if config['awgn'] is None or config['awgn'] <= 1e-12:
-        pass
-    elif config['awgn'] > 0.0:
-        composed_train += [EEGAddGaussianNoise(mean=0.0, std=config['awgn'])]
-    else:
-        raise ValueError(f"config['awgn'] have to be None or a positive floating point number")
-
-    ####################################################
-    # additive Gaussian noise for regularization (age) #
-    ####################################################
-    if config['awgn_age'] is None or config['awgn_age'] <= 1e-12:
-        pass
-    elif config['awgn_age'] > 0.0:
-        composed_train += [EEGAddGaussianNoiseAge(mean=0.0, std=config['awgn_age'])]
-    else:
-        raise ValueError(f"config['awgn_age'] have to be None or a positive floating point number")
-
-    ###################
-    # numpy to tensor #
-    ###################
-    composed_train += [EEGToTensor()]
-    composed_test += [EEGToTensor()]
-
-    #################################################
-    # compose new thing for test on longer sequence #
-    #################################################
-    composed_test_longer = deepcopy(composed_test)
-    composed_test_longer[0] = EEGRandomCrop(crop_length=config['longer_crop_length'])
-
-    #####################
-    # transform-compose #
-    #####################
-    composed_train = transforms.Compose(composed_train)
-    composed_test = transforms.Compose(composed_test)
-    composed_test_longer = transforms.Compose(composed_test_longer)
-
-    if verbose:
-        print('composed_train:', composed_train)
-        print('\n' + '-' * 100 + '\n')
-
-        print('composed_test:', composed_test)
-        print('\n' + '-' * 100 + '\n')
-
-        print('longer_composed_test:', composed_test_longer)
-        print('\n' + '-' * 100 + '\n')
-        print()
-
-    ################################################
-    # wrap the splitted data using PyTorch Dataset #
-    ################################################
-    train_dataset = EEGDataset(config['data_path'], metadata_train, composed_train)
-    val_dataset = EEGDataset(config['data_path'], metadata_val, composed_test)
-    test_dataset = EEGDataset(config['data_path'], metadata_test, composed_test)
-    test_dataset_longer = EEGDataset(config['data_path'], metadata_test, composed_test_longer)
-
-    if verbose:
-        print('train_dataset[0]:')
-        print(train_dataset[0]['signal'].shape)
-        print(train_dataset[0])
-        print('\n' + '-' * 100 + '\n')
-
-        print('val_dataset[0]:')
-        print(val_dataset[0]['signal'].shape)
-        print(val_dataset[0])
-        print('\n' + '-' * 100 + '\n')
-
-        print('test_dataset[0]:')
-        print(test_dataset[0]['signal'].shape)
-        print(test_dataset[0])
-        print('\n' + '-' * 100 + '\n')
-
-        print('test_dataset_longer[0]:')
-        print(test_dataset_longer[0]['signal'].shape)
-        print(test_dataset_longer[0])
-        print('\n' + '-' * 100 + '\n')
-
-    return train_dataset, val_dataset, test_dataset, test_dataset_longer
-
-
-def make_dataloader(config, train_dataset, val_dataset, test_dataset, test_dataset_longer, verbose=False):
-    if config['device'].type == 'cuda':
-        num_workers = 0  # A number other than 0 causes an error
-        pin_memory = True
-    else:
-        num_workers = 0
-        pin_memory = False
-
-    train_loader = DataLoader(train_dataset,
-                              batch_size=config['minibatch'],
-                              shuffle=True,
-                              drop_last=True,
-                              num_workers=num_workers,
-                              pin_memory=pin_memory,
-                              collate_fn=eeg_collate_fn)
-
-    val_loader = DataLoader(val_dataset,
-                            batch_size=config['minibatch'],
-                            shuffle=False,
-                            drop_last=False,
-                            num_workers=num_workers,
-                            pin_memory=pin_memory,
-                            collate_fn=eeg_collate_fn)
-
-    test_loader = DataLoader(test_dataset,
-                             batch_size=config['minibatch'],
-                             shuffle=False,
-                             drop_last=False,
-                             num_workers=num_workers,
-                             pin_memory=pin_memory,
-                             collate_fn=eeg_collate_fn)
-
-    test_loader_longer = DataLoader(test_dataset_longer,
-                                    batch_size=config['minibatch'] // 2,  # to save the memory capacity
-                                    shuffle=False,
-                                    drop_last=False,
-                                    num_workers=num_workers,
-                                    pin_memory=pin_memory,
-                                    collate_fn=eeg_collate_fn)
-
-    if verbose:
-        for i_batch, sample_batched in enumerate(train_loader):
-            sample_batched['signal'].to(config['device'])
-            sample_batched['age'].to(config['device'])
-            sample_batched['class_label'].to(config['device'])
-
-            print(i_batch,
-                  sample_batched['signal'].shape,
-                  sample_batched['age'].shape,
-                  sample_batched['class_label'].shape,
-                  len(sample_batched['metadata']))
-
-            if i_batch > 3:
-                break
-        print('\n' + '-' * 100 + '\n')
-
-    return train_loader, val_loader, test_loader, test_loader_longer
-
-
-def build_dataset(config, verbose=False):
-    with open(config['meta_path'], 'r') as json_file:
-        metadata = json.load(json_file)
-
-    diagnosis_filter, class_label_to_type = define_target_task(config, verbose=verbose)
-
-    splitted_metadata = split_metadata(config, metadata, diagnosis_filter, verbose=verbose)
-
-    metadata_train, metadata_val, metadata_test = shuffle_splitted_metadata(config, splitted_metadata,
-                                                                            class_label_to_type, verbose=verbose)
-
-    train_dataset, val_dataset, test_dataset, test_dataset_longer = compose_datasets(config,
-                                                                                     metadata_train,
-                                                                                     metadata_val,
-                                                                                     metadata_test,
-                                                                                     verbose=verbose)
-
-    train_loader, val_loader, test_loader, test_loader_longer = make_dataloader(config,
-                                                                                train_dataset,
-                                                                                val_dataset,
-                                                                                test_dataset,
-                                                                                test_dataset_longer,
-                                                                                verbose=verbose)
-
-    return train_loader, val_loader, test_loader, test_loader_longer, class_label_to_type
-
-
 class EEGDataset(Dataset):
     """EEG Dataset Class for PyTorch.
 
@@ -609,19 +349,75 @@ class EEGRandomCrop(object):
 
     Args:
         - crop_length (int): Desired output signal length.
+        - multiple (int): Desired number of cropping.
     """
 
-    def __init__(self, crop_length):
-        assert isinstance(crop_length, int), 'EEGRandomCrop.__init__() needs a integer to initialize'
+    def __init__(self, crop_length: int, multiple: int = 1):
+        assert isinstance(crop_length, int), 'EEGRandomCrop.__init__(crop_length) needs a integer to initialize'
+        if multiple < 1:
+            raise ValueError('EEGRandomCrop.__init__(multiple) needs a positive integer to initialize')
+
         self.crop_length = crop_length
+        self.multiple = multiple
+
+    def _random_crop_signal(self, signal):
+        total_length = signal.shape[-1]
+        start_point = np.random.randint(total_length - self.crop_length)
+
+        return signal[:, start_point:start_point + self.crop_length]
 
     def __call__(self, sample):
         signal = sample['signal']
 
-        total_length = signal.shape[1]
+        if self.multiple == 1:
+            sample['signal'] = self._random_crop_signal(signal)
+        else:
+            signals = []
+            for r in range(self.multiple):
+                signals.append(self._random_crop_signal(signal))
+            sample['signal'] = signals
+
+        return sample
+
+
+class EEGRandomCropDebug(object):
+    """Randomly crop the EEG data to a given size (debug version).
+
+    Args:
+        - crop_length (int): Desired output signal length.
+        - multiple (int): Desired number of cropping.
+    """
+
+    def __init__(self, crop_length: int, multiple: int = 1):
+        assert isinstance(crop_length, int), 'EEGRandomCropDebug.__init__(crop_length) needs a integer to initialize'
+        if multiple < 1:
+            raise ValueError('EEGRandomCropDebug.__init__(multiple) needs a positive integer to initialize')
+
+        self.crop_length = crop_length
+        self.multiple = multiple
+
+    def _random_crop_signal(self, signal):
+        total_length = signal.shape[-1]
         start_point = np.random.randint(total_length - self.crop_length)
 
-        sample['signal'] = signal[:, start_point:start_point + self.crop_length]
+        return signal[:, start_point:start_point + self.crop_length], start_point
+
+    def __call__(self, sample):
+        signal = sample['signal']
+
+        if self.multiple == 1:
+            sample['signal'], sample['metadata']['start_point'] = self._random_crop_signal(signal)
+        else:
+            signals = []
+            start_points = []
+            for r in range(self.multiple):
+                s, sp = self._random_crop_signal(signal)
+                signals.append(s)
+                start_points.append(sp)
+
+            sample['signal'] = signals
+            sample['metadata']['start_point'] = start_points
+
         return sample
 
 
@@ -646,7 +442,7 @@ class EEGEyeOpenCrop(object):
 
     def __call__(self, sample):
         signal = sample['signal']
-        total_length = signal.shape[1]
+        total_length = signal.shape[-1]
 
         candidates = []
         for e in sample['metadata']['events']:
@@ -709,7 +505,7 @@ class EEGEyeClosedCrop(object):
 
     def __call__(self, sample):
         signal = sample['signal']
-        total_length = signal.shape[1]
+        total_length = signal.shape[-1]
 
         intervals = []
         started = True
@@ -765,56 +561,122 @@ class EEGEyeClosedCrop(object):
 
 
 class EEGNormalizePerSignal(object):
-    """Normalize multi-channel EEG signal by its internal statistics."""
+    """Normalize multichannel EEG signal by its internal statistics."""
 
     def __init__(self, eps=1e-8):
         self.eps = eps
 
+    def _normalize_per_signal(self, signal):
+        if torch.is_tensor(signal):
+            std, mean = torch.std_mean(signal, dim=-1, keepdim=True)
+        else:
+            mean = np.mean(signal, axis=-1, keepdims=True)
+            std = np.std(signal, axis=-1, keepdims=True)
+        return (signal - mean) / (std + self.eps)
+
     def __call__(self, sample):
         signal = sample['signal']
 
-        if torch.is_tensor(signal):
-            std, mean = torch.std_mean(signal, dim=1, keepdim=True)
+        if isinstance(signal, (np.ndarray,)):
+            sample['signal'] = self._normalize_per_signal(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self._normalize_per_signal(s))
+            sample['signal'] = signals
         else:
-            mean = np.mean(signal, axis=1, keepdims=True)
-            std = np.std(signal, axis=1, keepdims=True)
+            raise ValueError('EEGNormalizePerSignal.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             'or list of np.ndarray')
 
-        sample['signal'] = (signal - mean) / (std + self.eps)
         return sample
 
 
 class EEGNormalizeMeanStd(object):
-    """Normalize multi-channel EEG signal by pre-calculated statistics."""
+    """Normalize multichannel EEG signal by pre-calculated statistics."""
 
     def __init__(self, mean, std, eps=1e-8):
         self.mean = mean
         self.std = std
         self.eps = eps
 
+    def _normalize_mean_std(self, signal):
+        return (signal - self.mean) / (self.std + self.eps)
+
     def __call__(self, sample):
         signal = sample['signal']
 
-        sample['signal'] = (signal - self.mean) / (self.std + self.eps)
+        if isinstance(signal, (np.ndarray,)):
+            sample['signal'] = self._normalize_mean_std(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self._normalize_mean_std(s))
+            sample['signal'] = signals
+        else:
+            raise ValueError('EEGNormalizeMeanStd.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             'or list of np.ndarray')
         return sample
 
 
-class EEGAddGaussianNoise(object):
+class EEGAdditiveGaussianNoise(object):
     """Additive white Gaussian noise."""
 
     def __init__(self, mean=0.0, std=1e-2):
         self.mean = mean
         self.std = std
 
-    def __call__(self, sample):
-        signal = sample['signal']
-
+    def _add_gaussian_noise(self, signal):
         if torch.is_tensor(signal):
             noise = torch.normal(mean=torch.ones_like(signal)*self.mean,
                                  std=torch.ones_like(signal)*self.std)
         else:
             noise = np.random.normal(loc=self.mean, scale=self.std, size=signal.shape)
+        return signal + noise
 
-        sample['signal'] = signal + noise
+    def __call__(self, sample):
+        signal = sample['signal']
+
+        if isinstance(signal, (np.ndarray,)):
+            sample['signal'] = self._add_gaussian_noise(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self._add_gaussian_noise(s))
+            sample['signal'] = signals
+        else:
+            raise ValueError('EEGAddGaussianNoise.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             'or their array')
+        return sample
+
+
+class EEGMultiplicativeGaussianNoise(object):
+    """Multiplicative white Gaussian noise."""
+
+    def __init__(self, mean=0.0, std=1e-2):
+        self.mean = mean
+        self.std = std
+
+    def _add_multiplicative_gaussian_noise(self, signal):
+        if torch.is_tensor(signal):
+            noise = torch.normal(mean=torch.ones_like(signal)*self.mean,
+                                 std=torch.ones_like(signal)*self.std)
+        else:
+            noise = np.random.normal(loc=self.mean, scale=self.std, size=signal.shape)
+        return signal + (signal * noise)
+
+    def __call__(self, sample):
+        signal = sample['signal']
+
+        if isinstance(signal, (np.ndarray,)):
+            sample['signal'] = self._add_multiplicative_gaussian_noise(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self._add_multiplicative_gaussian_noise(s))
+            sample['signal'] = signals
+        else:
+            raise ValueError('EEGAddGaussianNoise.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             'or their array')
         return sample
 
 
@@ -865,36 +727,95 @@ class EEGAddGaussianNoiseAge(object):
 class EEGDropEKGChannel(object):
     """Drop the EKG channel from EEG signal."""
 
+    def _drop_ekg_channel(self, signal):
+        return np.delete(signal, 19, 0)
+
     def __call__(self, sample):
-        sample['signal'] = np.delete(sample['signal'], 19, 0)
+        signal = sample['signal']
+
+        if isinstance(signal, (np.ndarray,)):
+            sample['signal'] = self._drop_ekg_channel(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self._drop_ekg_channel(s))
+            sample['signal'] = signals
+        else:
+            raise ValueError('EEGDropEKGChannel.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             'or their array')
         return sample
 
 
 class EEGDropPhoticChannel(object):
     """Drop the photic stimulation channel from EEG signal."""
 
+    def _drop_photic_channel(self, signal):
+        return signal[:-1]
+
     def __call__(self, sample):
-        sample['signal'] = sample['signal'][:-1]
+        signal = sample['signal']
+
+        if isinstance(signal, (np.ndarray,)):
+            sample['signal'] = self._drop_photic_channel(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self._drop_photic_channel(s))
+            sample['signal'] = signals
+        else:
+            raise ValueError('EEGDropPhoticChannel.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             'or their array')
         return sample
 
 
 class EEGDropSpecificChannel(object):
     """Drop the specified channel from EEG signal."""
+
     def __init__(self, drop_channel):
         self.drop_channel = drop_channel
 
+    def drop_specific_channel(self, signal):
+        return np.delete(signal, self.drop_channel, 0)
+
     def __call__(self, sample):
-        sample['signal'] = np.delete(sample['signal'], self.drop_channel, 0)
+        signal = sample['signal']
+
+        if isinstance(signal, (np.ndarray,)):
+            sample['signal'] = self.drop_specific_channel(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self.drop_specific_channel(s))
+            sample['signal'] = signals
+        else:
+            raise ValueError('EEGDropSpecificChannel.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             'or their array')
         return sample
 
 
 class EEGToTensor(object):
     """Convert EEG numpy array in sample to Tensors."""
 
+    def _signal_to_tensor(self, signal):
+        return torch.tensor(signal, dtype=torch.float32)
+
     def __call__(self, sample):
-        sample['signal'] = torch.tensor(sample['signal'], dtype=torch.float32)
+        signal = sample['signal']
+
+        if isinstance(signal, (np.ndarray,)):
+            sample['signal'] = self._signal_to_tensor(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self._signal_to_tensor(s))
+            sample['signal'] = signals
+        else:
+            raise ValueError('EEGToTensor.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             'or their array')
+
         sample['age'] = torch.tensor(sample['age'], dtype=torch.float32)
         sample['class_label'] = torch.tensor(sample['class_label'])
+
         return sample
 
 
@@ -910,14 +831,11 @@ class EEGSpectrogram(object):
         self.complex_mode = complex_mode
         self.stft_kwargs = kwargs
 
-    def __call__(self, sample):
-        signal = sample['signal']
-
+    def _spectrogram(self, signal):
         if torch.is_tensor(signal) is False:
             raise TypeError('Before transforming the data signal as a spectrogram '
                             'it must be converted to a PyTorch Tensor object using EEGToTensor() transform.')
 
-        signal = sample['signal']
         signal_f = torch.stft(signal, n_fft=self.n_fft, return_complex=True, **self.stft_kwargs)
 
         if self.complex_mode == 'as_real':
@@ -931,7 +849,22 @@ class EEGSpectrogram(object):
         elif self.complex_mode == 'remove':
             signal_f = torch.real(signal_f)
 
-        sample['signal'] = signal_f
+        return signal_f
+
+    def __call__(self, sample):
+        signal = sample['signal']
+
+        if torch.is_tensor(signal):
+            sample['signal'] = self._spectrogram(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self._spectrogram(s))
+            sample['signal'] = signals
+        else:
+            raise ValueError('EEGSpectrogram.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             'or their array')
+
         return sample
 
 
@@ -942,15 +875,317 @@ def eeg_collate_fn(batch):
     metadata = []
 
     for sample in batch:
-        signal += [sample['signal']]
-        age += [sample['age']]
-        class_label += [sample['class_label']]
-        metadata += [sample['metadata']]
+        if isinstance(sample['signal'], (np.ndarray,)) or torch.is_tensor(sample['signal']):
+            signal += [sample['signal']]
+            age += [sample['age']]
+            class_label += [sample['class_label']]
+            metadata += [sample['metadata']]
+        elif isinstance(sample['signal'], (list,)):
+            for s in sample['signal']:
+                signal += [s]
+                age += [sample['age']]
+                class_label += [sample['class_label']]
+                metadata += [sample['metadata']]
 
-    batched_sample = {'signal': torch.stack(signal).contiguous(),
-                      'age': torch.stack(age).contiguous(),
-                      'class_label': torch.stack(class_label).contiguous(),
+    batched_sample = {'signal': torch.stack(signal),
+                      'age': torch.stack(age),
+                      'class_label': torch.stack(class_label),
                       'metadata': metadata}
     return batched_sample
 
+
+def calculate_age_statistics(config, metadata_train, verbose=False):
+    ages = np.array([m['age'] for m in metadata_train])
+    age_mean = np.mean(ages)
+    age_std = np.std(ages)
+
+    if verbose:
+        print('Age mean and standard deviation:')
+        print(age_mean, age_std)
+        print('\n' + '-' * 100 + '\n')
+
+    return age_mean, age_std
+
+
+def calculate_signal_statistics(config, metadata_train, repeats=5, verbose=False):
+    composed = transforms.Compose([EEGRandomCrop(crop_length=config['crop_length'])])
+    train_dataset = EEGDataset(config['data_path'], metadata_train, composed)
+
+    signal_means = []
+    signal_stds = []
+
+    for i in range(repeats):
+        for d in train_dataset:
+            signal_means.append(d['signal'].mean(axis=1, keepdims=True))
+            signal_stds.append(d['signal'].std(axis=1, keepdims=True))
+
+    signal_mean = np.mean(np.array(signal_means), axis=0)
+    signal_std = np.mean(np.array(signal_stds), axis=0)
+
+    if verbose:
+        print('Mean and standard deviation for signal:')
+        print(signal_mean, '\n\n', signal_std)
+        print('\n' + '-' * 100 + '\n')
+
+    return signal_mean, signal_std
+
+
+def compose_datasets(config, metadata_train, metadata_val, metadata_test, verbose=False):
+    composed_train = []
+    composed_test = []
+
+    ###############
+    # signal crop #
+    ###############
+    if config.get('evaluation_phase') is True:
+        composed_train += [EEGRandomCropDebug(crop_length=config['crop_length'])]
+        composed_test += [EEGRandomCropDebug(crop_length=config['crop_length'])]  # can remove the multiple
+    else:
+        composed_train += [EEGRandomCrop(crop_length=config['crop_length'],
+                                         multiple=config.get('crop_multiple', 1))]
+        composed_test += [EEGRandomCrop(crop_length=config['crop_length'],
+                                        multiple=config.get('crop_multiple', 1))]  # can remove the multiple
+
+    ###############################
+    # data normalization (signal) #
+    ###############################
+    if config['input_norm'] == 'dataset':
+        config['signal_mean'], config['signal_std'] = calculate_signal_statistics(config, metadata_train,
+                                                                                  repeats=5, verbose=False)
+        composed_train += [EEGNormalizeMeanStd(mean=config['signal_mean'],
+                                               std=config['signal_std'])]
+        composed_test += [EEGNormalizeMeanStd(mean=config['signal_mean'],
+                                              std=config['signal_std'])]
+    elif config['input_norm'] == 'datapoint':
+        composed_train += [EEGNormalizePerSignal()]
+        composed_test += [EEGNormalizePerSignal()]
+    elif config['input_norm'] == 'no':
+        pass
+    else:
+        raise ValueError(f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']")
+
+    ############################
+    # data normalization (age) #
+    ############################
+    config['age_mean'], config['age_std'] = calculate_age_statistics(config, metadata_train, verbose=False)
+    composed_train += [EEGNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
+    composed_test += [EEGNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
+
+    ########################
+    # usage of EEG channel #
+    ########################
+    if config['EKG'] == 'O':
+        pass
+    elif config['EKG'] == 'X':
+        composed_train += [EEGDropEKGChannel()]
+        composed_test += [EEGDropEKGChannel()]
+    else:
+        raise ValueError(f"config['EKG'] have to be set to one of ['O', 'X']")
+
+    ###########################
+    # usage of Photic channel #
+    ###########################
+    if config['photic'] == 'O':
+        pass
+    elif config['photic'] == 'X':
+        composed_train += [EEGDropPhoticChannel()]
+        composed_test += [EEGDropPhoticChannel()]
+    else:
+        raise ValueError(f"config['photic'] have to be set to one of ['O', 'X']")
+
+    #######################################################
+    # additive Gaussian noise for augmentation (signal) #
+    #######################################################
+    if config.get('evaluation_phase') is True:
+        pass
+    elif config.get('awgn') is None or config['awgn'] <= 1e-12:
+        pass
+    elif config['awgn'] > 0.0:
+        composed_train += [EEGAdditiveGaussianNoise(mean=0.0, std=config['awgn'])]
+    else:
+        raise ValueError(f"config['awgn'] have to be None or a positive floating point number")
+
+    #####################################################
+    # additive Gaussian noise for augmentation (signal) #
+    #####################################################
+    if config.get('evaluation_phase') is True:
+        pass
+    elif config.get('mgn') is None or config['mgn'] <= 1e-12:
+        pass
+    elif config['mgn'] > 0.0:
+        composed_train += [EEGMultiplicativeGaussianNoise(mean=0.0, std=config['mgn'])]
+    else:
+        raise ValueError(f"config['mgn'] have to be None or a positive floating point number")
+
+    ##################################################
+    # additive Gaussian noise for augmentation (age) #
+    ##################################################
+    if config.get('evaluation_phase') is True:
+        pass
+    elif config.get('awgn_age') is None or config['awgn_age'] <= 1e-12:
+        pass
+    elif config['awgn_age'] > 0.0:
+        composed_train += [EEGAddGaussianNoiseAge(mean=0.0, std=config['awgn_age'])]
+    else:
+        raise ValueError(f"config['awgn_age'] have to be None or a positive floating point number")
+
+    ###################
+    # numpy to tensor #
+    ###################
+    composed_train += [EEGToTensor()]
+    composed_test += [EEGToTensor()]
+
+    #################################################
+    # compose new thing for test on longer sequence #
+    #################################################
+    composed_test_longer = deepcopy(composed_test)
+    if config.get('evaluation_phase') is True:
+        composed_test_longer[0] = EEGRandomCropDebug(crop_length=config['longer_crop_length'])
+    else:
+        composed_test_longer[0] = EEGRandomCrop(crop_length=config['longer_crop_length'])
+
+    #####################
+    # transform-compose #
+    #####################
+    composed_train = transforms.Compose(composed_train)
+    composed_test = transforms.Compose(composed_test)
+    composed_test_longer = transforms.Compose(composed_test_longer)
+
+    if verbose:
+        print('composed_train:', composed_train)
+        print('\n' + '-' * 100 + '\n')
+
+        print('composed_test:', composed_test)
+        print('\n' + '-' * 100 + '\n')
+
+        print('longer_composed_test:', composed_test_longer)
+        print('\n' + '-' * 100 + '\n')
+        print()
+
+    ################################################
+    # wrap the splitted data using PyTorch Dataset #
+    ################################################
+    train_dataset = EEGDataset(config['data_path'], metadata_train, composed_train)
+    val_dataset = EEGDataset(config['data_path'], metadata_val, composed_test)
+    test_dataset = EEGDataset(config['data_path'], metadata_test, composed_test)
+    test_dataset_longer = EEGDataset(config['data_path'], metadata_test, composed_test_longer)
+
+    if verbose:
+        print('train_dataset[0]:')
+        print(train_dataset[0])
+        print('\n' + '-' * 100 + '\n')
+
+        print('val_dataset[0]:')
+        print(val_dataset[0])
+        print('\n' + '-' * 100 + '\n')
+
+        print('test_dataset[0]:')
+        print(test_dataset[0])
+        print('\n' + '-' * 100 + '\n')
+
+        print('test_dataset_longer[0]:')
+        print(test_dataset_longer[0])
+        print('\n' + '-' * 100 + '\n')
+
+    return train_dataset, val_dataset, test_dataset, test_dataset_longer
+
+
+def make_dataloader(config, train_dataset, val_dataset, test_dataset, test_dataset_longer, verbose=False):
+    if config['device'].type == 'cuda':
+        num_workers = 0  # A number other than 0 causes an error
+        pin_memory = True
+    else:
+        num_workers = 0
+        pin_memory = False
+
+    if config.get('evaluation_phase') is True:
+        batch_size = config['minibatch']
+    else:
+        batch_size = config['minibatch'] // config.get('crop_multiple', 1)
+
+    if config.get('evaluation_phase') is True:
+        train_loader = DataLoader(train_dataset,
+                                  batch_size=batch_size,
+                                  shuffle=False,
+                                  drop_last=False,
+                                  num_workers=num_workers,
+                                  pin_memory=pin_memory,
+                                  collate_fn=eeg_collate_fn)
+    else:
+        train_loader = DataLoader(train_dataset,
+                                  batch_size=batch_size,
+                                  shuffle=True,
+                                  drop_last=True,
+                                  num_workers=num_workers,
+                                  pin_memory=pin_memory,
+                                  collate_fn=eeg_collate_fn)
+
+    val_loader = DataLoader(val_dataset,
+                            batch_size=batch_size,
+                            shuffle=False,
+                            drop_last=False,
+                            num_workers=num_workers,
+                            pin_memory=pin_memory,
+                            collate_fn=eeg_collate_fn)
+
+    test_loader = DataLoader(test_dataset,
+                             batch_size=batch_size,
+                             shuffle=False,
+                             drop_last=False,
+                             num_workers=num_workers,
+                             pin_memory=pin_memory,
+                             collate_fn=eeg_collate_fn)
+
+    test_loader_longer = DataLoader(test_dataset_longer,
+                                    batch_size=batch_size // 2,  # to save the memory capacity
+                                    shuffle=False,
+                                    drop_last=False,
+                                    num_workers=num_workers,
+                                    pin_memory=pin_memory,
+                                    collate_fn=eeg_collate_fn)
+
+    if verbose:
+        for i_batch, sample_batched in enumerate(train_loader):
+            sample_batched['signal'].to(config['device'])
+            sample_batched['age'].to(config['device'])
+            sample_batched['class_label'].to(config['device'])
+
+            print(i_batch,
+                  sample_batched['signal'].shape,
+                  sample_batched['age'].shape,
+                  sample_batched['class_label'].shape,
+                  len(sample_batched['metadata']))
+
+            if i_batch > 3:
+                break
+        print('\n' + '-' * 100 + '\n')
+
+    return train_loader, val_loader, test_loader, test_loader_longer
+
+
+def build_dataset(config, verbose=False):
+    with open(config['meta_path'], 'r') as json_file:
+        metadata = json.load(json_file)
+
+    diagnosis_filter, class_label_to_type = define_target_task(config, verbose=verbose)
+
+    splitted_metadata = split_metadata(config, metadata, diagnosis_filter, verbose=verbose)
+
+    metadata_train, metadata_val, metadata_test = shuffle_splitted_metadata(config, splitted_metadata,
+                                                                            class_label_to_type, verbose=verbose)
+
+    train_dataset, val_dataset, test_dataset, test_dataset_longer = compose_datasets(config,
+                                                                                     metadata_train,
+                                                                                     metadata_val,
+                                                                                     metadata_test,
+                                                                                     verbose=verbose)
+
+    train_loader, val_loader, test_loader, test_loader_longer = make_dataloader(config,
+                                                                                train_dataset,
+                                                                                val_dataset,
+                                                                                test_dataset,
+                                                                                test_dataset_longer,
+                                                                                verbose=verbose)
+
+    return train_loader, val_loader, test_loader, test_loader_longer, class_label_to_type
 

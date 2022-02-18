@@ -5,10 +5,11 @@ matplotlib
 openpyxl
 jupyter
 jupyterlab
-torch==1.9.0+cu102
+torch
 tensorboard
 ipynbname
 wandb
 pandas
 h5py
+sklearn
 plotly

@@ -1,11 +1,12 @@
+from itertools import cycle
+
 import numpy as np
 import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc  # roc_auc_score
+from sklearn.preprocessing import label_binarize
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from sklearn.metrics import roc_curve, auc, roc_auc_score
-from sklearn.preprocessing import label_binarize
-from itertools import cycle
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 
@@ -65,6 +66,8 @@ def train_multistep(model, loader, optimizer, scheduler, config, steps):
                 y_oh = F.one_hot(y, num_classes=output.size(dim=1))
                 s = torch.sigmoid(output)
                 loss = F.binary_cross_entropy_with_logits(output, y_oh.float())
+            else:
+                raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce']")
 
             # backward and update
             loss.backward()
@@ -78,8 +81,10 @@ def train_multistep(model, loader, optimizer, scheduler, config, steps):
             cumu_loss += loss.item()
 
             i += 1
-            if steps <= i: break
-        if steps <= i: break
+            if steps <= i:
+                break
+        if steps <= i:
+            break
 
     train_acc = 100.0 * correct / total
     avg_loss = cumu_loss / steps
@@ -129,6 +134,8 @@ def train_mixup_multistep(model, loader, optimizer, scheduler, config, steps):
                 y_oh = lam * y1_oh + (1.0 - lam) * y2_oh
                 s = torch.sigmoid(output)
                 loss = F.binary_cross_entropy_with_logits(output, y_oh)
+            else:
+                raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce']")
 
             # backward and update
             loss.backward()
@@ -144,8 +151,10 @@ def train_mixup_multistep(model, loader, optimizer, scheduler, config, steps):
             cumu_loss += loss.item()
 
             i += 1
-            if steps <= i: break
-        if steps <= i: break
+            if steps <= i:
+                break
+        if steps <= i:
+            break
 
     train_acc = 100.0 * correct / total
     avg_loss = cumu_loss / steps
@@ -336,7 +345,7 @@ def draw_confusion(confusion, class_label_to_type, use_wandb=False):
 
     fig = plt.figure(num=1, clear=True, figsize=(4.0, 4.0), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
-    im = ax.imshow(confusion, alpha=0.8)
+    ax.imshow(confusion, alpha=0.8)
 
     ax.set_xticks(np.arange(C))
     ax.set_yticks(np.arange(C))
@@ -345,8 +354,8 @@ def draw_confusion(confusion, class_label_to_type, use_wandb=False):
 
     for r in range(C):
         for c in range(C):
-            text = ax.text(c, r, confusion[r, c],
-                           ha="center", va="center", color='k')
+            ax.text(c, r, confusion[r, c],
+                    ha="center", va="center", color='k')
 
     ax.set_title('Confusion Matrix')
     ax.set_xlabel('Prediction')
@@ -465,7 +474,7 @@ def draw_debug_table(debug_table, use_wandb=False):
         total_error += err
         total_count += cnt
 
-        ax.bar(edf, err / cnt, color=['g', 'b', 'r'][debug_table_gt[i]])
+        ax.bar(edf, err / cnt, color=['g', 'b', 'r'][debug_table_gt[indices[0]]])
 
     ax.set_title(f'Debug Table (Acc. {1.0 - total_error / total_count: .2f}%)', fontsize=18)
     ax.set_ylim(0.0, 1.0)
