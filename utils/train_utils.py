@@ -1,4 +1,5 @@
 from itertools import cycle
+from copy import deepcopy
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,6 +8,7 @@ from sklearn.preprocessing import label_binarize
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+
 from torch.utils.tensorboard import SummaryWriter
 import wandb
 
@@ -253,6 +255,8 @@ def check_accuracy(model, loader, config, repeat=1):
 
 def learning_rate_search(config, train_loader, min_log_lr, max_log_lr, trials, steps):
     learning_rate_record = []
+    best_accuracy = 0
+    best_model_state = None
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
@@ -264,13 +268,20 @@ def learning_rate_search(config, train_loader, min_log_lr, max_log_lr, trials, s
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=config['lr_decay_step'],
                                               gamma=config['lr_decay_gamma'])
 
-        _, train_accuracy = config['tr_ms'](model, train_loader, optimizer, scheduler, config, steps)
+        tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
+        _, train_accuracy = tr_ms(model, train_loader, optimizer, scheduler, config, steps)
 
         # Train accuracy for the final epoch is stored
         learning_rate_record.append((log_lr, train_accuracy))
 
-    best_log_lr = learning_rate_record[np.argmax(np.array([v for lr, v in learning_rate_record]))][0]
-    return 10 ** best_log_lr, learning_rate_record
+        # keep the best model
+        if best_accuracy < train_accuracy:
+            best_accuracy = train_accuracy
+            best_model_state = deepcopy(model.state_dict())
+
+    best_log_lr = learning_rate_record[np.argmax([v for lr, v in learning_rate_record])][0]
+
+    return 10 ** best_log_lr, learning_rate_record, best_model_state
 
 
 def draw_loss_plot(losses, lr_decay_step=None):
@@ -494,26 +505,27 @@ def draw_debug_table(debug_table, use_wandb=False):
 
 
 def draw_learning_rate_record(learning_rate_record, use_wandb=False):
-    plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
-
-    fig = plt.figure(num=1, clear=True, constrained_layout=True, figsize=(5.0, 5.0))
-    ax = fig.add_subplot(1, 1, 1)
-
-    ax.set_title('Learning Rate Search')
-    ax.set_xlabel('Learning rate in log-scale')
-    ax.set_ylabel('Train accuracy')
-
-    ax.scatter(*max(learning_rate_record, key=lambda x: x[1]),
-               s=150, c='w', marker='o', edgecolors='limegreen')
-
-    for log_lr, val_accuracy in learning_rate_record:
-        ax.scatter(log_lr, val_accuracy, c='r',
-                   alpha=0.5, edgecolors='none')
-
     if use_wandb:
-        wandb.log({'Learning Rate Search Plot': plt})
+        data = [[lr, v] for lr, v in learning_rate_record]
+        table = wandb.Table(data=data, columns=["learning rate (log)", "train accuracy"])
+        wandb.log({"lr_search": wandb.plot.scatter(table, "learning rate (log)", "train accuracy")})
     else:
-        plt.show()
+        plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
 
-    fig.clear()
-    plt.close(fig)
+        fig = plt.figure(num=1, clear=True, constrained_layout=True, figsize=(5.0, 5.0))
+        ax = fig.add_subplot(1, 1, 1)
+
+        ax.set_title('Learning Rate Search')
+        ax.set_xlabel('Learning rate in log-scale')
+        ax.set_ylabel('Train accuracy')
+
+        ax.scatter(*max(learning_rate_record, key=lambda x: x[1]),
+                   s=150, c='w', marker='o', edgecolors='limegreen')
+
+        for log_lr, val_accuracy in learning_rate_record:
+            ax.scatter(log_lr, val_accuracy, c='r',
+                       alpha=0.5, edgecolors='none')
+        plt.show()
+        fig.clear()
+        plt.close(fig)
+
