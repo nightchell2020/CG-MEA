@@ -119,7 +119,7 @@ class MultiLabel:
 
         elif dx1 in ['mci_ef', 'mci ef', 'mci(ef)', 'amci (ef)', 'amci(ef)', 'mci encoding failure']:
             label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_ef=True)
-        elif dx1 in ['mci encoding failure multi-domain']:
+        elif dx1 in ['mci (ef) multi-domain', 'mci encoding failure multi-domain']:
             label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_ef=True, mci_multi_domain=True)
 
         elif dx1 in ['mci_rf', 'mci rf', 'mci (rf)', 'amci rf', 'mci retrieval failure']:
@@ -136,7 +136,7 @@ class MultiLabel:
             label = MultiLabel(mci=True, mci_vascular=True, mci_non_amnestic=True)
         elif dx1 in ['vmci(ef)']:
             label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_ef=True, mci_vascular=True)
-        elif dx1 in ['vmci(rf)']:
+        elif dx1 in ['vmci(rf)', 'vascular mci (rf)']:
             label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_rf=True, mci_vascular=True)
 
         elif dx1 in ['nc', 'nl']:
