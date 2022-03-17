@@ -1,6 +1,6 @@
 numpy
 scipy
-pyedflib
+pyedflib==0.1.22
 matplotlib
 openpyxl
 jupyter
@@ -13,3 +13,5 @@ pandas
 h5py
 sklearn
 plotly
+tqdm
+pyarrow

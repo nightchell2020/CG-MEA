@@ -1,19 +1,11 @@
-/dataset/
-
-/checkpoint/
-
-/checkpoint_temp/
-
-/history/
-
-/history_temp/
+/local/
 
 /.ipynb_checkpoints/
+
+/.idea/
 
 /runs/
 
 /output/
-
-/.idea/
 
 /wandb/
