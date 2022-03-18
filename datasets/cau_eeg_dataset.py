@@ -3,7 +3,6 @@ import json
 from copy import deepcopy
 from dataclasses import dataclass, asdict
 
-import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data import Dataset

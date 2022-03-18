@@ -5,15 +5,17 @@ import json
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
-from cau_eeg_dataset import CauEegDataset
-from pipeline import EegRandomCrop, EegRandomCropDebug
-from pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
-from pipeline import EegNormalizeAge
-from pipeline import EegDropEKGChannel, EegDropPhoticChannel
-from pipeline import EegAdditiveGaussianNoise, EegMultiplicativeGaussianNoise
-from pipeline import EegAddGaussianNoiseAge
-from pipeline import EegToTensor
-from pipeline import eeg_collate_fn
+from .cau_eeg_dataset import CauEegDataset
+from .pipeline import EegRandomCrop, EegRandomCropDebug
+from .pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
+from .pipeline import EegNormalizeAge
+from .pipeline import EegDropEKGChannel, EegDropPhoticChannel
+from .pipeline import EegAdditiveGaussianNoise, EegMultiplicativeGaussianNoise
+from .pipeline import EegAddGaussianNoiseAge
+from .pipeline import EegToTensor
+from .pipeline import eeg_collate_fn
+
+# __all__ = []
 
 
 def define_target_task(config, verbose=False):

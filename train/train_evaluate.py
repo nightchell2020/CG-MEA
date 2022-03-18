@@ -4,6 +4,8 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 
+# __all__ = ['train_multistep', 'train_mixup_multistep', 'calculate_confusion_matrix',
+#            'check_accuracy', 'learning_rate_search', ]
 
 def train_multistep(model, loader, optimizer, scheduler, config, steps):
     model.train()
