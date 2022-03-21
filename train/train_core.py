@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+import time
 
 # __all__ = []
 
@@ -14,16 +15,24 @@ def train_multistep(model, loader, optimizer, scheduler, config, steps):
     correct, total = (0, 0)
 
     while True:
+        timers = [time.time()]
         for sample_batched in loader:
+            timers.clear()
+            print([timers[ii] - timers[ii - 1] for ii in range(len(timers) - 1)])
+            timers.append(time.time())
+
             optimizer.zero_grad()
+            timers.append(time.time())
 
             # load the mini-batched data
             x = sample_batched['signal'].to(device)
             age = sample_batched['age'].to(device)
             y = sample_batched['class_label'].to(device)
+            timers.append(time.time())
 
             # forward pass
             output = model(x, age)
+            timers.append(time.time())
 
             # loss function
             if config['criterion'] == 'cross-entropy':
@@ -35,17 +44,22 @@ def train_multistep(model, loader, optimizer, scheduler, config, steps):
                 loss = F.binary_cross_entropy_with_logits(output, y_oh.float())
             else:
                 raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce']")
+            timers.append(time.time())
 
             # backward and update
             loss.backward()
+            timers.append(time.time())
             optimizer.step()
+            timers.append(time.time())
             scheduler.step()
+            timers.append(time.time())
 
             # train accuracy
             pred = s.argmax(dim=-1)
             correct += pred.squeeze().eq(y).sum().item()
             total += pred.shape[0]
             cumu_loss += loss.item()
+            timers.append(time.time())
 
             i += 1
             if steps <= i:
