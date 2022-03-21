@@ -213,8 +213,8 @@ class ResNet2D(nn.Module):
             in_channels *= 2
         in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
 
-        self.conv1 = nn.Conv2d(in_channels, self.current_channels, kernel_size=7,
-                               stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(in_channels, self.current_channels, kernel_size=(7, 7),
+                               stride=(2, 2), padding=3, bias=False)
         self.bn1 = norm_layer(self.current_channels)
         self.act1 = self.nn_act()
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)

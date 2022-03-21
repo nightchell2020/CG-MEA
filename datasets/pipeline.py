@@ -394,7 +394,8 @@ class EegAddGaussianNoiseAge(object):
 class EegDropEKGChannel(object):
     """Drop the EKG channel from EEG signal."""
 
-    def _drop_ekg_channel(self, signal):
+    @staticmethod
+    def _drop_ekg_channel(signal):
         return np.delete(signal, 19, 0)
 
     def __call__(self, sample):
@@ -416,7 +417,8 @@ class EegDropEKGChannel(object):
 class EegDropPhoticChannel(object):
     """Drop the photic stimulation channel from EEG signal."""
 
-    def _drop_photic_channel(self, signal):
+    @staticmethod
+    def _drop_photic_channel(signal):
         return signal[:-1]
 
     def __call__(self, sample):
@@ -463,7 +465,8 @@ class EegDropSpecificChannel(object):
 class EegToTensor(object):
     """Convert EEG numpy array in sample to Tensors."""
 
-    def _signal_to_tensor(self, signal):
+    @staticmethod
+    def _signal_to_tensor(signal):
         return torch.tensor(signal, dtype=torch.float32)
 
     def __call__(self, sample):

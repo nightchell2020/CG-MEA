@@ -191,12 +191,12 @@ def compose_datasets(config, metadata_train, metadata_val, metadata_test, verbos
     ###############
     if config.get('evaluation_phase') is True:
         composed_train += [EegRandomCropDebug(crop_length=config['crop_length'])]
-        composed_test += [EegRandomCropDebug(crop_length=config['crop_length'])]  # can remove the multiple
+        composed_test += [EegRandomCropDebug(crop_length=config['crop_length'])]
     else:
         composed_train += [EegRandomCrop(crop_length=config['crop_length'],
                                          multiple=config.get('crop_multiple', 1))]
         composed_test += [EegRandomCrop(crop_length=config['crop_length'],
-                                        multiple=config.get('crop_multiple', 1))]  # can remove the multiple
+                                        multiple=config.get('crop_multiple', 1))]  # can add or remove the multiple
 
     ###############################
     # data normalization (signal) #
