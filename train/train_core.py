@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from .utils import TimeElapsed
+# from .utils import TimeElapsed
 
 # __all__ = []
 
@@ -15,23 +15,17 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, config, ste
     correct, total = (0, 0)
 
     while True:
-        te = TimeElapsed()
         for sample_batched in loader:
-            print(te.elapsed_str())
-
             optimizer.zero_grad()
-            print(te.elapsed_str())
 
             # preprocessing (this includes to-device operation)
             preprocess(sample_batched)
-            print(te.elapsed_str())
 
             # forward pass
             x = sample_batched['signal']
             age = sample_batched['age']
             y = sample_batched['class_label']
             output = model(x, age)
-            print(te.elapsed_str())
 
             # loss function
             if config['criterion'] == 'cross-entropy':
@@ -43,29 +37,21 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, config, ste
                 loss = F.binary_cross_entropy_with_logits(output, y_oh.float())
             else:
                 raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce']")
-            print(te.elapsed_str())
 
             # backward and update
             loss.backward()
-            print(te.elapsed_str())
             optimizer.step()
-            print(te.elapsed_str())
             scheduler.step()
-            print(te.elapsed_str())
 
             # train accuracy
             pred = s.argmax(dim=-1)
             correct += pred.squeeze().eq(y).sum().item()
             total += pred.shape[0]
             cumu_loss += loss.item()
-            print(te.elapsed_str())
-            print()
 
             i += 1
             if steps <= i:
                 break
-        print(te.elapsed_str())
-        print('-' * 70)
         if steps <= i:
             break
 
