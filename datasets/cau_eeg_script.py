@@ -404,7 +404,7 @@ def warp_dataset(config, metadata_train, metadata_val, metadata_test,
         pprint.pprint(test_dataset_longer[0].keys(), compact=True)
         print('\n' + '-' * 100 + '\n')
 
-        return train_dataset, val_dataset, test_dataset, test_dataset_longer
+    return train_dataset, val_dataset, test_dataset, test_dataset_longer
 
 
 def make_dataloader(config, train_dataset, val_dataset, test_dataset, test_dataset_longer, verbose=False):
