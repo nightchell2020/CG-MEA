@@ -2,6 +2,8 @@ from copy import deepcopy
 import numpy as np
 import random
 import json
+import pprint
+import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
 
@@ -12,7 +14,7 @@ from .pipeline import EegNormalizeAge
 from .pipeline import EegDropEKGChannel, EegDropPhoticChannel
 from .pipeline import EegAdditiveGaussianNoise, EegMultiplicativeGaussianNoise
 from .pipeline import EegAddGaussianNoiseAge
-from .pipeline import EegToTensor
+from .pipeline import EegToTensor, EegToDevice
 from .pipeline import eeg_collate_fn
 
 # __all__ = []
@@ -145,10 +147,18 @@ def shuffle_splitted_metadata(config, splitted_metadata, class_label_to_type, ve
     return metadata_train, metadata_val, metadata_test
 
 
-def calculate_age_statistics(config, metadata_train, verbose=False):
-    ages = np.array([m['age'] for m in metadata_train])
-    age_mean = np.mean(ages)
-    age_std = np.std(ages)
+def calculate_age_statistics(config, train_loader, verbose=False):
+    age_means = []
+    age_stds = []
+
+    for sample in train_loader:
+        age = sample['age']
+        std, mean = torch.std_mean(age, dim=-1, keepdims=True)
+        age_means.append(mean)
+        age_stds.append(std)
+
+    age_mean = torch.cat(age_means, dim=0).mean(dim=0, keepdims=True)
+    age_std = torch.cat(age_stds, dim=0).mean(dim=0, keepdims=True)
 
     if verbose:
         print('Age mean and standard deviation:')
@@ -158,21 +168,19 @@ def calculate_age_statistics(config, metadata_train, verbose=False):
     return age_mean, age_std
 
 
-def calculate_signal_statistics(config, metadata_train, repeats=5, verbose=False):
-    composed = transforms.Compose([EegRandomCrop(crop_length=config['crop_length'])])
-    train_dataset = CauEegDataset(config['data_path'], metadata_train,
-                                  config.get('load_event', False), composed)
-
+def calculate_signal_statistics(config, train_loader, repeats=5, verbose=False):
     signal_means = []
     signal_stds = []
 
     for i in range(repeats):
-        for d in train_dataset:
-            signal_means.append(d['signal'].mean(axis=1, keepdims=True))
-            signal_stds.append(d['signal'].std(axis=1, keepdims=True))
+        for sample in train_loader:
+            signal = sample['signal']
+            std, mean = torch.std_mean(signal, dim=-1, keepdims=True)  # [N, C, 1]
+            signal_means.append(mean)
+            signal_stds.append(std)
 
-    signal_mean = np.mean(np.array(signal_means), axis=0)
-    signal_std = np.mean(np.array(signal_stds), axis=0)
+    signal_mean = torch.cat(signal_means, dim=0).mean(dim=0, keepdims=True)  # [B, C, 1] --> [1, C, 1]
+    signal_std = torch.cat(signal_stds, dim=0).mean(dim=0, keepdims=True)
 
     if verbose:
         print('Mean and standard deviation for signal:')
@@ -182,46 +190,9 @@ def calculate_signal_statistics(config, metadata_train, repeats=5, verbose=False
     return signal_mean, signal_std
 
 
-def compose_datasets(config, metadata_train, metadata_val, metadata_test, verbose=False):
+def compose_transforms(config, verbose=False):
     composed_train = []
     composed_test = []
-
-    ###############
-    # signal crop #
-    ###############
-    if config.get('evaluation_phase') is True:
-        composed_train += [EegRandomCropDebug(crop_length=config['crop_length'])]
-        composed_test += [EegRandomCropDebug(crop_length=config['crop_length'])]
-    else:
-        composed_train += [EegRandomCrop(crop_length=config['crop_length'],
-                                         multiple=config.get('crop_multiple', 1))]
-        composed_test += [EegRandomCrop(crop_length=config['crop_length'],
-                                        multiple=config.get('crop_multiple', 1))]  # can add or remove the multiple
-
-    ###############################
-    # data normalization (signal) #
-    ###############################
-    if config['input_norm'] == 'dataset':
-        config['signal_mean'], config['signal_std'] = calculate_signal_statistics(config, metadata_train,
-                                                                                  repeats=5, verbose=False)
-        composed_train += [EegNormalizeMeanStd(mean=config['signal_mean'],
-                                               std=config['signal_std'])]
-        composed_test += [EegNormalizeMeanStd(mean=config['signal_mean'],
-                                              std=config['signal_std'])]
-    elif config['input_norm'] == 'datapoint':
-        composed_train += [EegNormalizePerSignal()]
-        composed_test += [EegNormalizePerSignal()]
-    elif config['input_norm'] == 'no':
-        pass
-    else:
-        raise ValueError(f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']")
-
-    ############################
-    # data normalization (age) #
-    ############################
-    config['age_mean'], config['age_std'] = calculate_age_statistics(config, metadata_train, verbose=False)
-    composed_train += [EegNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
-    composed_test += [EegNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
 
     ########################
     # usage of EEG channel #
@@ -245,41 +216,17 @@ def compose_datasets(config, metadata_train, metadata_val, metadata_test, verbos
     else:
         raise ValueError(f"config['photic'] have to be set to one of ['O', 'X']")
 
-    #######################################################
-    # additive Gaussian noise for augmentation (signal) #
-    #######################################################
+    ###############
+    # signal crop #
+    ###############
     if config.get('evaluation_phase') is True:
-        pass
-    elif config.get('awgn') is None or config['awgn'] <= 1e-12:
-        pass
-    elif config['awgn'] > 0.0:
-        composed_train += [EegAdditiveGaussianNoise(mean=0.0, std=config['awgn'])]
+        composed_train += [EegRandomCropDebug(crop_length=config['crop_length'])]
+        composed_test += [EegRandomCropDebug(crop_length=config['crop_length'])]
     else:
-        raise ValueError(f"config['awgn'] have to be None or a positive floating point number")
-
-    #####################################################
-    # additive Gaussian noise for augmentation (signal) #
-    #####################################################
-    if config.get('evaluation_phase') is True:
-        pass
-    elif config.get('mgn') is None or config['mgn'] <= 1e-12:
-        pass
-    elif config['mgn'] > 0.0:
-        composed_train += [EegMultiplicativeGaussianNoise(mean=0.0, std=config['mgn'])]
-    else:
-        raise ValueError(f"config['mgn'] have to be None or a positive floating point number")
-
-    ##################################################
-    # additive Gaussian noise for augmentation (age) #
-    ##################################################
-    if config.get('evaluation_phase') is True:
-        pass
-    elif config.get('awgn_age') is None or config['awgn_age'] <= 1e-12:
-        pass
-    elif config['awgn_age'] > 0.0:
-        composed_train += [EegAddGaussianNoiseAge(mean=0.0, std=config['awgn_age'])]
-    else:
-        raise ValueError(f"config['awgn_age'] have to be None or a positive floating point number")
+        composed_train += [EegRandomCrop(crop_length=config['crop_length'],
+                                         multiple=config.get('crop_multiple', 1))]
+        composed_test += [EegRandomCrop(crop_length=config['crop_length'],
+                                        multiple=config.get('crop_multiple', 1))]  # can add or remove the multiple
 
     ###################
     # numpy to tensor #
@@ -299,6 +246,10 @@ def compose_datasets(config, metadata_train, metadata_val, metadata_test, verbos
     #####################
     # transform-compose #
     #####################
+    # composed_train = [TransformTimeChecker(t, '', '>50') for t in composed_train]
+    # composed_test = [TransformTimeChecker(t, '', '>50') for t in composed_test]
+    # composed_test_longer = [TransformTimeChecker(t, '', '>50') for t in composed_test_longer]
+
     composed_train = transforms.Compose(composed_train)
     composed_test = transforms.Compose(composed_test)
     composed_test_longer = transforms.Compose(composed_test_longer)
@@ -314,36 +265,146 @@ def compose_datasets(config, metadata_train, metadata_val, metadata_test, verbos
         print('\n' + '-' * 100 + '\n')
         print()
 
-    ################################################
-    # wrap the splitted data using PyTorch Dataset #
-    ################################################
-    train_dataset = CauEegDataset(config['data_path'], metadata_train,
-                                  config.get('load_event', False), composed_train)
-    val_dataset = CauEegDataset(config['data_path'], metadata_val,
-                                config.get('load_event', False), composed_test)
-    test_dataset = CauEegDataset(config['data_path'], metadata_test,
-                                 config.get('load_event', False), composed_test)
-    test_dataset_longer = CauEegDataset(config['data_path'], metadata_test,
-                                        config.get('load_event', False), composed_test_longer)
+    return composed_train, composed_test, composed_test_longer
+
+
+def compose_preprocess(config, train_loader, verbose=True):
+    preprocess_train = []
+    preprocess_test = []
+
+    #############
+    # to device #
+    #############
+    preprocess_train += [EegToDevice(device=config['device'])]
+    preprocess_test += [EegToDevice(device=config['device'])]
+
+    ###############################
+    # data normalization (signal) #
+    ###############################
+    if config['input_norm'] == 'dataset':
+        config['signal_mean'], config['signal_std'] = calculate_signal_statistics(config, train_loader,
+                                                                                  repeats=5, verbose=False)
+        preprocess_train += [EegNormalizeMeanStd(mean=config['signal_mean'],
+                                                 std=config['signal_std'])]
+        preprocess_test += [EegNormalizeMeanStd(mean=config['signal_mean'],
+                                                std=config['signal_std'])]
+    elif config['input_norm'] == 'datapoint':
+        preprocess_train += [EegNormalizePerSignal()]
+        preprocess_test += [EegNormalizePerSignal()]
+    elif config['input_norm'] == 'no':
+        pass
+    else:
+        raise ValueError(f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']")
+
+    ############################
+    # data normalization (age) #
+    ############################
+    config['age_mean'], config['age_std'] = calculate_age_statistics(config, train_loader, verbose=False)
+    preprocess_train += [EegNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
+    preprocess_test += [EegNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
+
+    #######################################################
+    # additive Gaussian noise for augmentation (signal) #
+    #######################################################
+    if config.get('evaluation_phase') is True:
+        pass
+    elif config.get('awgn') is None or config['awgn'] <= 1e-12:
+        pass
+    elif config['awgn'] > 0.0:
+        preprocess_train += [EegAdditiveGaussianNoise(mean=0.0, std=config['awgn'])]
+    else:
+        raise ValueError(f"config['awgn'] have to be None or a positive floating point number")
+
+    ###########################################################
+    # multiplicative Gaussian noise for augmentation (signal) #
+    ###########################################################
+    if config.get('evaluation_phase') is True:
+        pass
+    elif config.get('mgn') is None or config['mgn'] <= 1e-12:
+        pass
+    elif config['mgn'] > 0.0:
+        preprocess_train += [EegMultiplicativeGaussianNoise(mean=0.0, std=config['mgn'])]
+    else:
+        raise ValueError(f"config['mgn'] have to be None or a positive floating point number")
+
+    ##################################################
+    # additive Gaussian noise for augmentation (age) #
+    ##################################################
+    if config.get('evaluation_phase') is True:
+        pass
+    elif config.get('awgn_age') is None or config['awgn_age'] <= 1e-12:
+        pass
+    elif config['awgn_age'] > 0.0:
+        preprocess_train += [EegAddGaussianNoiseAge(mean=0.0, std=config['awgn_age'])]
+    else:
+        raise ValueError(f"config['awgn_age'] have to be None or a positive floating point number")
+
+    #######################
+    # Compose All at Once #
+    #######################
+    preprocess_train = transforms.Compose(preprocess_train)
+    preprocess_train = torch.nn.Sequential(*preprocess_train.transforms)
+
+    preprocess_test = transforms.Compose(preprocess_test)
+    preprocess_test = torch.nn.Sequential(*preprocess_test.transforms)
 
     if verbose:
-        print('train_dataset[0]:')
-        print(train_dataset[0])
+        print('preprocess_train:', preprocess_train)
         print('\n' + '-' * 100 + '\n')
 
-        print('val_dataset[0]:')
-        print(val_dataset[0])
+        print('preprocess_test:', preprocess_test)
         print('\n' + '-' * 100 + '\n')
 
-        print('test_dataset[0]:')
-        print(test_dataset[0])
+    return preprocess_train, preprocess_test
+
+
+def warp_dataset(config, metadata_train, metadata_val, metadata_test,
+                 composed_train, composed_test, composed_test_longer, verbose=False):
+    #######################################
+    # wrap the data using PyTorch Dataset #
+    #######################################
+    train_dataset = CauEegDataset(config['data_path'],
+                                  metadata_train,
+                                  config.get('load_event', False),
+                                  config.get('file_format', 'memmap'),
+                                  composed_train)
+    val_dataset = CauEegDataset(config['data_path'],
+                                metadata_val,
+                                config.get('load_event', False),
+                                config.get('file_format', 'memmap'),
+                                composed_test)
+    test_dataset = CauEegDataset(config['data_path'],
+                                 metadata_test,
+                                 config.get('load_event', False),
+                                 config.get('file_format', 'memmap'),
+                                 composed_test)
+    test_dataset_longer = CauEegDataset(config['data_path'],
+                                        metadata_test,
+                                        config.get('load_event', False),
+                                        config.get('file_format', 'memmap'),
+                                        composed_test_longer)
+
+    if verbose:
+        print('train_dataset[0].keys():')
+        pprint.pprint(train_dataset[0].keys(), compact=True)
+        print('train_dataset[0]["signal"]:')
+        pprint.pprint(train_dataset[0]['signal'], compact=True)
+        print()
         print('\n' + '-' * 100 + '\n')
 
-        print('test_dataset_longer[0]:')
-        print(test_dataset_longer[0])
+        print('val_dataset[0].keys():')
+        pprint.pprint(val_dataset[0].keys(), compact=True)
         print('\n' + '-' * 100 + '\n')
 
-    return train_dataset, val_dataset, test_dataset, test_dataset_longer
+        print('test_dataset[0].keys():')
+        pprint.pprint(test_dataset[0].keys(), compact=True)
+        print('\n' + '-' * 100 + '\n')
+
+        print('test_dataset_longer[0].keys():')
+        pprint.pprint(test_dataset_longer[0].keys(), compact=True)
+        print('\n' + '-' * 100 + '\n')
+
+        return train_dataset, val_dataset, test_dataset, test_dataset_longer
 
 
 def make_dataloader(config, train_dataset, val_dataset, test_dataset, test_dataset_longer, verbose=False):
@@ -401,10 +462,67 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, test_datas
                                     collate_fn=eeg_collate_fn)
 
     if verbose:
+        print('train_loader:')
+        print(train_loader)
+        print('\n' + '-' * 100 + '\n')
+
+        print('val_loader:')
+        print(val_loader)
+        print('\n' + '-' * 100 + '\n')
+
+        print('test_loader:')
+        print(test_loader)
+        print('\n' + '-' * 100 + '\n')
+
+        print('test_loader_longer:')
+        print(test_loader_longer)
+        print('\n' + '-' * 100 + '\n')
+
+    return train_loader, val_loader, test_loader, test_loader_longer
+
+
+def build_dataset(config, verbose=False):
+    with open(config['meta_path'], 'r') as json_file:
+        metadata = json.load(json_file)
+
+    diagnosis_filter, class_label_to_type = define_target_task(config,
+                                                               verbose=verbose)
+
+    splitted_metadata = split_metadata(config,
+                                       metadata,
+                                       diagnosis_filter,
+                                       verbose=verbose)
+
+    metadata_train, metadata_val, metadata_test = shuffle_splitted_metadata(config,
+                                                                            splitted_metadata,
+                                                                            class_label_to_type,
+                                                                            verbose=verbose)
+
+    composed_train, composed_test, composed_test_longer = compose_transforms(config,
+                                                                             verbose=verbose)
+
+    train_dataset, val_dataset, test_dataset, test_dataset_longer = warp_dataset(config,
+                                                                                 metadata_train,
+                                                                                 metadata_val,
+                                                                                 metadata_test,
+                                                                                 composed_train,
+                                                                                 composed_test,
+                                                                                 composed_test_longer,
+                                                                                 verbose=verbose)
+
+    train_loader, val_loader, test_loader, test_loader_longer = make_dataloader(config,
+                                                                                train_dataset,
+                                                                                val_dataset,
+                                                                                test_dataset,
+                                                                                test_dataset_longer,
+                                                                                verbose=verbose)
+
+    preprocess_train, preprocess_test = compose_preprocess(config, train_loader, verbose=verbose)
+
+    if verbose:
         for i_batch, sample_batched in enumerate(train_loader):
-            sample_batched['signal'].to(config['device'])
-            sample_batched['age'].to(config['device'])
-            sample_batched['class_label'].to(config['device'])
+            # preprocessing includes to-device operation
+            preprocess_train(sample_batched)
 
             print(i_batch,
                   sample_batched['signal'].shape,
@@ -416,31 +534,5 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, test_datas
                 break
         print('\n' + '-' * 100 + '\n')
 
-    return train_loader, val_loader, test_loader, test_loader_longer
-
-
-def build_dataset(config, verbose=False):
-    with open(config['meta_path'], 'r') as json_file:
-        metadata = json.load(json_file)
-
-    diagnosis_filter, class_label_to_type = define_target_task(config, verbose=verbose)
-
-    splitted_metadata = split_metadata(config, metadata, diagnosis_filter, verbose=verbose)
-
-    metadata_train, metadata_val, metadata_test = shuffle_splitted_metadata(config, splitted_metadata,
-                                                                            class_label_to_type, verbose=verbose)
-
-    train_dataset, val_dataset, test_dataset, test_dataset_longer = compose_datasets(config,
-                                                                                     metadata_train,
-                                                                                     metadata_val,
-                                                                                     metadata_test,
-                                                                                     verbose=verbose)
-
-    train_loader, val_loader, test_loader, test_loader_longer = make_dataloader(config,
-                                                                                train_dataset,
-                                                                                val_dataset,
-                                                                                test_dataset,
-                                                                                test_dataset_longer,
-                                                                                verbose=verbose)
-
-    return train_loader, val_loader, test_loader, test_loader_longer, class_label_to_type
+    return [train_loader, val_loader, test_loader, test_loader_longer,
+            preprocess_train, preprocess_test, class_label_to_type]

@@ -17,9 +17,9 @@ def calculate_confusion_matrix(pred, target, num_classes):
     return confusion
 
 
-def check_accuracy(model, loader, config, repeat=1):
+@torch.no_grad()
+def check_accuracy(model, loader, preprocess, config, repeat=1):
     model.eval()
-    device = config['device']
 
     # for accuracy
     correct, total = (0, 0)
@@ -40,12 +40,13 @@ def check_accuracy(model, loader, config, repeat=1):
     with torch.no_grad():
         for k in range(repeat):
             for sample_batched in loader:
-                # pull up the data
-                x = sample_batched['signal'].to(device)
-                age = sample_batched['age'].to(device)
-                y = sample_batched['class_label'].to(device)
+                # preprocessing (this includes to-device operation)
+                preprocess(sample_batched)
 
                 # apply model on whole batch directly on device
+                x = sample_batched['signal']
+                age = sample_batched['age']
+                y = sample_batched['class_label']
                 output = model(x, age)
 
                 if config['criterion'] == 'cross-entropy':

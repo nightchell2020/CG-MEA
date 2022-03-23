@@ -1,38 +1,37 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-import time
+
+from .utils import TimeElapsed
 
 # __all__ = []
 
 
-def train_multistep(model, loader, optimizer, scheduler, config, steps):
+def train_multistep(model, loader, preprocess, optimizer, scheduler, config, steps):
     model.train()
-    device = config['device']
 
     i = 0
     cumu_loss = 0
     correct, total = (0, 0)
 
     while True:
-        timers = [time.time()]
+        te = TimeElapsed()
         for sample_batched in loader:
-            timers.clear()
-            print([timers[ii] - timers[ii - 1] for ii in range(len(timers) - 1)])
-            timers.append(time.time())
+            print(te.elapsed_str())
 
             optimizer.zero_grad()
-            timers.append(time.time())
+            print(te.elapsed_str())
 
-            # load the mini-batched data
-            x = sample_batched['signal'].to(device)
-            age = sample_batched['age'].to(device)
-            y = sample_batched['class_label'].to(device)
-            timers.append(time.time())
+            # preprocessing (this includes to-device operation)
+            preprocess(sample_batched)
+            print(te.elapsed_str())
 
             # forward pass
+            x = sample_batched['signal']
+            age = sample_batched['age']
+            y = sample_batched['class_label']
             output = model(x, age)
-            timers.append(time.time())
+            print(te.elapsed_str())
 
             # loss function
             if config['criterion'] == 'cross-entropy':
@@ -44,26 +43,29 @@ def train_multistep(model, loader, optimizer, scheduler, config, steps):
                 loss = F.binary_cross_entropy_with_logits(output, y_oh.float())
             else:
                 raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce']")
-            timers.append(time.time())
+            print(te.elapsed_str())
 
             # backward and update
             loss.backward()
-            timers.append(time.time())
+            print(te.elapsed_str())
             optimizer.step()
-            timers.append(time.time())
+            print(te.elapsed_str())
             scheduler.step()
-            timers.append(time.time())
+            print(te.elapsed_str())
 
             # train accuracy
             pred = s.argmax(dim=-1)
             correct += pred.squeeze().eq(y).sum().item()
             total += pred.shape[0]
             cumu_loss += loss.item()
-            timers.append(time.time())
+            print(te.elapsed_str())
+            print()
 
             i += 1
             if steps <= i:
                 break
+        print(te.elapsed_str())
+        print('-' * 70)
         if steps <= i:
             break
 
@@ -73,9 +75,8 @@ def train_multistep(model, loader, optimizer, scheduler, config, steps):
     return avg_loss, train_acc
 
 
-def train_mixup_multistep(model, loader, optimizer, scheduler, config, steps):
+def train_mixup_multistep(model, loader, preprocess, optimizer, scheduler, config, steps):
     model.train()
-    device = config['device']
 
     i = 0
     cumu_loss = 0
@@ -85,10 +86,13 @@ def train_mixup_multistep(model, loader, optimizer, scheduler, config, steps):
         for sample_batched in loader:
             optimizer.zero_grad()
 
+            # preprocessing (this includes to-device operation)
+            preprocess(sample_batched)
+
             # load and mixup the mini-batched data
-            x1 = sample_batched['signal'].to(device)
-            age1 = sample_batched['age'].to(device)
-            y1 = sample_batched['class_label'].to(device)
+            x1 = sample_batched['signal']
+            age1 = sample_batched['age']
+            y1 = sample_batched['class_label']
 
             index = torch.randperm(x1.shape[0]).cuda()
             x2 = x1[index]

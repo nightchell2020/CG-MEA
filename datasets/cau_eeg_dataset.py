@@ -3,7 +3,9 @@ import json
 from copy import deepcopy
 from dataclasses import dataclass, asdict
 
+import numpy as np
 import pandas as pd
+import pyarrow.feather as feather
 import torch
 from torch.utils.data import Dataset
 
@@ -189,13 +191,19 @@ class CauEegDataset(Dataset):
         root_dir (str): Root path to the EDF data files.
         metadata (list of dict): List of dictionary with metadata.
         load_event (bool): Determines whether to load event information or not for saving loading time.
+        file_format (str): Determines which file format is used among PyArrow Feather and NumPy memmap.
         transform (callable): Optional transform to be applied on each data.
     """
 
-    def __init__(self, root_dir, metadata, load_event, transform):
+    def __init__(self, root_dir, metadata, load_event, file_format='feather', transform=None):
+        if file_format not in ['feather', 'memmap']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(file_format) "
+                             f"must be set to one of 'feather' and 'memmap'")
+
         self.root_dir = root_dir
         self.metadata = metadata
         self.load_event = load_event
+        self.file_format = file_format
         self.transform = transform
 
     def __len__(self):
@@ -209,16 +217,14 @@ class CauEegDataset(Dataset):
         m = deepcopy(self.metadata[idx])
 
         # signal
-        fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.feather')
-        df = pd.read_feather(fname)
-        m['channel'] = df.columns.to_list()
-        signal = df.to_numpy().T
+        if self.file_format == 'feather':
+            signal = self.read_feather(m)
+        else:
+            signal = self.read_memmap(m)
 
         # event
         if self.load_event:
-            fname = os.path.join(self.root_dir, 'event', m['serial'] + '.json')
-            with open(fname, 'r') as json_file:
-                m['event'] = json.load(json_file)
+            m['event'] = self.read_event(m)
 
         # pack into dictionary
         sample = {'signal': signal,
@@ -231,3 +237,42 @@ class CauEegDataset(Dataset):
 
         return sample
 
+    def read_feather(self, m):
+        fname = os.path.join(self.root_dir, 'signal/feather', m['serial'] + '.feather')
+        signal = feather.read_feather(fname).values.T
+        # m['channel'] = df.columns.to_list()
+        return signal
+
+    def read_memmap(self, m):
+        fname = os.path.join(self.root_dir, 'signal/memmap', m['serial'] + '.dat')
+        signal = np.memmap(fname, dtype='int32', mode='r').reshape(21, -1)
+        return signal
+
+    # def read_np(self, m):
+    #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.npy')
+    #     return np.load(fname)
+    #
+    # def read_hdf5(self, m):
+    #     return self.f_handle[m['serial']][:]
+    #
+    # def read_jay(self, m):
+    #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.jay')
+    #     signal = dt.fread(fname).to_numpy().T
+    #     return signal
+    #
+    # def read_parquet(self, m):
+    #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.parquet')
+    #     signal = pd.read_parquet(fname).values.T
+    #     return signal
+
+    def read_event(self, m):
+        fname = os.path.join(self.root_dir, 'event', m['serial'] + '.json')
+        with open(fname, 'r') as json_file:
+            event = json.load(json_file)
+        return event
+
+    def get_data_frame(self, idx=0):
+        m = self.metadata[idx]
+        fname = os.path.join(self.root_dir, 'signal/feather', m['serial'] + '.feather')
+        df = pd.read_feather(fname)
+        return df

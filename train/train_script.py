@@ -1,6 +1,5 @@
 import os
 from copy import deepcopy
-import math
 import numpy as np
 import torch
 import torch.optim as optim
@@ -15,7 +14,7 @@ from .visualize import draw_roc_curve, draw_confusion, draw_debug_table
 # __all__ = []
 
 
-def learning_rate_search(config, train_loader, trials, steps):
+def learning_rate_search(config, train_loader, preprocess, trials, steps):
     learning_rate_record = []
     best_accuracy = 0
     best_model_state = None
@@ -36,7 +35,7 @@ def learning_rate_search(config, train_loader, trials, steps):
                                               gamma=config['lr_decay_gamma'])
 
         tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
-        _, train_accuracy = tr_ms(model, train_loader, optimizer, scheduler, config, steps)
+        _, train_accuracy = tr_ms(model, train_loader, preprocess, optimizer, scheduler, config, steps)
 
         # Train accuracy for the final epoch is stored
         learning_rate_record.append((log_lr, train_accuracy))
@@ -51,7 +50,8 @@ def learning_rate_search(config, train_loader, trials, steps):
     return 10 ** best_log_lr, learning_rate_record, best_model_state
 
 
-def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_longer, class_label_to_type):
+def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_longer,
+                     preprocess_train, preprocess_test, class_label_to_type):
     print('*' * 120)
     print(f'{"*" * 30}{config["model"] + " train starts":^60}{"*" * 30}')
     print('*' * 120)
@@ -59,7 +59,9 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     # search an appropriate starting learning rate if needed
     model_state = None
     if config["LR"] is None:
-        config['LR'], lr_search, model_state = learning_rate_search(config, train_loader,
+        config['LR'], lr_search, model_state = learning_rate_search(config=config,
+                                                                    train_loader=train_loader,
+                                                                    preprocess=preprocess_train,
                                                                     trials=100, steps=100)
         wandb.config.LR = config['LR']
         draw_learning_rate_record(lr_search, use_wandb=True)
@@ -89,12 +91,18 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     best_model_state = deepcopy(model.state_dict())
     for i in range(0, config["iterations"], config["history_interval"]):
         # train 'history_interval' steps
-        loss, train_acc = tr_ms(model, train_loader, optimizer, scheduler,
-                                config, config["history_interval"])
+        loss, train_acc = tr_ms(model=model,
+                                loader=train_loader,
+                                preprocess=preprocess_train,
+                                optimizer=optimizer,
+                                scheduler=scheduler, config=config,
+                                steps=config["history_interval"])
 
         # validation
-        val_acc, _, _, _, _ = check_accuracy(model, val_loader, config,
-                                             repeat=max(1, math.ceil(10 / config['crop_multiple'])))
+        val_acc, _, _, _, _ = check_accuracy(model=model,
+                                             loader=val_loader,
+                                             preprocess=preprocess_test,
+                                             config=config, repeat=10)
 
         if best_val_acc < val_acc:
             best_val_acc = val_acc
@@ -112,11 +120,17 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
 
     # calculate the test accuracies for best and last models
     last_model_state = deepcopy(model.state_dict())
-    last_test_result = check_accuracy(model, test_loader, config, repeat=30)
+    last_test_result = check_accuracy(model=model,
+                                      loader=test_loader,
+                                      preprocess=preprocess_test,
+                                      config=config, repeat=30)
     last_test_acc = last_test_result[0]
 
     model.load_state_dict(best_model_state)
-    best_test_result = check_accuracy(model, test_loader, config, repeat=30)
+    best_test_result = check_accuracy(model=model,
+                                      loader=test_loader,
+                                      preprocess=preprocess_test,
+                                      config=config, repeat=30)
     best_test_acc = best_test_result[0]
 
     if last_test_acc < best_test_acc:
@@ -130,7 +144,10 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     test_acc, test_confusion, test_debug, score, target = test_result
 
     # calculate the test accuracies for final model on much longer sequence
-    longer_test_acc = check_accuracy(model, test_loader_longer, config, repeat=30)[0]
+    longer_test_acc = check_accuracy(model=model,
+                                     loader=test_loader_longer,
+                                     preprocess=preprocess_test,
+                                     config=config, repeat=30)[0]
 
     # save the model
     if config['save_model']:
