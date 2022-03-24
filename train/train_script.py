@@ -186,4 +186,8 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
         #                                                            class_names=class_label_to_type)})
         # wandb.log({"ROC Curve": wandb.plot.roc_curve(target, score, labels=class_label_to_type)})
 
+    # release memory
+    del optimizer, scheduler
+    del last_model_state, best_model_state
+
     return model
