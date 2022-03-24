@@ -193,6 +193,7 @@ def calculate_signal_statistics(config, train_loader, repeats=5, verbose=False):
 def compose_transforms(config, verbose=False):
     composed_train = []
     composed_test = []
+    composed_test_longer = []
 
     ########################
     # usage of EEG channel #
@@ -202,6 +203,7 @@ def compose_transforms(config, verbose=False):
     elif config['EKG'] == 'X':
         composed_train += [EegDropEKGChannel()]
         composed_test += [EegDropEKGChannel()]
+        composed_test_longer += [EegDropEKGChannel()]
     else:
         raise ValueError(f"config['EKG'] have to be set to one of ['O', 'X']")
 
@@ -213,6 +215,7 @@ def compose_transforms(config, verbose=False):
     elif config['photic'] == 'X':
         composed_train += [EegDropPhoticChannel()]
         composed_test += [EegDropPhoticChannel()]
+        composed_test_longer += [EegDropPhoticChannel()]
     else:
         raise ValueError(f"config['photic'] have to be set to one of ['O', 'X']")
 
@@ -222,26 +225,21 @@ def compose_transforms(config, verbose=False):
     if config.get('evaluation_phase') is True:
         composed_train += [EegRandomCropDebug(crop_length=config['crop_length'])]
         composed_test += [EegRandomCropDebug(crop_length=config['crop_length'])]
+        composed_test_longer += [EegRandomCropDebug(crop_length=config['composed_test_longer'])]
     else:
         composed_train += [EegRandomCrop(crop_length=config['crop_length'],
                                          multiple=config.get('crop_multiple', 1))]
         composed_test += [EegRandomCrop(crop_length=config['crop_length'],
-                                        multiple=config.get('crop_multiple', 1))]  # can add or remove the multiple
+                                        multiple=1)]  # can add or remove the multiple
+        composed_test_longer += [EegRandomCrop(crop_length=config['longer_crop_length'],
+                                               multiple=1)]  # can add or remove the multiple
 
     ###################
     # numpy to tensor #
     ###################
     composed_train += [EegToTensor()]
     composed_test += [EegToTensor()]
-
-    #################################################
-    # compose new thing for test on longer sequence #
-    #################################################
-    composed_test_longer = deepcopy(composed_test)
-    if config.get('evaluation_phase') is True:
-        composed_test_longer[0] = EegRandomCropDebug(crop_length=config['longer_crop_length'])
-    else:
-        composed_test_longer[0] = EegRandomCrop(crop_length=config['longer_crop_length'])
+    composed_test_longer += [EegToTensor()]
 
     #####################
     # transform-compose #
