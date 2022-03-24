@@ -14,14 +14,16 @@ from .visualize import draw_roc_curve, draw_confusion, draw_debug_table
 # __all__ = []
 
 
-def learning_rate_search(config, train_loader, preprocess, trials, steps):
+def learning_rate_search(config, train_loader, val_loader,
+                         preprocess_train, preprocess_test,
+                         trials, steps):
     learning_rate_record = []
     best_accuracy = 0
     best_model_state = None
 
     # default learning rate range is set based on a minibatch size of 32
-    min_log_lr = -2.8 + np.log10(config['minibatch'] / 32)
-    max_log_lr = -4.5 + np.log10(config['minibatch'] / 32)
+    min_log_lr = -2.4 + np.log10(config['minibatch'] / 32)
+    max_log_lr = -4.1 + np.log10(config['minibatch'] / 32)
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
@@ -35,17 +37,19 @@ def learning_rate_search(config, train_loader, preprocess, trials, steps):
                                               gamma=config['lr_decay_gamma'])
 
         tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
-        _, train_accuracy = tr_ms(model, train_loader, preprocess, optimizer, scheduler, config, steps)
+        tr_ms(model, train_loader, preprocess_train, optimizer, scheduler, config, steps)
+        train_accuracy, *_ = check_accuracy(model, train_loader, preprocess_test, 10)
+        val_accuracy, *_ = check_accuracy(model, val_loader, preprocess_test, 10)
 
         # Train accuracy for the final epoch is stored
-        learning_rate_record.append((log_lr, train_accuracy))
+        learning_rate_record.append((log_lr, train_accuracy, val_accuracy))
 
         # keep the best model
         if best_accuracy < train_accuracy:
             best_accuracy = train_accuracy
             best_model_state = deepcopy(model.state_dict())
 
-    best_log_lr = learning_rate_record[np.argmax([v for lr, v in learning_rate_record])][0]
+    best_log_lr = learning_rate_record[np.argmax([(tr + vl)/2 for _, tr, vl in learning_rate_record])][0]
 
     return 10 ** best_log_lr, learning_rate_record, best_model_state
 
@@ -61,8 +65,10 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     if config["LR"] is None:
         config['LR'], lr_search, model_state = learning_rate_search(config=config,
                                                                     train_loader=train_loader,
-                                                                    preprocess=preprocess_train,
-                                                                    trials=100, steps=100)
+                                                                    val_loader=val_loader,
+                                                                    preprocess_train=preprocess_train,
+                                                                    preprocess_test=preprocess_test,
+                                                                    trials=25, steps=250)
         wandb.config.LR = config['LR']
         draw_learning_rate_record(lr_search, use_wandb=True)
 

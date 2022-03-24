@@ -1,8 +1,10 @@
 from itertools import cycle
+import warnings
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc  # roc_auc_score
 from sklearn.preprocessing import label_binarize
+import matplotlib.pyplot as plt
+from plotly.tools import mpl_to_plotly
 import wandb
 
 
@@ -227,27 +229,46 @@ def draw_debug_table(debug_table, use_wandb=False):
 
 
 def draw_learning_rate_record(learning_rate_record, use_wandb=False):
+    # if use_wandb:
+    #     data = [[lr, tr, vl] for lr, tr, vl in learning_rate_record]
+    #     table = wandb.Table(data=data, columns=["learning rate (log)",
+    #                                             "train accuracy",
+    #                                             "validation accuracy"])
+    #     wandb.log({"lr_search": wandb.plot.scatter(table, "learning rate (log)",
+    #                                                "train accuracy",
+    #                                                "validation accuracy")})
+    # else:
+    plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
+
+    fig = plt.figure(num=1, clear=True, constrained_layout=True, figsize=(7.0, 4.0))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_title('Learning Rate Search')
+    ax.set_xlabel('Learning rate in log-scale')
+    ax.set_ylabel('Accuracy')
+
+    train_accs = np.array([[log_lr, tr] for log_lr, tr, vl in learning_rate_record])
+    val_accs = np.array([[log_lr, vl] for log_lr, tr, vl in learning_rate_record])
+    midpoints = np.array([[log_lr, (tr + vl)/2] for log_lr, tr, vl in learning_rate_record])
+    idx = np.argmax(midpoints[:, 1])
+
+    ax.plot(train_accs[:, 0], train_accs[:, 1], 'o',
+            color='tab:red', alpha=0.6, label='Train')
+    ax.plot(val_accs[:, 0], val_accs[:, 1], 'o',
+            color='tab:blue', alpha=0.6, label='Validation')
+    ax.plot(midpoints[:, 0], midpoints[:, 1], '-',
+            color='tab:purple', alpha=0.8, linewidth=1.0, label='Midpoint')
+    ax.plot(midpoints[idx, 0], midpoints[idx, 1], 'o',
+            color='tab:pink', alpha=1, markersize=10)
+    ax.legend(loc='lower center').get_frame().set_facecolor('snow')
+    # ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
+
     if use_wandb:
-        data = [[lr, v] for lr, v in learning_rate_record]
-        table = wandb.Table(data=data, columns=["learning rate (log)", "train accuracy"])
-        wandb.log({"lr_search": wandb.plot.scatter(table, "learning rate (log)", "train accuracy")})
+        warnings.filterwarnings(action='ignore')
+        wandb.log({"Learning Rate Search": mpl_to_plotly(fig)})
+        warnings.filterwarnings(action='default')
     else:
-        plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
-
-        fig = plt.figure(num=1, clear=True, constrained_layout=True, figsize=(5.0, 5.0))
-        ax = fig.add_subplot(1, 1, 1)
-
-        ax.set_title('Learning Rate Search')
-        ax.set_xlabel('Learning rate in log-scale')
-        ax.set_ylabel('Train accuracy')
-
-        ax.scatter(*max(learning_rate_record, key=lambda x: x[1]),
-                   s=150, c='w', marker='o', edgecolors='limegreen')
-
-        for log_lr, val_accuracy in learning_rate_record:
-            ax.scatter(log_lr, val_accuracy, c='r',
-                       alpha=0.5, edgecolors='none')
         plt.show()
-        fig.clear()
-        plt.close(fig)
+
+    fig.clear()
+    plt.close(fig)
 

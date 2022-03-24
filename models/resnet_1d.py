@@ -190,7 +190,7 @@ class ResNet1D(nn.Module):
         elif activation == 'mish':
             self.nn_act = nn.Mish
         else:
-            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
+            raise ValueError("activation must be set to one of ['relu', 'gelu', 'mish']")
 
         self.groups = groups
         self.current_channels = base_channels

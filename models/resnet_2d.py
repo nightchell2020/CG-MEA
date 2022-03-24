@@ -183,7 +183,7 @@ class ResNet2D(nn.Module):
         elif activation == 'mish':
             self.nn_act = nn.Mish
         else:
-            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
+            raise ValueError("activation must be set to one of ['relu', 'gelu', 'mish']")
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
