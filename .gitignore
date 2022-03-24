@@ -1,0 +1,11 @@
+/local/
+
+/.ipynb_checkpoints/
+
+/.idea/
+
+/runs/
+
+/output/
+
+/wandb/
