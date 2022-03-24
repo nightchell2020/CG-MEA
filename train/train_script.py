@@ -38,8 +38,9 @@ def learning_rate_search(config, train_loader, val_loader,
 
         tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
         tr_ms(model, train_loader, preprocess_train, optimizer, scheduler, config, steps)
-        train_accuracy, *_ = check_accuracy(model, train_loader, preprocess_test, 10)
-        val_accuracy, *_ = check_accuracy(model, val_loader, preprocess_test, 10)
+
+        train_accuracy, *_ = check_accuracy(model, train_loader, preprocess_test, config, 10)
+        val_accuracy, *_ = check_accuracy(model, val_loader, preprocess_test, config, 10)
 
         # Train accuracy for the final epoch is stored
         learning_rate_record.append((log_lr, train_accuracy, val_accuracy))
