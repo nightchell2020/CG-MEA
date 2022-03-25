@@ -23,7 +23,7 @@ def learning_rate_search(config, train_loader, val_loader,
 
     # default learning rate range is set based on a minibatch size of 32
     min_log_lr = -2.4 + np.log10(config['minibatch'] / 32)
-    max_log_lr = -4.1 + np.log10(config['minibatch'] / 32)
+    max_log_lr = -4.3 + np.log10(config['minibatch'] / 32)
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
@@ -69,7 +69,7 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
                                                                     val_loader=val_loader,
                                                                     preprocess_train=preprocess_train,
                                                                     preprocess_test=preprocess_test,
-                                                                    trials=25, steps=200)
+                                                                    trials=30, steps=150)
         wandb.config.LR = config['LR']
         draw_learning_rate_record(lr_search, use_wandb=True)
 
