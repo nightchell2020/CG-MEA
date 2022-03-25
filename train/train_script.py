@@ -50,6 +50,10 @@ def learning_rate_search(config, train_loader, val_loader,
             best_accuracy = train_accuracy
             best_model_state = deepcopy(model.state_dict())
 
+        del model, optimizer, scheduler
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
     best_log_lr = learning_rate_record[np.argmax([(tr + vl)/2 for _, tr, vl in learning_rate_record])][0]
 
     return 10 ** best_log_lr, learning_rate_record, best_model_state
