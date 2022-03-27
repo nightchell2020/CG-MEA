@@ -125,6 +125,10 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
                 torch.save(best_model_state, path)
 
         # log
+        if i == 0:
+            wandb.config.final_shape = model.get_final_shape()
+            wandb.config.num_params = count_parameters(model)
+
         wandb.log({'Loss': loss,
                    'Train Accuracy': train_acc,
                    'Validation Accuracy': val_acc}, step=i + config["history_interval"])
@@ -168,8 +172,6 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
         torch.save(model_state, path)
 
     # leave the message
-    wandb.config.final_shape = model.get_final_shape()
-    wandb.config.num_params = count_parameters(model)
     wandb.log({'Test Accuracy': test_acc,
                '(Best / Last) Test Accuracy': ('Best' if last_test_acc < best_test_acc else 'Last',
                                                round(best_test_acc, 2), round(last_test_acc, 2)),
