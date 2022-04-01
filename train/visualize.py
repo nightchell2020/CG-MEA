@@ -229,15 +229,6 @@ def draw_debug_table(debug_table, use_wandb=False):
 
 
 def draw_learning_rate_record(learning_rate_record, use_wandb=False):
-    # if use_wandb:
-    #     data = [[lr, tr, vl] for lr, tr, vl in learning_rate_record]
-    #     table = wandb.Table(data=data, columns=["learning rate (log)",
-    #                                             "train accuracy",
-    #                                             "validation accuracy"])
-    #     wandb.log({"lr_search": wandb.plot.scatter(table, "learning rate (log)",
-    #                                                "train accuracy",
-    #                                                "validation accuracy")})
-    # else:
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
 
     fig = plt.figure(num=1, clear=True, constrained_layout=True, figsize=(7.0, 4.0))
@@ -260,7 +251,6 @@ def draw_learning_rate_record(learning_rate_record, use_wandb=False):
     ax.plot(midpoints[idx, 0], midpoints[idx, 1], 'o',
             color='tab:pink', alpha=1, markersize=10)
     ax.legend(loc='lower center').get_frame().set_facecolor('snow')
-    # ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
 
     if use_wandb:
         warnings.filterwarnings(action='ignore')

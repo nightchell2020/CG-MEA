@@ -2,6 +2,7 @@ import os
 import json
 from copy import deepcopy
 from dataclasses import dataclass, asdict
+import pyedflib
 
 import numpy as np
 import pandas as pd
@@ -195,10 +196,10 @@ class CauEegDataset(Dataset):
         transform (callable): Optional transform to be applied on each data.
     """
 
-    def __init__(self, root_dir, metadata, load_event, file_format='feather', transform=None):
-        if file_format not in ['feather', 'memmap']:
+    def __init__(self, root_dir, metadata, load_event, file_format='edf', transform=None):
+        if file_format not in ['edf', 'feather', 'memmap']:
             raise ValueError(f"{self.__class__.__name__}.__init__(file_format) "
-                             f"must be set to one of 'feather' and 'memmap'")
+                             f"must be set to one of 'edf', 'feather', and 'memmap'")
 
         self.root_dir = root_dir
         self.metadata = metadata
@@ -217,7 +218,9 @@ class CauEegDataset(Dataset):
         m = deepcopy(self.metadata[idx])
 
         # signal
-        if self.file_format == 'feather':
+        if self.file_format == 'edf':
+            signal = self.read_edf(m)
+        elif self.file_format == 'feather':
             signal = self.read_feather(m)
         else:
             signal = self.read_memmap(m)
@@ -237,11 +240,17 @@ class CauEegDataset(Dataset):
 
         return sample
 
+    def read_edf(self, m):
+        edf_file = os.path.join(self.root_dir, 'signal', m['serial'] + '.edf')
+        signal, signal_headers, _ = pyedflib.highlevel.read_edf(edf_file)
+        # m['channel'] = [s_h['label'] for s_h in signal_headers]
+        return signal
+
     def read_feather(self, m):
         fname = os.path.join(self.root_dir, 'signal/feather', m['serial'] + '.feather')
-        signal = feather.read_feather(fname).values.T
+        df = feather.read_feather(fname)
         # m['channel'] = df.columns.to_list()
-        return signal
+        return df.values.T
 
     def read_memmap(self, m):
         fname = os.path.join(self.root_dir, 'signal/memmap', m['serial'] + '.dat')

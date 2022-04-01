@@ -2,28 +2,54 @@ import numpy as np
 import torch
 
 
+class EegLimitMaxLength(object):
+    """Cut off the start and end signals by the specified amount.
+
+    Args:
+        - max_length (int): Signal length limit to cut out the rest
+    """
+
+    def __init__(self, max_length: int):
+        if isinstance(max_length, int) is False or max_length <= 0:
+            raise ValueError(f'{self.__class__.__name__}.__init__(front_cut) '
+                             f'needs a positive integer to initialize')
+        self.max_length = max_length
+
+    def __call__(self, sample):
+        sample['signal'] = sample['signal'][:, :self.max_length]
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(max_length={self.max_length})"
+
+
 class EegRandomCrop(object):
     """Randomly crop the EEG data to a given size.
 
     Args:
         - crop_length (int): Desired output signal length.
-        - multiple (int): Desired number of cropping.
+        - multiple (int, optional): Desired number of cropping.
+        - latency (int, optional): Latency signal length to exclude after record starting.
     """
 
-    def __init__(self, crop_length: int, multiple: int = 1):
+    def __init__(self, crop_length: int, multiple: int = 1, latency: int = 0):
         if isinstance(crop_length, int) is False:
             raise ValueError(f'{self.__class__.__name__}.__init__(crop_length) '
                              f'needs a integer to initialize')
-        if multiple < 1:
+        if isinstance(crop_length, int) is False or multiple < 1:
             raise ValueError(f'{self.__class__.__name__}.__init__(multiple)'
                              f' needs a positive integer to initialize')
+        if isinstance(latency, int) is False or latency < 0:
+            raise ValueError(f'{self.__class__.__name__}.__init__(latency)'
+                             f' needs a non negative integer to initialize')
 
         self.crop_length = crop_length
         self.multiple = multiple
+        self.latency = latency
 
     def _random_crop_signal(self, signal):
         total_length = signal.shape[-1]
-        start_point = np.random.randint(total_length - self.crop_length)
+        start_point = np.random.randint(self.latency, total_length - self.crop_length)
         return signal[:, start_point:start_point + self.crop_length]
 
     def __call__(self, sample):
@@ -39,6 +65,10 @@ class EegRandomCrop(object):
 
         return sample
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(crop_length={self.crop_length}, " \
+               f"multiple={self.multiple}, latency={self.latency})"
+
 
 class EegRandomCropDebug(object):
     """Randomly crop the EEG data to a given size (debug version).
@@ -46,23 +76,27 @@ class EegRandomCropDebug(object):
     Args:
         - crop_length (int): Desired output signal length.
         - multiple (int): Desired number of cropping.
+        - latency (int, optional): Latency signal length to exclude after record starting.
     """
 
-    def __init__(self, crop_length: int, multiple: int = 1):
+    def __init__(self, crop_length: int, multiple: int = 1, latency: int = 0):
         if isinstance(crop_length, int) is False:
             raise ValueError(f'{self.__class__.__name__}.__init__(crop_length) '
                              f'needs a integer to initialize')
-        if multiple < 1:
-            raise ValueError(f'{self.__class__.__name__}.__init__(multiple) '
-                             f'needs a positive integer to initialize')
+        if isinstance(crop_length, int) is False or multiple < 1:
+            raise ValueError(f'{self.__class__.__name__}.__init__(multiple)'
+                             f' needs a positive integer to initialize')
+        if isinstance(latency, int) is False or latency < 0:
+            raise ValueError(f'{self.__class__.__name__}.__init__(latency)'
+                             f' needs a non negative integer to initialize')
 
         self.crop_length = crop_length
         self.multiple = multiple
+        self.latency = latency
 
     def _random_crop_signal(self, signal):
         total_length = signal.shape[-1]
-        start_point = np.random.randint(total_length - self.crop_length)
-
+        start_point = np.random.randint(self.latency, total_length - self.crop_length)
         return signal[:, start_point:start_point + self.crop_length], start_point
 
     def __call__(self, sample):
@@ -82,6 +116,10 @@ class EegRandomCropDebug(object):
             sample['metadata']['start_point'] = start_points
 
         return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(crop_length={self.crop_length}, " \
+               f"multiple={self.multiple}, latency={self.latency})"
 
 
 class EegEyeOpenCrop(object):
@@ -108,7 +146,7 @@ class EegEyeOpenCrop(object):
         if 'event' not in sample['metadata'].keys():
             raise ValueError(f'{self.__class__.__name__}, this dataset '
                              f'does not have the event information at all.')
-        
+
         signal = sample['signal']
         total_length = signal.shape[-1]
 
@@ -151,6 +189,10 @@ class EegEyeOpenCrop(object):
         time = time + np.random.randint(low=neg, high=pos)
         sample['signal'] = signal[:, time - self.crop_before:time + self.crop_after]
         return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(crop_before={self.crop_before}, " \
+               f"crop_after={self.crop_after}, jitter={self.jitter}, mode={self.mode})"
 
 
 class EegEyeClosedCrop(object):
@@ -235,6 +277,10 @@ class EegEyeClosedCrop(object):
         sample['signal'] = signal[:, time:time + self.crop_length]
         return sample
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(transition={self.transition}, " \
+               f"crop_length={self.crop_length}, jitter={self.jitter}, mode={self.mode})"
+
 
 class EegDropEKGChannel(object):
     """Drop the EKG channel from EEG signal."""
@@ -258,6 +304,9 @@ class EegDropEKGChannel(object):
                              f'or their array')
         return sample
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
+
 
 class EegDropPhoticChannel(object):
     """Drop the photic stimulation channel from EEG signal."""
@@ -280,6 +329,9 @@ class EegDropPhoticChannel(object):
             raise ValueError(f'{self.__class__.__name__}.__call__(sample["signal"]) needs to be set to np.ndarray '
                              f'or their array')
         return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
 
 
 class EegDropSpecificChannel(object):
@@ -306,13 +358,16 @@ class EegDropSpecificChannel(object):
                              f'or their array')
         return sample
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(drop_channel={self.drop_channel})"
+
 
 class EegToTensor(object):
     """Convert EEG numpy array in sample to Tensors."""
 
     @staticmethod
     def _signal_to_tensor(signal):
-        if isinstance(signal, (np.core.memmap, )):
+        if isinstance(signal, (np.core.memmap,)):
             return torch.tensor(signal).to(dtype=torch.float32)
         return torch.from_numpy(signal).to(dtype=torch.float32)
 
@@ -334,6 +389,9 @@ class EegToTensor(object):
         sample['class_label'] = torch.tensor(sample['class_label'])
 
         return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}()"
 
 
 def eeg_collate_fn(batch):

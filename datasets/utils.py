@@ -6,7 +6,7 @@ import time
 from .cau_eeg_dataset import MultiLabel
 
 
-def trim_tailing_zeros(a):
+def trim_trailing_zeros(a):
     assert type(a) == np.ndarray
     trim = 0
     for i in range(a.shape[-1]):

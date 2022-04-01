@@ -1,4 +1,3 @@
-from copy import deepcopy
 import numpy as np
 import random
 import json
@@ -8,7 +7,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 
 from .cau_eeg_dataset import CauEegDataset
-from .pipeline import EegRandomCrop, EegRandomCropDebug
+from .pipeline import EegLimitMaxLength, EegRandomCrop, EegRandomCropDebug
 from .pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
 from .pipeline import EegNormalizeAge
 from .pipeline import EegDropEKGChannel, EegDropPhoticChannel
@@ -219,20 +218,37 @@ def compose_transforms(config, verbose=False):
     else:
         raise ValueError(f"config['photic'] have to be set to one of ['O', 'X']")
 
+    #######################
+    # signal length limit #
+    #######################
+    if 'signal_length_limit' in config.keys():
+        composed_train += [EegLimitMaxLength(max_length=config['signal_length_limit'])]
+        composed_test += [EegLimitMaxLength(max_length=config['signal_length_limit'])]
+        composed_test_longer += [EegLimitMaxLength(max_length=config['signal_length_limit'])]
+
     ###############
     # signal crop #
     ###############
     if config.get('evaluation_phase') is True:
-        composed_train += [EegRandomCropDebug(crop_length=config['crop_length'])]
-        composed_test += [EegRandomCropDebug(crop_length=config['crop_length'])]
-        composed_test_longer += [EegRandomCropDebug(crop_length=config['composed_test_longer'])]
+        composed_train += [EegRandomCropDebug(crop_length=config['crop_length'],
+                                              multiple=config.get('crop_multiple', 1),
+                                              latency=config.get('latency', 0))]
+        composed_test += [EegRandomCropDebug(crop_length=config['crop_length'],
+                                             multiple=config.get('crop_multiple', 1),
+                                             latency=config.get('latency', 0))]
+        composed_test_longer += [EegRandomCropDebug(crop_length=config['longer_crop_length'],
+                                                    multiple=config.get('crop_multiple', 1),
+                                                    latency=config.get('latency', 0))]
     else:
         composed_train += [EegRandomCrop(crop_length=config['crop_length'],
-                                         multiple=config.get('crop_multiple', 1))]
+                                         multiple=config.get('crop_multiple', 1),
+                                         latency=config.get('latency', 0))]
         composed_test += [EegRandomCrop(crop_length=config['crop_length'],
-                                        multiple=1)]  # can add or remove the multiple
+                                        multiple=config.get('crop_multiple', 1),
+                                        latency=config.get('latency', 0))]
         composed_test_longer += [EegRandomCrop(crop_length=config['longer_crop_length'],
-                                               multiple=1)]  # can add or remove the multiple
+                                               multiple=config.get('crop_multiple', 1),
+                                               latency=config.get('latency', 0))]
 
     ###################
     # numpy to tensor #
@@ -297,7 +313,8 @@ def compose_preprocess(config, train_loader, verbose=True):
     ############################
     # data normalization (age) #
     ############################
-    config['age_mean'], config['age_std'] = calculate_age_statistics(config, train_loader, verbose=False)
+    if 'age_mean' not in config and 'age_std' not in config:
+        config['age_mean'], config['age_std'] = calculate_age_statistics(config, train_loader, verbose=False)
     preprocess_train += [EegNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
     preprocess_test += [EegNormalizeAge(mean=config['age_mean'], std=config['age_std'])]
 
