@@ -2,11 +2,42 @@ import numpy as np
 import torch
 
 
+class EegDropChannels(object):
+    """Drop the specified channel from EEG signal.
+
+    Args:
+        index (int or list): Channel index(or induce) to drop.
+    """
+    def __init__(self, index):
+        self.drop_index = index
+
+    def drop_specific_channel(self, signal):
+        return np.delete(signal, self.drop_index, axis=0)
+
+    def __call__(self, sample):
+        signal = sample['signal']
+
+        if isinstance(signal, (np.ndarray,)):
+            sample['signal'] = self.drop_specific_channel(signal)
+        elif isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self.drop_specific_channel(s))
+            sample['signal'] = signals
+        else:
+            raise ValueError(f'{self.__class__.__name__}.__call__(sample["signal"]) needs to be set to np.ndarray '
+                             f'or their array')
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(drop_index={self.drop_index})"
+
+
 class EegLimitMaxLength(object):
     """Cut off the start and end signals by the specified amount.
 
     Args:
-        - max_length (int): Signal length limit to cut out the rest
+        max_length (int): Signal length limit to cut out the rest.
     """
 
     def __init__(self, max_length: int):
@@ -27,12 +58,13 @@ class EegRandomCrop(object):
     """Randomly crop the EEG data to a given size.
 
     Args:
-        - crop_length (int): Desired output signal length.
-        - multiple (int, optional): Desired number of cropping.
-        - latency (int, optional): Latency signal length to exclude after record starting.
-    """
+        crop_length (int): Desired output signal length.
+        multiple (int, optional): Desired number of cropping.
+        latency (int, optional): Latency signal length to exclude after record starting.
+        return_timing (bool, optional): Decide whether return the sample timing or not.
 
-    def __init__(self, crop_length: int, multiple: int = 1, latency: int = 0):
+    """
+    def __init__(self, crop_length: int, multiple: int = 1, latency: int = 0, return_timing: bool = False):
         if isinstance(crop_length, int) is False:
             raise ValueError(f'{self.__class__.__name__}.__init__(crop_length) '
                              f'needs a integer to initialize')
@@ -46,6 +78,7 @@ class EegRandomCrop(object):
         self.crop_length = crop_length
         self.multiple = multiple
         self.latency = latency
+        self.return_timing = return_timing
 
     def _random_crop_signal(self, signal):
         total_length = signal.shape[-1]
@@ -54,82 +87,41 @@ class EegRandomCrop(object):
 
     def __call__(self, sample):
         signal = sample['signal']
-
-        if self.multiple == 1:
-            sample['signal'] = self._random_crop_signal(signal)
-        else:
-            signals = []
-            for r in range(self.multiple):
-                signals.append(self._random_crop_signal(signal))
-            sample['signal'] = signals
-
-        return sample
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(crop_length={self.crop_length}, " \
-               f"multiple={self.multiple}, latency={self.latency})"
-
-
-class EegRandomCropDebug(object):
-    """Randomly crop the EEG data to a given size (debug version).
-
-    Args:
-        - crop_length (int): Desired output signal length.
-        - multiple (int): Desired number of cropping.
-        - latency (int, optional): Latency signal length to exclude after record starting.
-    """
-
-    def __init__(self, crop_length: int, multiple: int = 1, latency: int = 0):
-        if isinstance(crop_length, int) is False:
-            raise ValueError(f'{self.__class__.__name__}.__init__(crop_length) '
-                             f'needs a integer to initialize')
-        if isinstance(crop_length, int) is False or multiple < 1:
-            raise ValueError(f'{self.__class__.__name__}.__init__(multiple)'
-                             f' needs a positive integer to initialize')
-        if isinstance(latency, int) is False or latency < 0:
-            raise ValueError(f'{self.__class__.__name__}.__init__(latency)'
-                             f' needs a non negative integer to initialize')
-
-        self.crop_length = crop_length
-        self.multiple = multiple
-        self.latency = latency
-
-    def _random_crop_signal(self, signal):
         total_length = signal.shape[-1]
-        start_point = np.random.randint(self.latency, total_length - self.crop_length)
-        return signal[:, start_point:start_point + self.crop_length], start_point
-
-    def __call__(self, sample):
-        signal = sample['signal']
 
         if self.multiple == 1:
-            sample['signal'], sample['metadata']['start_point'] = self._random_crop_signal(signal)
+            st = np.random.randint(self.latency, total_length - self.crop_length)
+            sample['signal'] = signal[:, st:st + self.crop_length]
+            if self.return_timing:
+                sample['metadata']['start_point'] = st
         else:
             signals = []
             start_points = []
+
             for r in range(self.multiple):
-                s, sp = self._random_crop_signal(signal)
-                signals.append(s)
-                start_points.append(sp)
+                st = np.random.randint(self.latency, total_length - self.crop_length)
+                signals.append(signal[:, st:st + self.crop_length])
+                start_points.append(st)
 
             sample['signal'] = signals
-            sample['metadata']['start_point'] = start_points
+            if self.return_timing:
+                sample['start_point'] = start_points
 
         return sample
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(crop_length={self.crop_length}, " \
-               f"multiple={self.multiple}, latency={self.latency})"
+               f"multiple={self.multiple}, latency={self.latency}, return_timing={self.return_timing})"
 
 
 class EegEyeOpenCrop(object):
     """Crop the EEG signal around the eye-opened event to a given size.
 
     Args:
-        - crop_before (int): Desired signal length to crop right before the event occurred
-        - crop_after (int): Desired signal length to crop right after the event occurred
-        - jitter (int): Amount of jitter
-        - mode (str, optional): Way for selecting one among multiple same events
+        crop_before (int): Desired signal length to crop right before the event occurred
+        crop_after (int): Desired signal length to crop right after the event occurred
+        jitter (int): Amount of jitter
+        mode (str, optional): Way for selecting one among multiple same events
     """
 
     def __init__(self, crop_before: int, crop_after: int, jitter: int, mode: str = 'first'):
@@ -199,10 +191,10 @@ class EegEyeClosedCrop(object):
     """Crop the EEG signal during the eye-closed event to a given size.
 
     Args:
-        - transition (int): Amount of standby until cropping after the eye-closed event occurred
-        - crop_length (int): Desired output signal length
-        - jitter (int, optional): Amount of jitter
-        - mode (str, optional): Way for selecting one during eye-closed
+        transition (int): Amount of standby until cropping after the eye-closed event occurred
+        crop_length (int): Desired output signal length
+        jitter (int, optional): Amount of jitter
+        mode (str, optional): Way for selecting one during eye-closed
     """
 
     def __init__(self, transition: int, crop_length: int, jitter: int = 0, mode: str = 'random'):
@@ -282,86 +274,6 @@ class EegEyeClosedCrop(object):
                f"crop_length={self.crop_length}, jitter={self.jitter}, mode={self.mode})"
 
 
-class EegDropEKGChannel(object):
-    """Drop the EKG channel from EEG signal."""
-
-    @staticmethod
-    def _drop_ekg_channel(signal):
-        return np.delete(signal, 19, 0)
-
-    def __call__(self, sample):
-        signal = sample['signal']
-
-        if isinstance(signal, (np.ndarray,)):
-            sample['signal'] = self._drop_ekg_channel(signal)
-        elif isinstance(signal, (list,)):
-            signals = []
-            for s in signal:
-                signals.append(self._drop_ekg_channel(s))
-            sample['signal'] = signals
-        else:
-            raise ValueError(f'{self.__class__.__name__}.__call__(sample["signal"]) needs to be set to np.ndarray '
-                             f'or their array')
-        return sample
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
-
-
-class EegDropPhoticChannel(object):
-    """Drop the photic stimulation channel from EEG signal."""
-
-    @staticmethod
-    def _drop_photic_channel(signal):
-        return signal[:-1]
-
-    def __call__(self, sample):
-        signal = sample['signal']
-
-        if isinstance(signal, (np.ndarray,)):
-            sample['signal'] = self._drop_photic_channel(signal)
-        elif isinstance(signal, (list,)):
-            signals = []
-            for s in signal:
-                signals.append(self._drop_photic_channel(s))
-            sample['signal'] = signals
-        else:
-            raise ValueError(f'{self.__class__.__name__}.__call__(sample["signal"]) needs to be set to np.ndarray '
-                             f'or their array')
-        return sample
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
-
-
-class EegDropSpecificChannel(object):
-    """Drop the specified channel from EEG signal."""
-
-    def __init__(self, drop_channel):
-        self.drop_channel = drop_channel
-
-    def drop_specific_channel(self, signal):
-        return np.delete(signal, self.drop_channel, 0)
-
-    def __call__(self, sample):
-        signal = sample['signal']
-
-        if isinstance(signal, (np.ndarray,)):
-            sample['signal'] = self.drop_specific_channel(signal)
-        elif isinstance(signal, (list,)):
-            signals = []
-            for s in signal:
-                signals.append(self.drop_specific_channel(s))
-            sample['signal'] = signals
-        else:
-            raise ValueError(f'{self.__class__.__name__}.__call__(sample["signal"]) needs to be set to np.ndarray '
-                             f'or their array')
-        return sample
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(drop_channel={self.drop_channel})"
-
-
 class EegToTensor(object):
     """Convert EEG numpy array in sample to Tensors."""
 
@@ -386,7 +298,8 @@ class EegToTensor(object):
                              f'or their list')
 
         sample['age'] = torch.tensor(sample['age'], dtype=torch.float32)
-        sample['class_label'] = torch.tensor(sample['class_label'])
+        if 'class_label' in sample.keys():
+            sample['class_label'] = torch.tensor(sample['class_label'])
 
         return sample
 
@@ -395,29 +308,47 @@ class EegToTensor(object):
 
 
 def eeg_collate_fn(batch):
-    signal = []
-    age = []
-    class_label = []
-    metadata = []
+    batched_sample = {k: [] for k in batch[0].keys()}
 
-    for sample in batch:
+    for i, sample in enumerate(batch):
         if isinstance(sample['signal'], (np.ndarray,)) or torch.is_tensor(sample['signal']):
-            signal += [sample['signal']]
-            age += [sample['age']]
-            class_label += [sample['class_label']]
-            metadata += [sample['metadata']]
+            for k in sample.keys():
+                batched_sample[k] += [sample[k]]
         elif isinstance(sample['signal'], (list,)):
             for s in sample['signal']:
-                signal += [s]
-                age += [sample['age']]
-                class_label += [sample['class_label']]
-                metadata += [sample['metadata']]
+                batched_sample['signal'] += [s]
+                for k in sample.keys():
+                    if k != 'signal':
+                        batched_sample[k] += [sample[k]]
 
-    batched_sample = {'signal': torch.stack(signal),
-                      'age': torch.stack(age),
-                      'class_label': torch.stack(class_label),
-                      'metadata': metadata}
+    batched_sample['signal'] = torch.stack(batched_sample['signal'])
+    batched_sample['age'] = torch.stack(batched_sample['age'])
+    if 'class_label' in batched_sample.keys():
+        batched_sample['class_label'] = torch.stack(batched_sample['class_label'])
+
     return batched_sample
+
+
+class EegToDevice(torch.nn.Module):
+    """Add a Gaussian noise to the age value
+
+    Args:
+        device: Desired working device.
+    """
+
+    def __init__(self, device):
+        super().__init__()
+        self.device = device
+
+    def forward(self, sample):
+        sample['signal'] = sample['signal'].to(self.device)
+        sample['age'] = sample['age'].to(self.device)
+        if 'class_label' in sample.keys():
+            sample['class_label'] = sample['class_label'].to(self.device)
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(device={self.device})"
 
 
 class EegNormalizePerSignal(torch.nn.Module):
@@ -443,17 +374,37 @@ class EegNormalizeMeanStd(torch.nn.Module):
 
     def __init__(self, mean, std, eps=1e-8):
         super().__init__()
-        self.mean = mean
-        self.std = std
+
+        if isinstance(mean, np.ndarray):
+            self.mean = torch.from_numpy(mean)
+        elif isinstance(mean, list):
+            self.mean = torch.tensor(mean)
+        elif torch.is_tensor(mean):
+            self.mean = mean
+        else:
+            raise ValueError(f'{self.__class__.__name__}.__init__(mean) needs to be set to among of torch.tensor, '
+                             f'np.ndarray, or list')
+
+        if isinstance(std, np.ndarray):
+            self.std = torch.from_numpy(std)
+        elif isinstance(std, list):
+            self.std = torch.tensor(std)
+        elif torch.is_tensor(std):
+            self.std = std
+        else:
+            raise ValueError(f'{self.__class__.__name__}.__init__(std) needs to be set to among of torch.tensor, '
+                             f'np.ndarray, or list')
         self.eps = eps
+        self.std_eps = self.std + self.eps
 
     def forward(self, sample):
         signal = sample['signal']
 
-        self.mean = torch.as_tensor(self.mean, device=signal.device)
-        self.std = torch.as_tensor(self.std, device=signal.device)
+        if self.mean.get_device() != signal.get_device():
+            self.mean = torch.as_tensor(self.mean, device=signal.device)
+            self.std_eps = torch.as_tensor(self.std_eps, device=signal.device)
 
-        signal.sub_(self.mean).div_(self.std + self.eps)
+        signal.sub_(self.mean).div_(self.std_eps)
         sample['signal'] = signal
         return sample
 
@@ -503,9 +454,9 @@ class EegNormalizeAge(torch.nn.Module):
     """Normalize age of EEG metadata by the calculated statistics.
 
     Args:
-        - mean: Mean age of all people in EEG training dataset.
-        - std: Standard deviation of the age for all people in EEG training dataset.
-        - eps: Small number to prevent zero division.
+        mean: Mean age of all people in EEG training dataset.
+        std: Standard deviation of the age for all people in EEG training dataset.
+        eps: Small number to prevent zero division.
     """
 
     def __init__(self, mean, std, eps=1e-8):
@@ -513,12 +464,16 @@ class EegNormalizeAge(torch.nn.Module):
         self.mean = mean
         self.std = std
         self.eps = eps
+        self.std_eps = self.std + self.eps
 
     def forward(self, sample):
         age = sample['age']
-        self.mean = torch.as_tensor(self.mean, device=age.device)
-        self.std = torch.as_tensor(self.std, device=age.device)
-        age.sub_(self.mean).div_(self.std + self.eps)
+
+        if not torch.is_tensor(self.mean) or self.mean.get_device() != age.get_device():
+            self.mean = torch.as_tensor(self.mean, device=age.device)
+            self.std_eps = torch.as_tensor(self.std_eps, device=age.device)
+
+        age.sub_(self.mean).div_(self.std_eps)
         sample['age'] = age
         return sample
 
@@ -530,8 +485,8 @@ class EegAddGaussianNoiseAge(torch.nn.Module):
     """Add a Gaussian noise to the age value
 
     Args:
-        - mean: Desired mean of noise level for the age value.
-        - std: Desired standard deviation of noise level for the age value.
+        mean: Desired mean of noise level for the age value.
+        std: Desired standard deviation of noise level for the age value.
     """
 
     def __init__(self, mean=0.0, std=1e-2):
@@ -563,51 +518,55 @@ class EegSpectrogram(torch.nn.Module):
         self.complex_mode = complex_mode
         self.stft_kwargs = kwargs
 
-    def _spectrogram(self, signal):
-        signal_f = torch.stft(signal, n_fft=self.n_fft, return_complex=True, **self.stft_kwargs)
+    def _spectrogram(self, x):
+        if len(x.shape) == 3:
+            N = x.shape[0]
 
-        if self.complex_mode == 'as_real':
-            signal_f1 = torch.view_as_real(signal_f)[..., 0]
-            signal_f2 = torch.view_as_real(signal_f)[..., 1]
-            signal_f = torch.cat((signal_f1, signal_f2), dim=0)
-        elif self.complex_mode == 'complex':
-            pass
-        elif self.complex_mode == 'power':
-            signal_f = signal_f.abs()
-        elif self.complex_mode == 'remove':
-            signal_f = torch.real(signal_f)
+            for i in range(N):
+                xf = torch.stft(x[i], n_fft=self.n_fft, return_complex=True, **self.stft_kwargs)
 
-        return signal_f
+                if i == 0:
+                    if self.complex_mode == 'as_real':
+                        x_out = torch.zeros((N, 2 * xf.shape[0], xf.shape[1], xf.shape[2]),
+                                            dtype=x.dtype, device=x.device)
+                    else:
+                        x_out = torch.zeros((N, *xf.shape),
+                                            dtype=x.dtype, device=x.device)
+
+                if self.complex_mode == 'as_real':
+                    x_out[i] = torch.cat((torch.view_as_real(xf)[..., 0],
+                                          torch.view_as_real(xf)[..., 1]), dim=0)
+                elif self.complex_mode == 'power':
+                    x_out[i] = xf.abs()
+                elif self.complex_mode == 'remove':
+                    x_out[i] = torch.real(xf)
+
+        elif len(x.shape) == 2:
+            xf = torch.stft(x, n_fft=self.n_fft, return_complex=True)
+
+            if self.complex_mode == 'as_real':
+                x_out = torch.cat((torch.view_as_real(xf)[..., 0],
+                                      torch.view_as_real(xf)[..., 1]), dim=0)
+            elif self.complex_mode == 'power':
+                x_out = xf.abs()
+            elif self.complex_mode == 'remove':
+                x_out = torch.real(xf)
+
+        else:
+            raise ValueError(f'{self.__class__.__name__}._spectrogram(sample["signal"]) '
+                             f'- check the signal tensor size.')
+
+        return x_out
 
     def forward(self, sample):
         signal = sample['signal']
         if torch.is_tensor(signal) is False:
             raise TypeError('Before transforming the data signal as a spectrogram '
                             'it must be converted to a PyTorch Tensor object using EegToTensor() transform.')
+
         sample['signal'] = self._spectrogram(signal)
         return sample
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(n_fft={self.n_fft}, complex_mode={self.complex_mode}, " \
                f"stft_kwargs={self.stft_kwargs})"
-
-
-class EegToDevice(torch.nn.Module):
-    """Add a Gaussian noise to the age value
-
-    Args:
-        - device: Desired working device.
-    """
-
-    def __init__(self, device):
-        super().__init__()
-        self.device = device
-
-    def forward(self, sample):
-        sample['signal'] = sample['signal'].to(self.device)
-        sample['age'] = sample['age'].to(self.device)
-        sample['class_label'] = sample['class_label'].to(self.device)
-        return sample
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(device={self.device})"

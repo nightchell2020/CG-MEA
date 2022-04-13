@@ -72,8 +72,8 @@ def draw_accuracy_history(train_acc_history, val_acc_history, history_interval, 
     plt.close(fig)
 
 
-def draw_confusion(confusion, class_label_to_type, use_wandb=False):
-    C = len(class_label_to_type)
+def draw_confusion(confusion, class_label_to_name, use_wandb=False):
+    C = len(class_label_to_name)
 
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
     plt.rcParams['image.cmap'] = 'jet'  # 'nipy_spectral'
@@ -84,8 +84,8 @@ def draw_confusion(confusion, class_label_to_type, use_wandb=False):
 
     ax.set_xticks(np.arange(C))
     ax.set_yticks(np.arange(C))
-    ax.set_xticklabels(class_label_to_type)
-    ax.set_yticklabels(class_label_to_type)
+    ax.set_xticklabels(class_label_to_name)
+    ax.set_yticklabels(class_label_to_name)
 
     for r in range(C):
         for c in range(C):
@@ -107,11 +107,11 @@ def draw_confusion(confusion, class_label_to_type, use_wandb=False):
     plt.close(fig)
 
 
-def draw_roc_curve(score, target, class_label_to_type, use_wandb=False):
+def draw_roc_curve(score, target, class_label_to_name, use_wandb=False):
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
 
     # Binarize the output
-    n_classes = len(class_label_to_type)
+    n_classes = len(class_label_to_name)
     target = label_binarize(target, classes=np.arange(n_classes))
 
     # Compute ROC curve and ROC area for each class
@@ -151,7 +151,7 @@ def draw_roc_curve(score, target, class_label_to_type, use_wandb=False):
     for i, color in zip(range(n_classes), colors):
         ax.plot(fpr[i], tpr[i], color=color, lw=lw,
                 label='{0} (area = {1:0.2f})'
-                      ''.format(class_label_to_type[i], roc_auc[i]))
+                      ''.format(class_label_to_name[i], roc_auc[i]))
     ax.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
     ax.set_xlim([0.0, 1.0])
     ax.set_ylim([0.0, 1.05])
@@ -190,37 +190,35 @@ def draw_roc_curve(score, target, class_label_to_type, use_wandb=False):
     plt.close(fig)
 
 
-def draw_debug_table(debug_table, use_wandb=False):
-    (debug_table_serial, debug_table_edf, debug_table_pred, debug_table_gt) = debug_table
+def draw_error_table(error_table, use_wandb=False, fig_size=(40.0, 4.0)):
+    serial_table = error_table['Serial']
+    prediction_table = error_table['Pred']
+    gt_table = error_table['GT']
 
-    fig = plt.figure(num=1, clear=True, figsize=(20.0, 4.0), constrained_layout=True)
+    fig = plt.figure(num=1, clear=True, figsize=fig_size, constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
 
     total_error, total_count = (0, 0)
 
-    for edf in np.unique(debug_table_edf):
-        indices = [i for i, x in enumerate(debug_table_edf) if x == edf]
+    for serial in np.unique(serial_table):
+        indices = [i for i, x in enumerate(serial_table) if x == serial]
 
         err, cnt = (0, 0)
         for i in indices:
-            cnt += sum(debug_table_pred[i])
-            err += sum(debug_table_pred[i]) - debug_table_pred[i][debug_table_gt[i]]
+            cnt += sum(prediction_table[i])
+            err += sum(prediction_table[i]) - prediction_table[i][gt_table[i]]
 
         total_error += err
         total_count += cnt
 
-        ax.bar(edf, err / cnt, color=['g', 'b', 'r'][debug_table_gt[indices[0]]])
+        ax.bar(serial, err / cnt, color=['g', 'b', 'r', 'y', 'm'][gt_table[indices[0]]])
 
-    ax.set_title(f'Debug Table (Acc. {1.0 - total_error / total_count: .2f}%)', fontsize=18)
+    ax.set_title(f'Error Table (Acc. {1.0 - total_error / total_count: .2f}%)', fontsize=18)
     ax.set_ylim(0.0, 1.0)
     plt.setp(ax.get_xticklabels(), rotation=90, ha="right", fontsize=9, visible=True)
 
     if use_wandb:
-        table = [[serial, edf, pred, gt] for serial, edf, pred, gt in zip(*debug_table)]
-        table = wandb.Table(data=table, columns=['Serial', 'EDF', 'Prediction', 'Ground-truth'])
-        wandb.log({'Debug Table': table})
-
-        wandb.log({'Debug Table (Image)': wandb.Image(plt)})
+        wandb.log({'Error Table (Image)': wandb.Image(plt)})
     else:
         plt.show()
 

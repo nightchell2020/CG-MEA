@@ -7,9 +7,9 @@ import wandb
 
 from models.utils import count_parameters
 from .train_core import train_multistep, train_mixup_multistep
-from .evaluate import check_accuracy
+from .evaluate import check_accuracy, check_accuracy_extended
 from .visualize import draw_learning_rate_record
-from .visualize import draw_roc_curve, draw_confusion, draw_debug_table
+from .visualize import draw_roc_curve, draw_confusion, draw_error_table
 
 # __all__ = []
 
@@ -39,15 +39,15 @@ def learning_rate_search(config, train_loader, val_loader,
         tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
         tr_ms(model, train_loader, preprocess_train, optimizer, scheduler, config, steps)
 
-        train_accuracy, *_ = check_accuracy(model, train_loader, preprocess_test, config, 10)
-        val_accuracy, *_ = check_accuracy(model, val_loader, preprocess_test, config, 10)
+        train_accuracy = check_accuracy(model, train_loader, preprocess_test, config, 10)
+        val_accuracy = check_accuracy(model, val_loader, preprocess_test, config, 10)
 
         # Train accuracy for the final epoch is stored
         learning_rate_record.append((log_lr, train_accuracy, val_accuracy))
 
         # keep the best model
-        if best_accuracy < train_accuracy:
-            best_accuracy = train_accuracy
+        if best_accuracy < (train_accuracy + val_accuracy) / 2:
+            best_accuracy = (train_accuracy + val_accuracy) / 2
             best_model_state = deepcopy(model.state_dict())
 
         del model, optimizer, scheduler
@@ -60,7 +60,7 @@ def learning_rate_search(config, train_loader, val_loader,
 
 
 def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_longer,
-                     preprocess_train, preprocess_test, class_label_to_type):
+                     preprocess_train, preprocess_test):
     print('*' * 120)
     print(f'{"*" * 30}{config["model"] + " train starts":^60}{"*" * 30}')
     print('*' * 120)
@@ -74,7 +74,6 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
                                                                     preprocess_train=preprocess_train,
                                                                     preprocess_test=preprocess_test,
                                                                     trials=30, steps=150)
-        wandb.config.LR = config['LR']
         draw_learning_rate_record(lr_search, use_wandb=True)
 
     # generate model and its trainer
@@ -110,42 +109,43 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
                                 steps=config["history_interval"])
 
         # validation
-        val_acc, _, _, _, _ = check_accuracy(model=model,
-                                             loader=val_loader,
-                                             preprocess=preprocess_test,
-                                             config=config, repeat=10)
-
-        if best_val_acc < val_acc:
-            best_val_acc = val_acc
-            best_model_state = deepcopy(model.state_dict())
-            if config['save_model'] and config['save_temporary']:
-                save_path = f'local/checkpoint_temp/{wandb.run.name}/'
-                os.makedirs(save_path, exist_ok=True)
-                path = os.path.join(save_path, f'{config["model"]}')
-                torch.save(best_model_state, path)
+        val_acc = check_accuracy(model=model, loader=val_loader,
+                                 preprocess=preprocess_test,
+                                 config=config, repeat=10)
 
         # log
         if i == 0:
-            wandb.config.final_shape = model.get_final_shape()
-            wandb.config.num_params = count_parameters(model)
+            config['final_shape'] = model.get_final_shape()
+            config['num_params'] = count_parameters(model)
+            for k, v in config.items():
+                if k not in wandb.config:
+                    wandb.config[k] = v
 
-        wandb.log({'Loss': loss,
-                   'Train Accuracy': train_acc,
-                   'Validation Accuracy': val_acc}, step=i + config["history_interval"])
+        wandb.log({'Loss': loss, 'Train Accuracy': train_acc, 'Validation Accuracy': val_acc},
+                  step=i + config["history_interval"])
+
+        # save the best model so far
+        if best_val_acc < val_acc:
+            best_val_acc = val_acc
+            best_model_state = deepcopy(model.state_dict())
+            if config['save_model']:
+                save_path = f'local/checkpoint_temp/{wandb.run.name}/'
+                os.makedirs(save_path, exist_ok=True)
+                best_checkpoint = {'model_state': best_model_state, 'config': config,
+                                   'optimizer': optimizer, 'scheduler': scheduler}
+                torch.save(best_checkpoint, os.path.join(save_path, 'best_checkpoint.pt'))
 
     # calculate the test accuracies for best and last models
     last_model_state = deepcopy(model.state_dict())
-    last_test_result = check_accuracy(model=model,
-                                      loader=test_loader,
-                                      preprocess=preprocess_test,
-                                      config=config, repeat=30)
+    last_test_result = check_accuracy_extended(model=model, loader=test_loader,
+                                               preprocess=preprocess_test,
+                                               config=config, repeat=30)
     last_test_acc = last_test_result[0]
 
     model.load_state_dict(best_model_state)
-    best_test_result = check_accuracy(model=model,
-                                      loader=test_loader,
-                                      preprocess=preprocess_test,
-                                      config=config, repeat=30)
+    best_test_result = check_accuracy_extended(model=model, loader=test_loader,
+                                               preprocess=preprocess_test,
+                                               config=config, repeat=30)
     best_test_acc = best_test_result[0]
 
     if last_test_acc < best_test_acc:
@@ -156,20 +156,20 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
         test_result = last_test_result
 
     model.load_state_dict(model_state)
-    test_acc, test_confusion, test_debug, score, target = test_result
+    test_acc, score, target, test_confusion, error_table = test_result
 
-    # calculate the test accuracies for final model on much longer sequence
-    longer_test_acc = check_accuracy(model=model,
-                                     loader=test_loader_longer,
+    # calculate the test accuracy for final model on much longer sequence
+    longer_test_acc = check_accuracy(model=model, loader=test_loader_longer,
                                      preprocess=preprocess_test,
-                                     config=config, repeat=30)[0]
+                                     config=config, repeat=30)
 
     # save the model
     if config['save_model']:
         save_path = f'local/checkpoint_temp/{wandb.run.name}/'
         os.makedirs(save_path, exist_ok=True)
-        path = os.path.join(save_path, f'{config["model"]}')
-        torch.save(model_state, path)
+        last_checkpoint = {'model_state': last_model_state, 'config': config,
+                           'optimizer': optimizer, 'scheduler': scheduler}
+        torch.save(last_checkpoint, os.path.join(save_path, 'last_checkpoint.pt'))
 
     # leave the message
     wandb.log({'Test Accuracy': test_acc,
@@ -177,20 +177,20 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
                                                round(best_test_acc, 2), round(last_test_acc, 2)),
                'Confusion Matrix (Array)': test_confusion,
                'Test Accuracy (Longer)': longer_test_acc,
-               'Test Debug Table/Serial': test_debug[0],
-               'Test Debug Table/EDF': test_debug[1],
-               'Test Debug Table/Pred': test_debug[2],
-               'Test Debug Table/GT': test_debug[3]})
+               'Test Debug Table/Serial': error_table['Serial'],
+               'Test Debug Table/Pred': error_table['Pred'],
+               'Test Debug Table/GT': error_table['GT']})
 
     if config['draw_result']:
-        draw_roc_curve(score, target, class_label_to_type, use_wandb=True)
-        draw_confusion(test_confusion, class_label_to_type, use_wandb=True)
-        draw_debug_table(test_debug, use_wandb=True)
+        draw_roc_curve(score, target, config['class_label_to_name'], use_wandb=True)
+        draw_confusion(test_confusion, config['class_label_to_name'], use_wandb=True)
+        draw_error_table(error_table, use_wandb=True)
+
         # leave these disabled to save the wandb resources
         # wandb.log({"Confusion Matrix": wandb.plot.confusion_matrix(y_true=target,
         #                                                            preds=score.argmax(axis=-1),
-        #                                                            class_names=class_label_to_type)})
-        # wandb.log({"ROC Curve": wandb.plot.roc_curve(target, score, labels=class_label_to_type)})
+        #                                                            class_names=config['class_label_to_name'])})
+        # wandb.log({"ROC Curve": wandb.plot.roc_curve(target, score, labels=config['class_label_to_name'])})
 
     # release memory
     del optimizer, scheduler

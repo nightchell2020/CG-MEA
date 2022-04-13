@@ -46,7 +46,6 @@ class MultiLabel:
     parkinson_synd: bool = False
     parkinson_disease: bool = False
     parkinson_dementia: bool = False
-    other_parkinson_synd: bool = False
 
     nph: bool = False
     tga: bool = False
@@ -160,14 +159,12 @@ class MultiLabel:
         elif dx1 in ['non fluent aphasia']:
             label = MultiLabel(ftd=True, non_fluent_aphasia=True)
 
-        elif dx1 in ['parkinson_synd']:
+        elif dx1 in ['parkinson_synd', 'other parkinson synd']:
             label = MultiLabel(parkinson_synd=True)
         elif dx1 in ['pd', 'parkinson\'s disease']:
             label = MultiLabel(parkinson_synd=True, parkinson_disease=True)
         elif dx1 in ['pdd', 'parkinson dementia']:
             label = MultiLabel(dementia=True, parkinson_synd=True, parkinson_dementia=True)
-        elif dx1 in ['other parkinson synd']:
-            label = MultiLabel(parkinson_synd=True, other_parkinson_synd=True)
 
         elif dx1 in ['nph']:
             label = MultiLabel(nph=True)
@@ -186,54 +183,53 @@ class MultiLabel:
 
 
 class CauEegDataset(Dataset):
-    """PyTorch Dataset Class for CAU EEG Dataset.
+    """PyTorch Dataset Class for CAUEEG Dataset.
 
     Args:
         root_dir (str): Root path to the EDF data files.
-        metadata (list of dict): List of dictionary with metadata.
+        data_list (list of dict): List of dictionary for the data.
         load_event (bool): Determines whether to load event information or not for saving loading time.
-        file_format (str): Determines which file format is used among PyArrow Feather and NumPy memmap.
+        file_format (str): Determines which file format is used among of EDF, PyArrow Feather, and NumPy memmap.
         transform (callable): Optional transform to be applied on each data.
     """
 
-    def __init__(self, root_dir, metadata, load_event, file_format='edf', transform=None):
-        if file_format not in ['edf', 'feather', 'memmap']:
+    def __init__(self, root_dir: str, data_list: list,
+                 load_event: bool, file_format: str = 'edf', transform=None):
+        if file_format not in ['edf', 'feather', 'memmap', 'np']:
             raise ValueError(f"{self.__class__.__name__}.__init__(file_format) "
-                             f"must be set to one of 'edf', 'feather', and 'memmap'")
+                             f"must be set to one of 'edf', 'feather', 'memmap' and 'np'")
 
         self.root_dir = root_dir
-        self.metadata = metadata
+        self.data_list = data_list
         self.load_event = load_event
         self.file_format = file_format
         self.transform = transform
 
     def __len__(self):
-        return len(self.metadata)
+        return len(self.data_list)
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
         # metadata
-        m = deepcopy(self.metadata[idx])
+        anno = deepcopy(self.data_list[idx])
 
         # signal
         if self.file_format == 'edf':
-            signal = self.read_edf(m)
+            signal = self.read_edf(anno)
         elif self.file_format == 'feather':
-            signal = self.read_feather(m)
+            signal = self.read_feather(anno)
         else:
-            signal = self.read_memmap(m)
+            signal = self.read_memmap(anno)
 
         # event
         if self.load_event:
-            m['event'] = self.read_event(m)
+            anno['event'] = self.read_event(anno)
 
         # pack into dictionary
         sample = {'signal': signal,
-                  'age': m['age'],
-                  'class_label': m['class_label'],
-                  'metadata': m}
+                  **anno}
 
         if self.transform:
             sample = self.transform(sample)
@@ -243,13 +239,13 @@ class CauEegDataset(Dataset):
     def read_edf(self, m):
         edf_file = os.path.join(self.root_dir, 'signal', m['serial'] + '.edf')
         signal, signal_headers, _ = pyedflib.highlevel.read_edf(edf_file)
-        # m['channel'] = [s_h['label'] for s_h in signal_headers]
+        # m['channel_header'] = [s_h['label'] for s_h in signal_headers]
         return signal
 
     def read_feather(self, m):
         fname = os.path.join(self.root_dir, 'signal/feather', m['serial'] + '.feather')
         df = feather.read_feather(fname)
-        # m['channel'] = df.columns.to_list()
+        # m['channel_header'] = df.columns.to_list()
         return df.values.T
 
     def read_memmap(self, m):
@@ -257,18 +253,18 @@ class CauEegDataset(Dataset):
         signal = np.memmap(fname, dtype='int32', mode='r').reshape(21, -1)
         return signal
 
-    # def read_np(self, m):
-    #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.npy')
-    #     return np.load(fname)
-    #
+    def read_np(self, m):
+        fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.npy')
+        return np.load(fname)
+
     # def read_hdf5(self, m):
     #     return self.f_handle[m['serial']][:]
-    #
+
     # def read_jay(self, m):
     #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.jay')
     #     signal = dt.fread(fname).to_numpy().T
     #     return signal
-    #
+
     # def read_parquet(self, m):
     #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.parquet')
     #     signal = pd.read_parquet(fname).values.T
@@ -281,7 +277,7 @@ class CauEegDataset(Dataset):
         return event
 
     def get_data_frame(self, idx=0):
-        m = self.metadata[idx]
+        m = self.data_list[idx]
         fname = os.path.join(self.root_dir, 'signal/feather', m['serial'] + '.feather')
         df = pd.read_feather(fname)
         return df

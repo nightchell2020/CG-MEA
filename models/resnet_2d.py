@@ -153,9 +153,6 @@ class ResNet2D(nn.Module):
             use_age,
             final_pool,
             base_channels,
-            n_fft,
-            complex_mode,
-            hop_length,
             dropout=0.1,
             zero_init_residual: bool = False,
             groups: int = 1,
@@ -203,14 +200,6 @@ class ResNet2D(nn.Module):
         self.groups = groups
         self.base_width = width_per_group
 
-        if complex_mode not in ('as_real', 'power', 'remove'):
-            raise ValueError('complex_mode must be set to one of ("as_real", "power", "remove")')
-        self.n_fft = n_fft
-        self.complex_mode = complex_mode
-        self.hop_length = hop_length
-
-        if complex_mode == 'as_real':
-            in_channels *= 2
         in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
 
         self.conv1 = nn.Conv2d(in_channels, self.current_channels, kernel_size=(7, 7),
@@ -297,27 +286,6 @@ class ResNet2D(nn.Module):
 
     def _forward_impl(self, x: torch.Tensor, age: torch.Tensor) -> torch.Tensor:
         # See note [TorchScript super()]
-        N = x.shape[0]
-
-        for i in range(N):
-            xf = torch.stft(x[i], n_fft=self.n_fft, return_complex=True)
-
-            if i == 0:
-                if self.complex_mode == 'as_real':
-                    x_out = torch.zeros((N, 2 * xf.shape[0],
-                                         xf.shape[1], xf.shape[2])).type_as(x)
-                else:
-                    x_out = torch.zeros((N, *xf.shape)).type_as(x)
-
-            if self.complex_mode == 'as_real':
-                x_out[i] = torch.cat((torch.view_as_real(xf)[..., 0],
-                                      torch.view_as_real(xf)[..., 1]), dim=0)
-            elif self.complex_mode == 'power':
-                x_out[i] = xf.abs()
-            elif self.complex_mode == 'remove':
-                x_out[i] = torch.real(xf)
-        x = x_out
-
         if self.use_age == 'conv':
             N, _, H, W = x.size()
             age = age.reshape((N, 1, 1, 1)).expand(N, 1, H, W)

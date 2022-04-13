@@ -3,7 +3,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 import time
 
-from .cau_eeg_dataset import MultiLabel
+from .caueeg_dataset import MultiLabel
 
 
 def trim_trailing_zeros(a):
