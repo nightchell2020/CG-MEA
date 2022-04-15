@@ -1,5 +1,4 @@
 import os
-from copy import deepcopy
 import json
 import pprint
 import torch
@@ -7,7 +6,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 
 from .caueeg_dataset import CauEegDataset
-from .pipeline import EegLimitMaxLength, EegRandomCrop
+from .pipeline import EegRandomCrop
 from .pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
 from .pipeline import EegNormalizeAge
 from .pipeline import EegDropChannels
@@ -78,7 +77,7 @@ def load_caueeg_task_datasets(dataset_path: str, task: str,
         dataset_path (str): The file path where the dataset files are located.
         task (str): The target task to load.
         load_event (bool): Whether to load the event information occurred during recording EEG signals.
-        file_format (str): Determines which file format is used among of EDF, PyArrow Feather, and NumPy memmap.
+        file_format (str): Determines which file format will be used (default: 'edf').
         transform (callable): Preprocessing process to apply during loading signals.
         verbose (bool): Whether to print the progress during loading the datasets.
 
@@ -96,14 +95,27 @@ def load_caueeg_task_datasets(dataset_path: str, task: str,
         print(f"ERROR: load_caueeg_task_datasets(dataset_path) encounters an error of {e}. "
               f"Make sure the dataset path is correct.")
 
-    train_dataset = CauEegDataset(dataset_path, task_dict['train_split'],
-                                  load_event=load_event, file_format=file_format, transform=transform)
+    if file_format == 'edf':
+        train_dataset = CauEegDataset(dataset_path, task_dict['train_split'],
+                                      load_event=load_event, file_format=file_format, transform=transform)
 
-    val_dataset = CauEegDataset(dataset_path, task_dict['validation_split'],
-                                load_event=load_event, file_format=file_format, transform=transform)
+        val_dataset = CauEegDataset(dataset_path, task_dict['validation_split'],
+                                    load_event=load_event, file_format=file_format, transform=transform)
 
-    test_dataset = CauEegDataset(dataset_path, task_dict['test_split'],
-                                 load_event=load_event, file_format=file_format, transform=transform)
+        test_dataset = CauEegDataset(dataset_path, task_dict['test_split'],
+                                     load_event=load_event, file_format=file_format, transform=transform)
+    elif file_format in ['feather', 'memmap']:
+        train_dataset = CauEegDataset(dataset_path, task_dict['train_split'],
+                                      load_event=load_event, file_format=file_format, transform=transform)
+
+        val_dataset = CauEegDataset(dataset_path, task_dict['validation_split'],
+                                    load_event=load_event, file_format=file_format, transform=transform)
+
+        test_dataset = CauEegDataset(dataset_path, task_dict['test_split'],
+                                     load_event=load_event, file_format=file_format, transform=transform)
+    else:
+        raise ValueError(f"load_caueeg_task_datasets(task) receives the invalid task name: {task}. "
+                         f"Make sure the task name is correct.")
 
     config = {k: v for k, v in task_dict.items()
               if k not in ['train_split', 'validation_split', 'test_split']}
@@ -258,9 +270,23 @@ def compose_transforms(config, verbose=False):
     transform = []
     transform_longer = []
 
-    ####################################
-    # usage of EEG and photic channels #
-    ####################################
+    ###############
+    # signal crop #
+    ###############
+    transform += [EegRandomCrop(crop_length=config['crop_length'],
+                                length_limit=config.get('signal_length_limit', 10 ** 7),
+                                multiple=config.get('crop_multiple', 1),
+                                latency=config.get('latency', 0),
+                                return_timing=config.get('crop_timing_analysis', False))]
+    transform_longer += [EegRandomCrop(crop_length=config['longer_crop_length'],
+                                       length_limit=config.get('signal_length_limit', 10 ** 7),
+                                       multiple=config.get('crop_multiple', 1),
+                                       latency=config.get('latency', 0),
+                                       return_timing=config.get('crop_timing_analysis', False))]
+
+    ###################################
+    # usage of EKG or photic channels #
+    ###################################
     channel_ekg = config['signal_header'].index('EKG')
     channel_photic = config['signal_header'].index('Photic')
 
@@ -282,25 +308,6 @@ def compose_transforms(config, verbose=False):
     else:
         raise ValueError(f"Both config['EKG'] and config['photic'] have to be set to one of ['O', 'X']")
 
-    #######################
-    # signal length limit #
-    #######################
-    if 'signal_length_limit' in config.keys():
-        transform += [EegLimitMaxLength(max_length=config['signal_length_limit'])]
-        transform_longer += [EegLimitMaxLength(max_length=config['signal_length_limit'])]
-
-    ###############
-    # signal crop #
-    ###############
-    transform += [EegRandomCrop(crop_length=config['crop_length'],
-                                multiple=config.get('crop_multiple', 1),
-                                latency=config.get('latency', 0),
-                                return_timing=config.get('crop_timing_analysis', False))]
-    transform_longer += [EegRandomCrop(crop_length=config['longer_crop_length'],
-                                       multiple=config.get('crop_multiple', 1),
-                                       latency=config.get('latency', 0),
-                                       return_timing=config.get('crop_timing_analysis', False))]
-
     ###################
     # numpy to tensor #
     ###################
@@ -310,9 +317,8 @@ def compose_transforms(config, verbose=False):
     #####################
     # transform-compose #
     #####################
-    # composed_train = [TransformTimeChecker(t, '', '>50') for t in composed_train]
-    # composed_test = [TransformTimeChecker(t, '', '>50') for t in composed_test]
-    # composed_test_longer = [TransformTimeChecker(t, '', '>50') for t in composed_test_longer]
+    # transform = [TransformTimeChecker(t, '', '>50') for t in transform]
+    # transform_longer = [TransformTimeChecker(t, '', '>50') for t in transform_longer]
 
     transform = transforms.Compose(transform)
     transform_longer = transforms.Compose(transform_longer)

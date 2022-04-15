@@ -2,56 +2,25 @@ import numpy as np
 import torch
 
 
-class EegDropChannels(object):
-    """Drop the specified channel from EEG signal.
-
-    Args:
-        index (int or list): Channel index(or induce) to drop.
-    """
-    def __init__(self, index):
-        self.drop_index = index
-
-    def drop_specific_channel(self, signal):
-        return np.delete(signal, self.drop_index, axis=0)
-
-    def __call__(self, sample):
-        signal = sample['signal']
-
-        if isinstance(signal, (np.ndarray,)):
-            sample['signal'] = self.drop_specific_channel(signal)
-        elif isinstance(signal, (list,)):
-            signals = []
-            for s in signal:
-                signals.append(self.drop_specific_channel(s))
-            sample['signal'] = signals
-        else:
-            raise ValueError(f'{self.__class__.__name__}.__call__(sample["signal"]) needs to be set to np.ndarray '
-                             f'or their array')
-        return sample
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(drop_index={self.drop_index})"
-
-
-class EegLimitMaxLength(object):
-    """Cut off the start and end signals by the specified amount.
-
-    Args:
-        max_length (int): Signal length limit to cut out the rest.
-    """
-
-    def __init__(self, max_length: int):
-        if isinstance(max_length, int) is False or max_length <= 0:
-            raise ValueError(f'{self.__class__.__name__}.__init__(front_cut) '
-                             f'needs a positive integer to initialize')
-        self.max_length = max_length
-
-    def __call__(self, sample):
-        sample['signal'] = sample['signal'][:, :self.max_length]
-        return sample
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(max_length={self.max_length})"
+# class EegLimitMaxLength(object):
+#     """Cut off the start and end signals by the specified amount.
+#
+#     Args:
+#         max_length (int): Signal length limit to cut out the rest.
+#     """
+#
+#     def __init__(self, max_length: int):
+#         if isinstance(max_length, int) is False or max_length <= 0:
+#             raise ValueError(f'{self.__class__.__name__}.__init__(front_cut) '
+#                              f'needs a positive integer to initialize')
+#         self.max_length = max_length
+#
+#     def __call__(self, sample):
+#         sample['signal'] = sample['signal'][:, :self.max_length]
+#         return sample
+#
+#     def __repr__(self) -> str:
+#         return f"{self.__class__.__name__}(max_length={self.max_length})"
 
 
 class EegRandomCrop(object):
@@ -59,12 +28,13 @@ class EegRandomCrop(object):
 
     Args:
         crop_length (int): Desired output signal length.
+        length_limit (int, optional): Signal length limit to use.
         multiple (int, optional): Desired number of cropping.
         latency (int, optional): Latency signal length to exclude after record starting.
         return_timing (bool, optional): Decide whether return the sample timing or not.
-
     """
-    def __init__(self, crop_length: int, multiple: int = 1, latency: int = 0, return_timing: bool = False):
+    def __init__(self, crop_length: int, length_limit: int = 10**7,
+                 multiple: int = 1, latency: int = 0, return_timing: bool = False):
         if isinstance(crop_length, int) is False:
             raise ValueError(f'{self.__class__.__name__}.__init__(crop_length) '
                              f'needs a integer to initialize')
@@ -76,21 +46,17 @@ class EegRandomCrop(object):
                              f' needs a non negative integer to initialize')
 
         self.crop_length = crop_length
+        self.length_limit = length_limit
         self.multiple = multiple
         self.latency = latency
         self.return_timing = return_timing
 
-    def _random_crop_signal(self, signal):
-        total_length = signal.shape[-1]
-        start_point = np.random.randint(self.latency, total_length - self.crop_length)
-        return signal[:, start_point:start_point + self.crop_length]
-
     def __call__(self, sample):
         signal = sample['signal']
-        total_length = signal.shape[-1]
+        signal_length = min(signal.shape[-1], self.length_limit)
 
         if self.multiple == 1:
-            st = np.random.randint(self.latency, total_length - self.crop_length)
+            st = np.random.randint(self.latency, signal_length - self.crop_length)
             sample['signal'] = signal[:, st:st + self.crop_length]
             if self.return_timing:
                 sample['metadata']['start_point'] = st
@@ -99,7 +65,7 @@ class EegRandomCrop(object):
             start_points = []
 
             for r in range(self.multiple):
-                st = np.random.randint(self.latency, total_length - self.crop_length)
+                st = np.random.randint(self.latency, signal_length - self.crop_length)
                 signals.append(signal[:, st:st + self.crop_length])
                 start_points.append(st)
 
@@ -110,7 +76,7 @@ class EegRandomCrop(object):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(crop_length={self.crop_length}, " \
+        return f"{self.__class__.__name__}(crop_length={self.crop_length}, length_limit={self.length_limit}, " \
                f"multiple={self.multiple}, latency={self.latency}, return_timing={self.return_timing})"
 
 
@@ -122,9 +88,11 @@ class EegEyeOpenCrop(object):
         crop_after (int): Desired signal length to crop right after the event occurred
         jitter (int): Amount of jitter
         mode (str, optional): Way for selecting one among multiple same events
+        length_limit (int, optional): Signal length limit to use.
     """
 
-    def __init__(self, crop_before: int, crop_after: int, jitter: int, mode: str = 'first'):
+    def __init__(self, crop_before: int, crop_after: int, jitter: int, mode: str = 'first',
+                 length_limit: int = 10**7):
         if mode not in ('first', 'random'):
             raise ValueError(f'{self.__class__.__name__}.__init__(mode) '
                              f'must be set to one of ("first", "random")')
@@ -133,22 +101,23 @@ class EegEyeOpenCrop(object):
         self.crop_after = crop_after
         self.jitter = jitter
         self.mode = mode
+        self.length_limit = length_limit
 
     def __call__(self, sample):
-        if 'event' not in sample['metadata'].keys():
+        if 'event' not in sample.keys():
             raise ValueError(f'{self.__class__.__name__}, this dataset '
                              f'does not have the event information at all.')
 
         signal = sample['signal']
-        total_length = signal.shape[-1]
+        total_length = min(signal.shape[-1], self.length_limit)
 
         candidates = []
-        for e in sample['metadata']['event']:
+        for e in sample['event']:
             if e[1].lower() == 'eyes open':
                 candidates.append(e[0])
 
         if len(candidates) == 0:
-            raise ValueError(f'{self.__class__.__name__}.__call__(), {sample["metadata"]["serial"]} '
+            raise ValueError(f'{self.__class__.__name__}.__call__(), {sample["serial"]} '
                              f'does not have an eye open event.')
 
         if self.mode == 'first':
@@ -175,7 +144,7 @@ class EegEyeOpenCrop(object):
                 break
 
         if len(candidates) == 0:
-            raise ValueError(f'{self.__class__.__name__}.__call__(), all events of {sample["metadata"]["serial"]} '
+            raise ValueError(f'{self.__class__.__name__}.__call__(), all events of {sample["serial"]} '
                              f'do not have the enough length to crop.')
 
         time = time + np.random.randint(low=neg, high=pos)
@@ -184,7 +153,8 @@ class EegEyeOpenCrop(object):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(crop_before={self.crop_before}, " \
-               f"crop_after={self.crop_after}, jitter={self.jitter}, mode={self.mode})"
+               f"crop_after={self.crop_after}, jitter={self.jitter}, mode={self.mode}, " \
+               f"length_limit={self.length_limit})"
 
 
 class EegEyeClosedCrop(object):
@@ -195,9 +165,11 @@ class EegEyeClosedCrop(object):
         crop_length (int): Desired output signal length
         jitter (int, optional): Amount of jitter
         mode (str, optional): Way for selecting one during eye-closed
+        length_limit (int, optional): Signal length limit to use.
     """
 
-    def __init__(self, transition: int, crop_length: int, jitter: int = 0, mode: str = 'random'):
+    def __init__(self, transition: int, crop_length: int, jitter: int = 0, mode: str = 'random',
+                 length_limit: int = 10*7):
         if mode not in ('random', 'exact'):
             raise ValueError(f'{self.__class__.__name__}.__init__(mode) '
                              f'must be set to one of ("random", "exact")')
@@ -206,21 +178,22 @@ class EegEyeClosedCrop(object):
         self.crop_length = crop_length
         self.jitter = jitter
         self.mode = mode
+        self.length_limit = length_limit
 
     def __call__(self, sample):
-        if 'event' not in sample['metadata'].keys():
+        if 'event' not in sample.keys():
             raise ValueError(f'{self.__class__.__name__}.__call__(), this dataset does not have '
                              f'an event information at all.')
 
         signal = sample['signal']
-        total_length = signal.shape[-1]
+        total_length = min(signal.shape[-1], self.length_limit)
 
         intervals = []
         started = True
         opened = False
         t = 00
 
-        for e in sample['metadata']['event']:
+        for e in sample['event']:
             if e[1].lower() == 'eyes open':
                 if started:
                     started = False
@@ -244,9 +217,9 @@ class EegEyeClosedCrop(object):
                      if min(x[1], total_length) - x[0] >= self.transition + self.crop_length + self.jitter]
 
         if len(intervals) == 0:
-            raise ValueError(f'{self.__class__.__name__}.__call__(), {sample["metadata"]["serial"]} does not have '
+            raise ValueError(f'{self.__class__.__name__}.__call__(), {sample["serial"]} does not have '
                              f'an useful eye-closed event, its total length is {total_length}, and its events are: '
-                             f'{sample["metadata"]["event"]}')
+                             f'{sample["event"]}')
 
         k = np.random.randint(low=0, high=len(intervals))
         time = 0
@@ -271,7 +244,37 @@ class EegEyeClosedCrop(object):
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(transition={self.transition}, " \
-               f"crop_length={self.crop_length}, jitter={self.jitter}, mode={self.mode})"
+               f"crop_length={self.crop_length}, jitter={self.jitter}, mode={self.mode}, " \
+               f"length_limit={self.length_limit})"
+
+
+class EegDropChannels(object):
+    """Drop the specified channel from EEG signal.
+
+    Args:
+        index (int or list): Channel index(or induce) to drop.
+    """
+    def __init__(self, index):
+        self.drop_index = index
+
+    def drop_specific_channel(self, signal):
+        return np.delete(signal, self.drop_index, axis=0)
+
+    def __call__(self, sample):
+        signal = sample['signal']
+
+        if isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self.drop_specific_channel(s))
+            sample['signal'] = signals
+        else:
+            sample['signal'] = self.drop_specific_channel(signal)
+
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(drop_index={self.drop_index})"
 
 
 class EegToTensor(object):

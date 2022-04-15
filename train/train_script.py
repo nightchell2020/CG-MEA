@@ -122,7 +122,7 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
                     wandb.config[k] = v
 
         wandb.log({'Loss': loss, 'Train Accuracy': train_acc, 'Validation Accuracy': val_acc},
-                  step=i + config["history_interval"])
+                  step=(i + config["history_interval"]) * config["minibatch"])
 
         # save the best model so far
         if best_val_acc < val_acc:

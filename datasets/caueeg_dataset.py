@@ -5,7 +5,6 @@ from dataclasses import dataclass, asdict
 import pyedflib
 
 import numpy as np
-import pandas as pd
 import pyarrow.feather as feather
 import torch
 from torch.utils.data import Dataset
@@ -193,8 +192,8 @@ class CauEegDataset(Dataset):
         transform (callable): Optional transform to be applied on each data.
     """
 
-    def __init__(self, root_dir: str, data_list: list,
-                 load_event: bool, file_format: str = 'edf', transform=None):
+    def __init__(self, root_dir: str, data_list: list, load_event: bool,
+                 file_format: str = 'edf', transform=None):
         if file_format not in ['edf', 'feather', 'memmap', 'np']:
             raise ValueError(f"{self.__class__.__name__}.__init__(file_format) "
                              f"must be set to one of 'edf', 'feather', 'memmap' and 'np'")
@@ -212,72 +211,63 @@ class CauEegDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        # metadata
-        anno = deepcopy(self.data_list[idx])
+        # annotation
+        sample = deepcopy(self.data_list[idx])
 
         # signal
-        if self.file_format == 'edf':
-            signal = self.read_edf(anno)
-        elif self.file_format == 'feather':
-            signal = self.read_feather(anno)
-        else:
-            signal = self.read_memmap(anno)
+        sample['signal'] = self._read_signal(sample)
 
         # event
         if self.load_event:
-            anno['event'] = self.read_event(anno)
-
-        # pack into dictionary
-        sample = {'signal': signal,
-                  **anno}
+            sample['event'] = self._read_event(sample)
 
         if self.transform:
             sample = self.transform(sample)
 
         return sample
 
-    def read_edf(self, m):
-        edf_file = os.path.join(self.root_dir, 'signal', m['serial'] + '.edf')
+    def _read_signal(self, anno):
+        if self.file_format == 'edf':
+            return self._read_edf(anno)
+        elif self.file_format == 'feather':
+            return self._read_feather(anno)
+        else:
+            return self._read_memmap(anno)
+
+    def _read_edf(self, anno):
+        edf_file = os.path.join(self.root_dir, f"signal/{anno['serial']}.edf")
         signal, signal_headers, _ = pyedflib.highlevel.read_edf(edf_file)
-        # m['channel_header'] = [s_h['label'] for s_h in signal_headers]
         return signal
 
-    def read_feather(self, m):
-        fname = os.path.join(self.root_dir, 'signal/feather', m['serial'] + '.feather')
+    def _read_feather(self, anno):
+        fname = os.path.join(self.root_dir, f"signal/feather/{anno['serial']}.feather")
         df = feather.read_feather(fname)
-        # m['channel_header'] = df.columns.to_list()
         return df.values.T
 
-    def read_memmap(self, m):
-        fname = os.path.join(self.root_dir, 'signal/memmap', m['serial'] + '.dat')
+    def _read_memmap(self, anno):
+        fname = os.path.join(self.root_dir, f"signal/memmap/{anno['serial']}.dat")
         signal = np.memmap(fname, dtype='int32', mode='r').reshape(21, -1)
         return signal
 
-    def read_np(self, m):
-        fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.npy')
+    def _read_np(self, anno):
+        fname = os.path.join(self.root_dir, f"signal/{anno['serial']}.npy")
         return np.load(fname)
 
-    # def read_hdf5(self, m):
+    # def _read_hdf5(self, m):
     #     return self.f_handle[m['serial']][:]
 
-    # def read_jay(self, m):
+    # def _read_jay(self, m):
     #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.jay')
     #     signal = dt.fread(fname).to_numpy().T
     #     return signal
 
-    # def read_parquet(self, m):
+    # def _read_parquet(self, m):
     #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.parquet')
     #     signal = pd.read_parquet(fname).values.T
     #     return signal
 
-    def read_event(self, m):
+    def _read_event(self, m):
         fname = os.path.join(self.root_dir, 'event', m['serial'] + '.json')
         with open(fname, 'r') as json_file:
             event = json.load(json_file)
         return event
-
-    def get_data_frame(self, idx=0):
-        m = self.data_list[idx]
-        fname = os.path.join(self.root_dir, 'signal/feather', m['serial'] + '.feather')
-        df = pd.read_feather(fname)
-        return df
