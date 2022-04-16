@@ -118,7 +118,7 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
             config['final_shape'] = model.get_final_shape()
             config['num_params'] = count_parameters(model)
             for k, v in config.items():
-                if k not in wandb.config:
+                if k not in wandb.config or wandb.config[k] is None:
                     wandb.config[k] = v
 
         wandb.log({'Loss': loss, 'Train Accuracy': train_acc, 'Validation Accuracy': val_acc},
