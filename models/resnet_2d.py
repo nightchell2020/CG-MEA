@@ -351,7 +351,7 @@ class ResNet2D(nn.Module):
         x = self.conv_stage3(x)
 
         x = self.pool4(x)
-        x = self.conv_stage1(x)
+        x = self.conv_stage4(x)
 
         x = self.final_pool(x)
         x = torch.flatten(x, 1)
