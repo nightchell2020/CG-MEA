@@ -77,23 +77,23 @@ class CNNTransformer(nn.Module):
 
         cf = conv_filter_list[0]
         self.pool0 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv0 = nn.Conv1d(in_channels=base_channels, out_channels=2 * base_channels,
+        self.conv0 = nn.Conv1d(in_channels=in_channels, out_channels=base_channels,
                                kernel_size=cf['kernel_size'], stride=cf['stride'],
                                padding=cf['kernel_size']//2, bias=False)
-        self.norm0 = norm_layer(2 * base_channels)
+        self.norm0 = norm_layer(base_channels)
         self.act0 = self.nn_act()
 
         cf = conv_filter_list[1]
         self.pool1 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv1 = nn.Conv1d(in_channels=2 * base_channels, out_channels=4 * base_channels,
+        self.conv1 = nn.Conv1d(in_channels=base_channels, out_channels=2 * base_channels,
                                kernel_size=cf['kernel_size'], stride=cf['stride'],
                                padding=cf['kernel_size']//2, bias=False)
-        self.norm1 = norm_layer(4 * base_channels)
+        self.norm1 = norm_layer(2 * base_channels)
         self.act1 = self.nn_act()
 
         cf = conv_filter_list[2]
         self.pool2 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv2 = nn.Conv1d(in_channels=4 * base_channels, out_channels=4 * base_channels,
+        self.conv2 = nn.Conv1d(in_channels=2 * base_channels, out_channels=4 * base_channels,
                                kernel_size=cf['kernel_size'], stride=cf['stride'],
                                padding=cf['kernel_size']//2, bias=False)
         self.norm2 = norm_layer(4 * base_channels)
