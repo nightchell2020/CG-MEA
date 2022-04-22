@@ -3,7 +3,7 @@ import datetime
 from dateutil.relativedelta import relativedelta
 import time
 
-from .caueeg_dataset import MultiLabel
+from .caueeg_dataset import MultiEegLabel
 
 
 def trim_trailing_zeros(a):
@@ -57,7 +57,7 @@ def serialize_json(obj):
         serial = obj.isoformat()
         return serial
 
-    if isinstance(obj, MultiLabel):
+    if isinstance(obj, MultiEegLabel):
         serial = obj.get_true_keys()
         return serial
 

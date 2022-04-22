@@ -1,7 +1,20 @@
-from typing import Type, Union, List
+"""
+1D modification of:
+    - torchvision implementation of ResNet, ResNeXt, and Wide ResNet (linked below)
+    - https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py
+    - ResNet paper: https://arxiv.org/abs/1603.05027
+    - ReNeXt paper: https://arxiv.org/abs/1611.05431
+    - Wide ResNet paper: https://arxiv.org/abs/1605.07146
+"""
+
+from typing import Callable, Optional, Type, Union, List, Any
 
 import torch
 import torch.nn as nn
+
+from .activation import get_activation_class
+from .utils import program_conv_filters
+from .utils import make_pool_or_not
 
 # __all__ = []
 
@@ -9,209 +22,223 @@ import torch.nn as nn
 class BasicBlock1D(nn.Module):
     expansion: int = 1
 
-    def __init__(self, c_in, c_out, kernel_size, stride, groups=1, activation=nn.ReLU) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            stride: int = 1,
+            downsample: Optional[nn.Module] = None,
+            groups: int = 1,
+            base_channels: int = 64,
+            dilation: int = 1,
+            norm_layer: Optional[Callable[..., nn.Module]] = None,
+            activation: Optional[Callable[..., nn.Module]] = nn.ReLU
+    ) -> None:
         super().__init__()
-        self.conv1 = nn.Conv1d(in_channels=c_in, out_channels=c_out,
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm1d
+        if groups != 1 or base_channels != 64:
+            raise ValueError('BasicBlock1D only supports groups=1 and base_channels=64')
+        if dilation > 1:
+            raise NotImplementedError("Dilation > 1 not supported in BasicBlock1D")
+
+        # Both self.conv1 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = nn.Conv1d(in_channels=in_channels, out_channels=out_channels,
                                kernel_size=kernel_size, stride=stride,
                                padding=kernel_size // 2, bias=False)
-        self.bn1 = nn.BatchNorm1d(c_out)
+        self.norm1 = norm_layer(out_channels)
+        self.act1 = activation()
 
-        self.conv2 = nn.Conv1d(in_channels=c_out, out_channels=c_out, groups=groups,
+        self.conv2 = nn.Conv1d(in_channels=out_channels, out_channels=out_channels,
                                kernel_size=kernel_size, stride=1,
                                padding=kernel_size // 2, bias=False)
-        self.bn2 = nn.BatchNorm1d(c_out)
+        self.norm2 = norm_layer(out_channels)
+        self.act2 = activation()
 
-        self.activation = activation()
-
-        self.downsample = None
-        if stride != 1 or c_in != c_out:
-            self.downsample = nn.Sequential(
-                nn.Conv1d(in_channels=c_in, out_channels=c_out,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm1d(c_out)
-            )
+        self.downsample = downsample
+        self.stride = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = x
 
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.activation(x)
+        out = self.conv1(x)
+        out = self.norm1(out)
+        out = self.act1(out)
 
-        x = self.conv2(x)
-        x = self.bn2(x)
+        out = self.conv2(out)
+        out = self.norm2(out)
+
         if self.downsample is not None:
             identity = self.downsample(identity)
-        x = self.activation(x + identity)
 
-        return x
+        out += identity
+        out = self.act2(out)
+
+        return out
 
 
 class BottleneckBlock1D(nn.Module):
     expansion: int = 4
 
-    def __init__(self, c_in, c_out, kernel_size, stride, groups=1, activation=nn.ReLU) -> None:
+    def __init__(
+            self,
+            in_channels: int,
+            out_channels: int,
+            kernel_size: int,
+            stride: int = 1,
+            downsample: Optional[nn.Module] = None,
+            groups: int = 1,
+            base_channels: int = 64,
+            dilation: int = 1,
+            norm_layer: Optional[Callable[..., nn.Module]] = None,
+            activation: Optional[Callable[..., nn.Module]] = nn.ReLU
+    ) -> None:
         super().__init__()
-        width = c_out
-        self.conv1 = nn.Conv1d(in_channels=c_in, out_channels=width,
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm1d
+        width = int(out_channels * (base_channels / 64.)) * groups
+
+        # Both self.conv2 and self.downsample layers downsample the input when stride != 1
+        self.conv1 = nn.Conv1d(in_channels=in_channels, out_channels=width,
                                kernel_size=1, stride=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(width)
+        self.norm1 = norm_layer(width)
+        self.act1 = activation()
 
         self.conv2 = nn.Conv1d(in_channels=width, out_channels=width, groups=groups,
-                               kernel_size=kernel_size, stride=stride,
+                               kernel_size=kernel_size, stride=stride, dilation=dilation,
                                padding=kernel_size // 2, bias=False)
-        self.bn2 = nn.BatchNorm1d(width)
+        self.norm2 = norm_layer(width)
+        self.act2 = activation()
 
-        self.conv3 = nn.Conv1d(in_channels=width, out_channels=c_out * self.expansion,
+        self.conv3 = nn.Conv1d(in_channels=width, out_channels=out_channels * self.expansion,
                                kernel_size=1, stride=1, bias=False)
-        self.bn3 = nn.BatchNorm1d(c_out * self.expansion)
+        self.norm3 = norm_layer(out_channels * self.expansion)
+        self.act3 = activation()
 
-        self.activation = activation()
-
-        self.downsample = None
-        if stride != 1 or c_in != c_out * self.expansion:
-            self.downsample = nn.Sequential(
-                nn.Conv1d(in_channels=c_in, out_channels=c_out * self.expansion,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm1d(c_out * self.expansion)
-            )
+        self.downsample = downsample
+        self.stride = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         identity = x
 
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.activation(x)
+        out = self.conv1(x)
+        out = self.norm1(out)
+        out = self.act1(out)
 
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.activation(x)
+        out = self.conv2(out)
+        out = self.norm2(out)
+        out = self.act2(out)
 
-        x = self.conv3(x)
-        x = self.bn3(x)
-        if self.downsample is not None:
-            identity = self.downsample(identity)
-
-        x = self.activation(x + identity)
-
-        return x
-
-
-class MultiBottleneckBlock1D(nn.Module):
-    expansion: int = 4
-
-    def __init__(self, c_in, c_out, kernel_size, stride, groups=1, activation=nn.ReLU) -> None:
-        super().__init__()
-        width = c_out
-
-        self.conv1 = nn.Conv1d(in_channels=c_in, out_channels=width, kernel_size=1,
-                               dilation=1, stride=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(width)
-
-        self.conv2_1 = nn.Conv1d(in_channels=width, out_channels=width, groups=groups,
-                                 kernel_size=kernel_size, dilation=1,
-                                 stride=stride, padding=kernel_size // 2, bias=False)
-        self.conv2_2 = nn.Conv1d(in_channels=width, out_channels=width, groups=groups,
-                                 kernel_size=kernel_size, dilation=2,
-                                 stride=stride, padding=(kernel_size // 2) * 2, bias=False)
-        self.bn2 = nn.BatchNorm1d(width * 2)
-
-        self.conv3 = nn.Conv1d(in_channels=width * 2, out_channels=c_out * self.expansion, kernel_size=1,
-                               dilation=1, stride=1, bias=False)
-        self.bn3 = nn.BatchNorm1d(c_out * self.expansion)
-
-        self.activation = activation()
-
-        self.downsample = None
-        if stride != 1 or c_in != c_out * self.expansion:
-            self.downsample = nn.Sequential(
-                nn.Conv1d(in_channels=c_in, out_channels=c_out * self.expansion,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm1d(c_out * self.expansion)
-            )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = x
-
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.activation(x)
-
-        x1 = self.conv2_1(x)
-        x2 = self.conv2_2(x)
-        x = torch.cat((x1, x2), dim=1)
-        x = self.bn2(x)
-        x = self.activation(x)
-
-        x = self.conv3(x)
-        x = self.bn3(x)
+        out = self.conv3(out)
+        out = self.norm3(out)
 
         if self.downsample is not None:
             identity = self.downsample(identity)
 
-        x = self.activation(x + identity)
-        return x
+        out += identity
+        out = self.act3(out)
+
+        return out
 
 
 class ResNet1D(nn.Module):
     def __init__(self,
-                 block: Type[Union[BasicBlock1D, BottleneckBlock1D, MultiBottleneckBlock1D]],
+                 block: Type[Union[BasicBlock1D, BottleneckBlock1D]],
                  conv_layers: List[int],
-                 fc_stages: int,
                  in_channels: int,
                  out_dims: int,
-                 use_age,
-                 final_pool,
-                 base_channels=64,
-                 first_stride=2,
-                 first_dilation=1,
-                 base_stride=3,
-                 dropout=0.1,
-                 groups=1,
-                 kernel_size=9,
-                 activation='relu',
+                 sequence_length: int,
+                 base_channels: int,
+                 use_age: str,
+                 fc_stages: int,
+                 dropout: float = 0.1,
+                 zero_init_residual: bool = False,
+                 groups: int = 1,
+                 width_per_group: int = 64,
+                 norm_layer: Optional[Callable[..., nn.Module]] = None,
+                 activation: str = 'relu',
+                 base_pool: str = 'max',
+                 final_pool: str = 'average',
                  **kwargs) -> None:
 
         super().__init__()
 
-        if use_age not in {'fc', 'conv', None}:
-            raise ValueError("use_age must be set to one of ['fc', 'conv', None]")
+        if use_age not in ['fc', 'conv', 'no']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
+                             f"receives one of ['fc', 'conv', 'no'].")
 
-        if final_pool not in {'average', 'max'}:
-            raise ValueError("final_pool must be set to one of ['average', 'max']")
+        if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
+                             f"receives one of ['average', 'max'].")
 
         self.use_age = use_age
-        self.final_shape = None
+        if self.use_age == 'conv':
+            in_channels += 1
 
-        if activation == 'relu':
-            self.nn_act = nn.ReLU
-        elif activation == 'gelu':
-            self.nn_act = nn.GELU
-        elif activation == 'mish':
-            self.nn_act = nn.Mish
-        else:
-            raise ValueError("activation must be set to one of ['relu', 'gelu', 'mish']")
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
 
-        self.groups = groups
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm1d
+        self._norm_layer = norm_layer
+        self.zero_init_residual = zero_init_residual
+
         self.current_channels = base_channels
-        in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
+        self.groups = groups
+        self.base_channels = width_per_group
+        self.groups = groups
 
-        self.input_stage = nn.Sequential(
-            nn.Conv1d(in_channels=in_channels, out_channels=base_channels,
-                      kernel_size=kernel_size * 3, stride=first_stride, dilation=first_dilation,
-                      padding=(kernel_size * 3) // 2, bias=False),
-            nn.BatchNorm1d(base_channels),
-            self.nn_act(),
-        )
+        if base_pool == 'average':
+            self.base_pool = nn.AvgPool1d
+        elif base_pool == 'max':
+            self.base_pool = nn.MaxPool1d
 
-        self.conv_stage1 = self._make_conv_layer(block, conv_layers[0], base_channels,
-                                                 kernel_size, stride=base_stride, activation=self.nn_act)
-        self.conv_stage2 = self._make_conv_layer(block, conv_layers[1], base_channels * 2,
-                                                 kernel_size, stride=base_stride, activation=self.nn_act)
-        self.conv_stage3 = self._make_conv_layer(block, conv_layers[2], base_channels * 4,
-                                                 kernel_size, stride=base_stride, activation=self.nn_act)
-        self.conv_stage4 = self._make_conv_layer(block, conv_layers[3], base_channels * 8,
-                                                 kernel_size, stride=base_stride, activation=self.nn_act)
+        if block.__name__ == BasicBlock1D.__name__:
+            conv_filter_list = [
+                {'kernel_size': 41},
+                {'kernel_size': 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
+                {'kernel_size': 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
+                {'kernel_size': 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
+                {'kernel_size': 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
+            ]
+        else:
+            conv_filter_list = [
+                {'kernel_size': 41},
+                {'kernel_size': 9},
+                {'kernel_size': 9},
+                {'kernel_size': 9},
+                {'kernel_size': 9},
+            ]
+        self.sequence_length = sequence_length
+        self.output_length = program_conv_filters(sequence_length=sequence_length,
+                                                  conv_filter_list=conv_filter_list,
+                                                  output_lower_bound=7, output_upper_bound=15,
+                                                  class_name=self.__class__.__name__)
+
+        cf = conv_filter_list[0]
+        self.pool0 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv0 = nn.Conv1d(in_channels=in_channels, out_channels=self.current_channels,
+                               kernel_size=cf['kernel_size'], stride=cf['stride'],
+                               padding=cf['kernel_size']//2, bias=False)
+        self.norm0 = norm_layer(self.current_channels)
+        self.act0 = self.nn_act()
+
+        cf = conv_filter_list[1]
+        self.pool1 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv_stage1 = self._make_conv_layer(block, base_channels, conv_layers[0], cf['kernel_size'],
+                                                 stride=cf['stride'], activation=self.nn_act)
+        cf = conv_filter_list[2]
+        self.pool2 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv_stage2 = self._make_conv_layer(block, 2 * base_channels, conv_layers[1], cf['kernel_size'],
+                                                 stride=cf['stride'], activation=self.nn_act)
+        cf = conv_filter_list[3]
+        self.pool3 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv_stage3 = self._make_conv_layer(block, 4 * base_channels, conv_layers[2], cf['kernel_size'],
+                                                 stride=cf['stride'], activation=self.nn_act)
+        cf = conv_filter_list[4]
+        self.pool4 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv_stage4 = self._make_conv_layer(block, 8 * base_channels, conv_layers[3], cf['kernel_size'],
+                                                 stride=cf['stride'], activation=self.nn_act)
 
         if final_pool == 'average':
             self.final_pool = nn.AdaptiveAvgPool1d(1)
@@ -225,7 +252,7 @@ class ResNet1D(nn.Module):
         for l in range(fc_stages):
             layer = nn.Sequential(nn.Linear(self.current_channels, self.current_channels // 2, bias=False),
                                   nn.Dropout(p=dropout),
-                                  nn.BatchNorm1d(self.current_channels // 2),
+                                  norm_layer(self.current_channels // 2),
                                   self.nn_act())
             self.current_channels = self.current_channels // 2
             fc_stage.append(layer)
@@ -234,26 +261,53 @@ class ResNet1D(nn.Module):
 
     def reset_weights(self):
         for m in self.modules():
-            if hasattr(m, 'reset_parameters'):
+            if isinstance(m, nn.Conv1d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, (nn.BatchNorm1d,)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, (nn.Linear,)):
+                nn.init.xavier_normal_(m.weight)
+            elif hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
 
-    def get_final_shape(self):
-        return self.final_shape
+        # Zero-initialize the last BN in each residual branch,
+        # so that the residual branch starts with zeros, and each residual block behaves like an identity.
+        # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
+        if self.zero_init_residual:
+            for m in self.modules():
+                if isinstance(m, BottleneckBlock1D):
+                    nn.init.constant_(m.norm3.weight, 0)  # type: ignore[arg-type]
+                elif isinstance(m, BasicBlock1D):
+                    nn.init.constant_(m.bn2.weight, 0)  # type: ignore[arg-type]
 
-    def _make_conv_layer(self, block: Type[Union[BasicBlock1D, BottleneckBlock1D]], n_block: int,
-                         c_out: int, kernel_size: int, stride: int = 1, activation=nn.ReLU) -> nn.Sequential:
-        layers = []
-        c_in = self.current_channels
-        layers.append(block(c_in, c_out, kernel_size, groups=self.groups, stride=1, activation=activation))
+    def get_output_length(self):
+        return self.output_length
 
-        c_in = c_out * block.expansion
-        self.current_channels = c_in
-        for _ in range(1, n_block):
-            layers.append(block(c_in, c_out, kernel_size, groups=self.groups, stride=1, activation=activation))
+    def _make_conv_layer(self, block: Type[Union[BasicBlock1D, BottleneckBlock1D]], channels: int, blocks: int,
+                         kernel_size: int, stride: int = 1, activation=nn.ReLU) -> nn.Sequential:
+        norm_layer = self._norm_layer
+        downsample = None
 
-        layers.append(nn.MaxPool1d(kernel_size=stride))
+        if stride != 1 or self.current_channels != channels * block.expansion:
+            downsample = nn.Sequential(
+                nn.Conv1d(in_channels=self.current_channels, out_channels=channels * block.expansion,
+                          kernel_size=1, stride=stride, bias=False),
+                norm_layer(channels * block.expansion),
+            )
 
-        return nn.Sequential(*layers)
+        conv_layers = []
+        conv_layers.append(
+            block(in_channels=self.current_channels, out_channels=channels, kernel_size=kernel_size,
+                  base_channels=self.base_channels, stride=stride, downsample=downsample, groups=self.groups, activation=activation)
+        )
+
+        self.current_channels = channels * block.expansion
+        for _ in range(1, blocks):
+            conv_layers.append(block(in_channels=self.current_channels, out_channels=channels, kernel_size=kernel_size,
+                                     base_channels=self.base_channels, groups=self.groups, stride=1, activation=activation))
+
+        return nn.Sequential(*conv_layers)
 
     def forward(self, x, age):
         N, _, L = x.size()
@@ -261,15 +315,23 @@ class ResNet1D(nn.Module):
             age = age.reshape((N, 1, 1)).expand(N, 1, L)
             x = torch.cat((x, age), dim=1)
 
-        x = self.input_stage(x)
+        x = self.pool0(x)
+        x = self.conv0(x)
+        x = self.norm0(x)
+        x = self.act0(x)
 
+        x = self.pool1(x)
         x = self.conv_stage1(x)
+
+        x = self.pool2(x)
         x = self.conv_stage2(x)
+
+        x = self.pool3(x)
         x = self.conv_stage3(x)
+
+        x = self.pool4(x)
         x = self.conv_stage4(x)
 
-        if self.final_shape is None:
-            self.final_shape = x.shape
         x = self.final_pool(x).reshape((N, -1))
 
         if self.use_age == 'fc':

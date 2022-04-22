@@ -75,7 +75,7 @@ def load_caueeg_task_datasets(dataset_path: str, task: str,
 
     Args:
         dataset_path (str): The file path where the dataset files are located.
-        task (str): The target task to load.
+        task (str): The target task to load among 'task1' or 'task2'.
         load_event (bool): Whether to load the event information occurred during recording EEG signals.
         file_format (str): Determines which file format will be used (default: 'edf').
         transform (callable): Preprocessing process to apply during loading signals.

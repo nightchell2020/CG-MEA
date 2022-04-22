@@ -56,22 +56,22 @@ class EegRandomCrop(object):
         signal_length = min(signal.shape[-1], self.length_limit)
 
         if self.multiple == 1:
-            st = np.random.randint(self.latency, signal_length - self.crop_length)
-            sample['signal'] = signal[:, st:st + self.crop_length]
+            ct = np.random.randint(self.latency, signal_length - self.crop_length)
+            sample['signal'] = signal[:, ct:ct + self.crop_length]
             if self.return_timing:
-                sample['metadata']['start_point'] = st
+                sample['crop_timing'] = ct
         else:
             signals = []
-            start_points = []
+            crop_timings = []
 
             for r in range(self.multiple):
-                st = np.random.randint(self.latency, signal_length - self.crop_length)
-                signals.append(signal[:, st:st + self.crop_length])
-                start_points.append(st)
+                ct = np.random.randint(self.latency, signal_length - self.crop_length)
+                signals.append(signal[:, ct:ct + self.crop_length])
+                crop_timings.append(ct)
 
             sample['signal'] = signals
             if self.return_timing:
-                sample['start_point'] = start_points
+                sample['crop_timing'] = crop_timings
 
         return sample
 
@@ -313,16 +313,22 @@ class EegToTensor(object):
 def eeg_collate_fn(batch):
     batched_sample = {k: [] for k in batch[0].keys()}
 
-    for i, sample in enumerate(batch):
+    for sample in batch:
         if isinstance(sample['signal'], (np.ndarray,)) or torch.is_tensor(sample['signal']):
             for k in sample.keys():
                 batched_sample[k] += [sample[k]]
+
         elif isinstance(sample['signal'], (list,)):
+            multiple = len(sample['signal'])
+
             for s in sample['signal']:
                 batched_sample['signal'] += [s]
-                for k in sample.keys():
-                    if k != 'signal':
-                        batched_sample[k] += [sample[k]]
+
+            for k in sample.keys():
+                if k not in ['signal', 'crop_timing']:
+                    batched_sample[k] += multiple * [sample[k]]
+                elif k == 'crop_timing':
+                    batched_sample[k] += [*sample[k]]
 
     batched_sample['signal'] = torch.stack(batched_sample['signal'])
     batched_sample['age'] = torch.stack(batched_sample['age'])

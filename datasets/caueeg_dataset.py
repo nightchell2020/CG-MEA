@@ -1,7 +1,7 @@
 import os
 import json
 from copy import deepcopy
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import pyedflib
 
 import numpy as np
@@ -11,47 +11,49 @@ from torch.utils.data import Dataset
 
 
 @dataclass
-class MultiLabel:
+class MultiEegLabel:
     """Dataclass for EEG multi-property diagnosis label.
     """
-    dementia: bool = False
-    ad: bool = False
-    load: bool = False
-    eoad: bool = False
-    vd: bool = False
-    sivd: bool = False
-    ad_vd_mixed: bool = False
+    dementia: bool = field(default=False, metadata={"help": "Dementia."})
+    ad: bool = field(default=False, metadata={"help": "Alzheimer's disease dementia."})
+    load: bool = field(default=False, metadata={"help": "Late-onset AD."})
+    eoad: bool = field(default=False, metadata={"help": "Early-onset AD."})
+    vd: bool = field(default=False, metadata={"help": "Vascular dementia."})
+    sivd: bool = field(default=False, metadata={"help": "Subcortical ischemic vascular dementia."})
+    ad_vd_mixed: bool = field(default=False, metadata={"help": "Mixed dementia of Alzheimer's disease "
+                                                               "and vascular dementia."})
 
-    mci: bool = False
-    mci_ad: bool = False
-    mci_amnestic: bool = False
-    mci_amnestic_ef: bool = False
-    mci_amnestic_rf: bool = False
-    mci_non_amnestic: bool = False
-    mci_multi_domain: bool = False
-    mci_vascular: bool = False
+    mci: bool = field(default=False, metadata={"help": "Mild cognitive impairment."})
+    mci_ad: bool = field(default=False, metadata={"help": "MCI with amyloid PET positive."})
+    mci_amnestic: bool = field(default=False, metadata={"help": "Amnestic MCI."})
+    mci_amnestic_ef: bool = field(default=False, metadata={"help": "MCI encoding failure."})
+    mci_amnestic_rf: bool = field(default=False, metadata={"help": "MCI retrieval failure."})
+    mci_non_amnestic: bool = field(default=False, metadata={"help": "Non-amnestic MCI."})
+    mci_multi_domain: bool = field(default=False, metadata={"help": "Multi-domain MCI."})
+    mci_vascular: bool = field(default=False, metadata={"help": "Vascular MCI."})
 
-    normal: bool = False
-    cb_normal: bool = False
-    smi: bool = False
-    hc_normal: bool = False
+    normal: bool = field(default=False, metadata={"help": "Normal."})
+    cb_normal: bool = field(default=False, metadata={"help": "Community-based normal."})
+    smi: bool = field(default=False, metadata={"help": "Subjective memory impairment (subjective cognitive decline)."})
+    hc_normal: bool = field(default=False, metadata={"help": "Health care center normal."})
 
-    ftd: bool = False
-    bvftd: bool = False
-    language_ftd: bool = False
-    semantic_aphasia: bool = False
-    non_fluent_aphasia: bool = False
+    ftd: bool = field(default=False, metadata={"help": "Frontotemporal dementia."})
+    bvftd: bool = field(default=False, metadata={"help": "Behavioral variant FTD."})
+    language_ftd: bool = field(default=False, metadata={"help": "Language variant FTD."})
+    semantic_aphasia: bool = field(default=False, metadata={"help": "Semantic aphasia."})
+    non_fluent_aphasia: bool = field(default=False, metadata={"help": "Non-fluent aphasia."})
 
-    parkinson_synd: bool = False
-    parkinson_disease: bool = False
-    parkinson_dementia: bool = False
+    parkinson_synd: bool = field(default=False, metadata={"help": "Parkinson's syndrome."})
+    parkinson_disease: bool = field(default=False, metadata={"help": "Parkinson's disease."})
+    parkinson_dementia: bool = field(default=False, metadata={"help": "Parkinson's disease dementia."})
 
-    nph: bool = False
-    tga: bool = False
+    nph: bool = field(default=False, metadata={"help": "Normal pressure hydrocephalus."})
+    tga: bool = field(default=False, metadata={"help": "Transient global amnesia."})
 
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
-            assert hasattr(self, k), f'(ERROR) MultiLabel dataclass initialization error - has unknown label: {k}'
+            if not hasattr(self, k):
+                raise ValueError(f'ERROR: MultiEegLabel.__init__() has unknown label: {k}')
             setattr(self, k, v)
 
     def __repr__(self):
@@ -86,94 +88,94 @@ class MultiLabel:
         # input sanity check
         assert type(dx1) == str, f'ERROR: load_from_string function input is non-string type: {type(dx1)}'
 
-        label = MultiLabel()
+        label = MultiEegLabel()
 
         if dx1 in ['load']:
-            label = MultiLabel(dementia=True, ad=True, load=True)
+            label = MultiEegLabel(dementia=True, ad=True, load=True)
         elif dx1 in ['eoad']:
-            label = MultiLabel(dementia=True, ad=True, eoad=True)
+            label = MultiEegLabel(dementia=True, ad=True, eoad=True)
 
         elif dx1 in ['vd', 'vascular dementia', 'sivd']:
-            label = MultiLabel(dementia=True, vd=True, sivd=True)
+            label = MultiEegLabel(dementia=True, vd=True, sivd=True)
         elif dx1 in ['ad-vd-mixed']:
-            label = MultiLabel(dementia=True, ad_vd_mixed=True)
+            label = MultiEegLabel(dementia=True, ad_vd_mixed=True)
 
         elif dx1 in ['mci']:
-            label = MultiLabel(mci=True)
+            label = MultiEegLabel(mci=True)
 
         elif dx1 in ['ad_mci', 'ad-mci']:
-            label = MultiLabel(mci=True, mci_ad=True)
+            label = MultiEegLabel(mci=True, mci_ad=True)
         elif dx1 in ['ad-mci amnestic']:
-            label = MultiLabel(mci=True, mci_ad=True, mci_amnestic=True)
+            label = MultiEegLabel(mci=True, mci_ad=True, mci_amnestic=True)
 
         elif dx1 in ['ad-mci (ef)']:
-            label = MultiLabel(mci=True, mci_ad=True, mci_amnestic=True, mci_amnestic_ef=True)
+            label = MultiEegLabel(mci=True, mci_ad=True, mci_amnestic=True, mci_amnestic_ef=True)
         elif dx1 in ['ad-mci (rf)']:
-            label = MultiLabel(mci=True, mci_ad=True, mci_amnestic=True, mci_amnestic_rf=True)
+            label = MultiEegLabel(mci=True, mci_ad=True, mci_amnestic=True, mci_amnestic_rf=True)
 
         elif dx1 in ['mci amnestic', 'amci']:
-            label = MultiLabel(mci=True, mci_amnestic=True)
+            label = MultiEegLabel(mci=True, mci_amnestic=True)
         elif dx1 in ['mci amnestic multi-domain']:
-            label = MultiLabel(mci=True, mci_amnestic=True, mci_multi_domain=True)
+            label = MultiEegLabel(mci=True, mci_amnestic=True, mci_multi_domain=True)
 
         elif dx1 in ['mci_ef', 'mci ef', 'mci(ef)', 'amci (ef)', 'amci(ef)', 'mci encoding failure']:
-            label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_ef=True)
+            label = MultiEegLabel(mci=True, mci_amnestic=True, mci_amnestic_ef=True)
         elif dx1 in ['mci (ef) multi-domain', 'mci encoding failure multi-domain']:
-            label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_ef=True, mci_multi_domain=True)
+            label = MultiEegLabel(mci=True, mci_amnestic=True, mci_amnestic_ef=True, mci_multi_domain=True)
 
         elif dx1 in ['mci_rf', 'mci rf', 'mci (rf)', 'amci rf', 'mci retrieval failure']:
-            label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_rf=True)
+            label = MultiEegLabel(mci=True, mci_amnestic=True, mci_amnestic_rf=True)
         elif dx1 in ['mci(rf) multi-domain']:
-            label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_rf=True, mci_multi_domain=True)
+            label = MultiEegLabel(mci=True, mci_amnestic=True, mci_amnestic_rf=True, mci_multi_domain=True)
 
         elif dx1 in ['mci non amnestic', 'mci non-amnestic', 'cind']:
-            label = MultiLabel(mci=True, mci_non_amnestic=True)
+            label = MultiEegLabel(mci=True, mci_non_amnestic=True)
 
         elif dx1 in ['vascular mci']:
-            label = MultiLabel(mci=True, mci_vascular=True)
+            label = MultiEegLabel(mci=True, mci_vascular=True)
         elif dx1 in ['vmci non-amnestic']:
-            label = MultiLabel(mci=True, mci_vascular=True, mci_non_amnestic=True)
+            label = MultiEegLabel(mci=True, mci_vascular=True, mci_non_amnestic=True)
         elif dx1 in ['vmci(ef)']:
-            label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_ef=True, mci_vascular=True)
+            label = MultiEegLabel(mci=True, mci_amnestic=True, mci_amnestic_ef=True, mci_vascular=True)
         elif dx1 in ['vmci(rf)', 'vascular mci (rf)']:
-            label = MultiLabel(mci=True, mci_amnestic=True, mci_amnestic_rf=True, mci_vascular=True)
+            label = MultiEegLabel(mci=True, mci_amnestic=True, mci_amnestic_rf=True, mci_vascular=True)
 
         elif dx1 in ['nc', 'nl']:
-            label = MultiLabel(normal=True)
+            label = MultiEegLabel(normal=True)
         elif dx1 in ['cb_normal']:
-            label = MultiLabel(normal=True, cb_normal=True)
+            label = MultiEegLabel(normal=True, cb_normal=True)
         elif dx1 in ['smi']:
-            label = MultiLabel(normal=True, smi=True)
+            label = MultiEegLabel(normal=True, smi=True)
         elif dx1 in ['hc_normal']:
-            label = MultiLabel(normal=True, hc_normal=True)
+            label = MultiEegLabel(normal=True, hc_normal=True)
 
         elif dx1 in ['ftd']:
-            label = MultiLabel(ftd=True)
+            label = MultiEegLabel(ftd=True)
         elif dx1 in ['bvftd']:
-            label = MultiLabel(ftd=True, bvftd=True)
+            label = MultiEegLabel(ftd=True, bvftd=True)
         elif dx1 in ['language ftd']:
-            label = MultiLabel(ftd=True, language_ftd=True)
+            label = MultiEegLabel(ftd=True, language_ftd=True)
         elif dx1 in ['semantic aphasia']:
-            label = MultiLabel(ftd=True, semantic_aphasia=True)
+            label = MultiEegLabel(ftd=True, semantic_aphasia=True)
         elif dx1 in ['non fluent aphasia']:
-            label = MultiLabel(ftd=True, non_fluent_aphasia=True)
+            label = MultiEegLabel(ftd=True, non_fluent_aphasia=True)
 
         elif dx1 in ['parkinson_synd', 'other parkinson synd']:
-            label = MultiLabel(parkinson_synd=True)
+            label = MultiEegLabel(parkinson_synd=True)
         elif dx1 in ['pd', 'parkinson\'s disease']:
-            label = MultiLabel(parkinson_synd=True, parkinson_disease=True)
+            label = MultiEegLabel(parkinson_synd=True, parkinson_disease=True)
         elif dx1 in ['pdd', 'parkinson dementia']:
-            label = MultiLabel(dementia=True, parkinson_synd=True, parkinson_dementia=True)
+            label = MultiEegLabel(dementia=True, parkinson_synd=True, parkinson_dementia=True)
 
         elif dx1 in ['nph']:
-            label = MultiLabel(nph=True)
+            label = MultiEegLabel(nph=True)
 
         elif dx1 in ['tga']:
-            label = MultiLabel(tga=True)
+            label = MultiEegLabel(tga=True)
 
         else:
             if dx1 in ['unknown', '0', '?검사없음']:
-                label = MultiLabel()
+                label = MultiEegLabel()
             else:
                 print(f'(Warning) load_from_string function cannot parse the input: {dx1}')
 
@@ -252,19 +254,6 @@ class CauEegDataset(Dataset):
     def _read_np(self, anno):
         fname = os.path.join(self.root_dir, f"signal/{anno['serial']}.npy")
         return np.load(fname)
-
-    # def _read_hdf5(self, m):
-    #     return self.f_handle[m['serial']][:]
-
-    # def _read_jay(self, m):
-    #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.jay')
-    #     signal = dt.fread(fname).to_numpy().T
-    #     return signal
-
-    # def _read_parquet(self, m):
-    #     fname = os.path.join(self.root_dir, 'signal', m['serial'] + '.parquet')
-    #     signal = pd.read_parquet(fname).values.T
-    #     return signal
 
     def _read_event(self, m):
         fname = os.path.join(self.root_dir, 'event', m['serial'] + '.json')

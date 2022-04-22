@@ -1,44 +1,61 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
+from .utils import program_conv_filters
+from .utils import make_pool_or_not
+from .activation import get_activation_class
+from .activation import get_activation_functional
 
 # __all__ = []
 
 
 class TinyCNN1D(nn.Module):
-    def __init__(self, in_channels, out_dims, fc_stages, use_age, final_pool,
-                 stride=7, base_channels=64, dropout=0.3, activation='relu', **kwargs):
+    def __init__(self, in_channels: int, out_dims: int, fc_stages: int, sequence_length: int,
+                 use_age: str, base_channels: int = 64, dropout: float = 0.3,
+                 base_pool: str = 'max', final_pool: str = 'average', activation: str = 'relu', **kwargs):
         super().__init__()
 
-        if use_age not in {'fc', 'conv', None}:
-            raise ValueError("use_age must be set to one of ['fc', 'conv', None]")
+        if use_age not in ['fc', 'conv', 'no']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
+                             f"receives one of ['fc', 'conv', 'no'].")
 
-        if final_pool not in {'average', 'max'}:
-            raise ValueError("final_pool must be set to one of ['average', 'max']")
+        if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
+                             f"receives one of ['average', 'max'].")
 
         self.use_age = use_age
-        self.final_shape = None
+        if self.use_age == 'conv':
+            in_channels += 1
 
-        if activation == 'relu':
-            self.F_act = F.relu
-            self.nn_act = nn.ReLU
-        elif activation == 'gelu':
-            self.F_act = F.gelu
-            self.nn_act = nn.GELU
-        elif activation == 'mish':
-            self.F_act = F.mish
-            self.nn_act = nn.Mish
-        else:
-            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
+        self.F_act = get_activation_functional(activation, class_name=self.__class__.__name__)
 
-        in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
-        self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=35, stride=stride)
+        if base_pool == 'average':
+            self.base_pool = nn.AvgPool1d
+        elif base_pool == 'max':
+            self.base_pool = nn.MaxPool1d
+
+        conv_filter_list = [
+            {'kernel_size': 35},
+            {'kernel_size': 9},
+        ]
+        self.sequence_length = sequence_length
+        self.output_length = program_conv_filters(sequence_length=sequence_length,
+                                                  conv_filter_list=conv_filter_list,
+                                                  output_lower_bound=7, output_upper_bound=15,
+                                                  class_name=self.__class__.__name__)
+
+        cf = conv_filter_list[0]
+        self.pool1 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=cf['kernel_size'],
+                               padding=cf['kernel_size']//2, stride=cf['stride'], bias=False)
         self.bn1 = nn.BatchNorm1d(base_channels)
-        self.pool1 = nn.MaxPool1d(4)
 
-        self.conv2 = nn.Conv1d(base_channels, base_channels, kernel_size=7)
+        cf = conv_filter_list[1]
+        self.pool2 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv2 = nn.Conv1d(base_channels, base_channels, kernel_size=cf['kernel_size'],
+                               padding=cf['kernel_size']//2, stride=cf['stride'], bias=False)
         self.bn2 = nn.BatchNorm1d(base_channels)
-        self.pool2 = nn.MaxPool1d(2)
 
         if final_pool == 'average':
             self.final_pool = nn.AdaptiveAvgPool1d(1)
@@ -64,9 +81,6 @@ class TinyCNN1D(nn.Module):
             if hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
 
-    def get_final_shape(self):
-        return self.final_shape
-
     def forward(self, x, age):
         N, C, L = x.size()
 
@@ -76,16 +90,14 @@ class TinyCNN1D(nn.Module):
             x = torch.cat((x, age), dim=1)
 
         # conv-bn-act-pool
+        x = self.pool1(x)
         x = self.conv1(x)
         x = self.F_act(self.bn1(x))
-        x = self.pool1(x)
 
+        x = self.pool2(x)
         x = self.conv2(x)
         x = self.F_act(self.bn2(x))
-        x = self.pool2(x)
 
-        if self.final_shape is None:
-            self.final_shape = x.shape
         x = self.final_pool(x).reshape((N, -1))
 
         if self.use_age == 'fc':
@@ -96,52 +108,74 @@ class TinyCNN1D(nn.Module):
         return x
 
 
-class M7(nn.Module):
-    def __init__(self, in_channels, out_dims, fc_stages, use_age, final_pool,
-                 base_channels=256, dropout=0.3, activation='relu', **kwargs):
+class M5(nn.Module):
+    def __init__(self, in_channels, out_dims, fc_stages, sequence_length: int,
+                 use_age: str, base_channels=256, dropout: float = 0.3,
+                 base_pool: str = 'max', final_pool: str = 'average', activation: str = 'relu', **kwargs):
         super().__init__()
 
-        if use_age not in {'fc', 'conv', None}:
-            raise ValueError("use_age must be set to one of ['fc', 'conv', None]")
+        if use_age not in ['fc', 'conv', 'no']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
+                             f"receives one of ['fc', 'conv', 'no'].")
 
-        if final_pool not in {'average', 'max'}:
-            raise ValueError("final_pool must be set to one of ['average', 'max']")
+        if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
+                             f"receives one of ['average', 'max'].")
 
         self.use_age = use_age
-        self.final_shape = None
+        if self.use_age == 'conv':
+            in_channels += 1
 
-        if activation == 'relu':
-            self.F_act = F.relu
-            self.nn_act = nn.ReLU
-        elif activation == 'gelu':
-            self.F_act = F.gelu
-            self.nn_act = nn.GELU
-        elif activation == 'mish':
-            self.F_act = F.mish
-            self.nn_act = nn.Mish
-        else:
-            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
+        self.F_act = get_activation_functional(activation, class_name=self.__class__.__name__)
 
-        in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
-        self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=41, stride=2)
+        if base_pool == 'average':
+            self.base_pool = nn.AvgPool1d
+        elif base_pool == 'max':
+            self.base_pool = nn.MaxPool1d
+
+        conv_filter_list = [
+            {'kernel_size': 41},
+            {'kernel_size': 9},
+            {'kernel_size': 9},
+            {'kernel_size': 9},
+            {'kernel_size': 9},
+        ]
+        self.sequence_length = sequence_length
+        self.output_length = program_conv_filters(sequence_length=sequence_length,
+                                                  conv_filter_list=conv_filter_list,
+                                                  output_lower_bound=7, output_upper_bound=15,
+                                                  class_name=self.__class__.__name__)
+
+        cf = conv_filter_list[0]
+        self.pool1 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=cf['kernel_size'],
+                               padding=cf['kernel_size']//2, stride=cf['stride'], bias=False)
         self.bn1 = nn.BatchNorm1d(base_channels)
-        self.pool1 = nn.MaxPool1d(2)
 
-        self.conv2 = nn.Conv1d(base_channels, base_channels, kernel_size=11)
+        cf = conv_filter_list[1]
+        self.pool2 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv2 = nn.Conv1d(base_channels, base_channels, kernel_size=cf['kernel_size'],
+                               padding=cf['kernel_size']//2, stride=cf['stride'], bias=False)
         self.bn2 = nn.BatchNorm1d(base_channels)
-        self.pool2 = nn.MaxPool1d(2)
 
-        self.conv3 = nn.Conv1d(base_channels, 2 * base_channels, kernel_size=11)
+        cf = conv_filter_list[2]
+        self.pool3 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv3 = nn.Conv1d(base_channels, 2 * base_channels, kernel_size=cf['kernel_size'],
+                               padding=cf['kernel_size']//2, stride=cf['stride'], bias=False)
         self.bn3 = nn.BatchNorm1d(2 * base_channels)
-        self.pool3 = nn.MaxPool1d(3)
 
-        self.conv4 = nn.Conv1d(2 * base_channels, 2 * base_channels, kernel_size=11)
+        cf = conv_filter_list[3]
+        self.pool4 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv4 = nn.Conv1d(2 * base_channels, 2 * base_channels, kernel_size=cf['kernel_size'],
+                               padding=cf['kernel_size']//2, stride=cf['stride'], bias=False)
         self.bn4 = nn.BatchNorm1d(2 * base_channels)
-        self.pool4 = nn.MaxPool1d(3)
 
-        self.conv5 = nn.Conv1d(2 * base_channels, 2 * base_channels, kernel_size=11)
+        cf = conv_filter_list[4]
+        self.pool5 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv5 = nn.Conv1d(2 * base_channels, 2 * base_channels, kernel_size=cf['kernel_size'],
+                               padding=cf['kernel_size']//2, stride=cf['stride'], bias=False)
         self.bn5 = nn.BatchNorm1d(2 * base_channels)
-        self.pool5 = nn.MaxPool1d(2)
         base_channels = 2 * base_channels
 
         if final_pool == 'average':
@@ -153,7 +187,7 @@ class M7(nn.Module):
         if self.use_age == 'fc':
             base_channels = base_channels + 1
 
-        for l in range(fc_stages):
+        for i in range(fc_stages):
             layer = nn.Sequential(nn.Linear(base_channels, base_channels // 2, bias=False),
                                   nn.Dropout(p=dropout),
                                   nn.BatchNorm1d(base_channels // 2),
@@ -168,8 +202,8 @@ class M7(nn.Module):
             if hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
 
-    def get_final_shape(self):
-        return self.final_shape
+    def get_output_length(self):
+        return self.output_length
 
     def forward(self, x, age):
         N, C, L = x.size()
@@ -180,28 +214,26 @@ class M7(nn.Module):
             x = torch.cat((x, age), dim=1)
 
         # conv-bn-act-pool
+        x = self.pool1(x)
         x = self.conv1(x)
         x = self.F_act(self.bn1(x))
-        x = self.pool1(x)
 
+        x = self.pool2(x)
         x = self.conv2(x)
         x = self.F_act(self.bn2(x))
-        x = self.pool2(x)
 
+        x = self.pool3(x)
         x = self.conv3(x)
         x = self.F_act(self.bn3(x))
-        x = self.pool3(x)
 
+        x = self.pool4(x)
         x = self.conv4(x)
         x = self.F_act(self.bn4(x))
-        x = self.pool4(x)
 
+        x = self.pool5(x)
         x = self.conv5(x)
         x = self.F_act(self.bn5(x))
-        x = self.pool5(x)
 
-        if self.final_shape is None:
-            self.final_shape = x.shape
         x = self.final_pool(x).reshape((N, -1))
 
         if self.use_age == 'fc':

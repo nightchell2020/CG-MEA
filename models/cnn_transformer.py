@@ -1,19 +1,25 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from typing import Callable, Optional
 
+from .activation import get_activation_class
+from .activation import get_activation_functional
+from models.utils import program_conv_filters
+from models.utils import make_pool_or_not
 # __all__ = []
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 1024):
+    """
+    Sinusoidal positional encoding generator proposed in 'Attention is All You Need' paper.
+    """
+    def __init__(self, d_model: int, max_len: int = 1024):
         super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
         position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2) * (-np.log(10000.0) / d_model))
-        pe = torch.zeros(max_len, 1, d_model)
+        div_term = torch.exp(torch.arange(0, d_model, 2, dtype=torch.float) * (-np.log(10000.0) / d_model))
+
+        pe = torch.zeros(max_len, 1, d_model, requires_grad=False)
         pe[:, 0, 0::2] = torch.sin(position * div_term)
         pe[:, 0, 1::2] = torch.cos(position * div_term)
         self.register_buffer('pe', pe)
@@ -23,55 +29,89 @@ class PositionalEncoding(nn.Module):
         Args:
             x: Tensor, shape [seq_len, batch_size, embedding_dim]
         """
-        x = x + self.pe[:x.size(0)]
-        return self.dropout(x)
+        return self.pe[:x.size(0)]
 
 
 class CNNTransformer(nn.Module):
-    def __init__(self, in_channels, out_dims, fc_stages, use_age, final_pool,
-                 first_dilation=1, base_channels=256,
-                 n_encoders=4, n_heads=2, dropout=0.2, activation='relu', **kwargs):
+    def __init__(self, in_channels: int, out_dims: int, sequence_length: int,
+                 fc_stages: int, use_age: str, base_channels=256,
+                 n_encoders=6, n_heads=8, dropout=0.2, norm_layer: Optional[Callable[..., nn.Module]] = None,
+                 activation='relu', base_pool: str = 'max', final_pool: str = 'average', **kwargs):
         super().__init__()
 
-        if use_age not in {'fc', 'conv', None}:
-            raise ValueError("use_age must be set to one of ['fc', 'conv', None]")
+        if use_age not in ['fc', 'conv', 'no']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
+                             f"receives one of ['fc', 'conv', 'no'].")
 
-        if final_pool not in {'average', 'max'}:
-            raise ValueError("final_pool must be set to one of ['average', 'max']")
+        if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
+                             f"receives one of ['average', 'max'].")
 
         self.use_age = use_age
-        self.final_shape = None
+        if self.use_age == 'conv':
+            in_channels += 1
 
-        if activation == 'relu':
-            self.nn_act = nn.ReLU
-            self.F_act = F.relu
-        elif activation == 'gelu':
-            self.nn_act = nn.GELU
-            self.F_act = F.gelu
-        elif activation == 'mish':
-            self.nn_act = nn.Mish
-            self.F_act = F.mish
-        else:
-            raise ValueError("final_pool must be set to one of ['relu', 'gelu', 'mish']")
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
+        self.F_act = get_activation_functional(activation, class_name=self.__class__.__name__)
 
-        in_channels = in_channels + 1 if self.use_age == 'conv' else in_channels
-        self.conv1 = nn.Conv1d(in_channels, base_channels, kernel_size=21, stride=9, dilation=first_dilation)
-        self.bn1 = nn.BatchNorm1d(base_channels)
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm1d
+        self._norm_layer = norm_layer
 
-        self.conv2 = nn.Conv1d(base_channels, base_channels, kernel_size=9, stride=3)
-        self.bn2 = nn.BatchNorm1d(base_channels)
+        if base_pool == 'average':
+            self.base_pool = nn.AvgPool1d
+        elif base_pool == 'max':
+            self.base_pool = nn.MaxPool1d
 
-        self.pos_encoder = PositionalEncoding(base_channels, dropout)
-        encoder_layers = nn.TransformerEncoderLayer(base_channels, nhead=n_heads,
-                                                    dim_feedforward=base_channels * 4, dropout=dropout)
+        conv_filter_list = [
+            {'kernel_size': 21},
+            {'kernel_size': 9},
+            {'kernel_size': 9},
+            {'kernel_size': 9},
+        ]
+        self.sequence_length = sequence_length
+        self.output_length = program_conv_filters(sequence_length=sequence_length,
+                                                  conv_filter_list=conv_filter_list,
+                                                  output_lower_bound=32, output_upper_bound=48,
+                                                  class_name=self.__class__.__name__)
+
+        cf = conv_filter_list[0]
+        self.pool0 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv0 = nn.Conv1d(in_channels=base_channels, out_channels=2 * base_channels,
+                               kernel_size=cf['kernel_size'], stride=cf['stride'],
+                               padding=cf['kernel_size']//2, bias=False)
+        self.norm0 = norm_layer(2 * base_channels)
+        self.act0 = self.nn_act()
+
+        cf = conv_filter_list[1]
+        self.pool1 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv1 = nn.Conv1d(in_channels=2 * base_channels, out_channels=4 * base_channels,
+                               kernel_size=cf['kernel_size'], stride=cf['stride'],
+                               padding=cf['kernel_size']//2, bias=False)
+        self.norm1 = norm_layer(4 * base_channels)
+        self.act1 = self.nn_act()
+
+        cf = conv_filter_list[2]
+        self.pool2 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv2 = nn.Conv1d(in_channels=4 * base_channels, out_channels=4 * base_channels,
+                               kernel_size=cf['kernel_size'], stride=cf['stride'],
+                               padding=cf['kernel_size']//2, bias=False)
+        self.norm2 = norm_layer(4 * base_channels)
+        self.act2 = self.nn_act()
+
+        self.pos_encoder = PositionalEncoding(4 * base_channels)
+        encoder_layers = nn.TransformerEncoderLayer(4 * base_channels, nhead=n_heads,
+                                                    dim_feedforward=16 * base_channels, dropout=dropout,
+                                                    activation=self.F_act)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, n_encoders)
 
-        self.conv3 = nn.Conv1d(base_channels, 2 * base_channels, kernel_size=9, stride=3)
-        self.bn3 = nn.BatchNorm1d(2 * base_channels)
-        base_channels = 2 * base_channels
-
-        self.conv4 = nn.Conv1d(base_channels, base_channels, kernel_size=9, stride=3)
-        self.bn4 = nn.BatchNorm1d(base_channels)
+        cf = conv_filter_list[3]
+        self.pool3 = make_pool_or_not(self.base_pool, cf['pool'])
+        self.conv3 = nn.Conv1d(in_channels=4 * base_channels, out_channels=2 * base_channels,
+                               kernel_size=cf['kernel_size'], stride=cf['stride'],
+                               padding=cf['kernel_size']//2, bias=False)
+        self.norm3 = norm_layer(2 * base_channels)
+        self.act3 = self.nn_act()
 
         if final_pool == 'average':
             self.final_pool = nn.AdaptiveAvgPool1d(1)
@@ -97,8 +137,8 @@ class CNNTransformer(nn.Module):
             if hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
 
-    def get_final_shape(self):
-        return self.final_shape
+    def get_output_length(self):
+        return self.output_length
 
     def forward(self, x, age):
         N, C, L = x.size()
@@ -109,26 +149,30 @@ class CNNTransformer(nn.Module):
             x = torch.cat((x, age), dim=1)
 
         # conv-bn-act
-        x = self.conv1(x)
-        x = self.F_act(self.bn1(x))
+        x = self.pool0(x)
+        x = self.conv0(x)
+        x = self.act0(self.norm0(x))
 
         # conv-bn-act
+        x = self.pool1(x)
+        x = self.conv1(x)
+        x = self.act1(self.norm1(x))
+
+        # conv-bn-act
+        x = self.pool2(x)
         x = self.conv2(x)
-        x = self.F_act(self.bn2(x))
+        x = self.act2(self.norm2(x))
 
         # transformer encoder layers
         x = x.permute(2, 0, 1)  # minibatch, dimension, length --> length, minibatch, dimension
-        x = self.pos_encoder(x)
+        x = x + self.pos_encoder(x)
         x = self.transformer_encoder(x)
         x = x.permute(1, 2, 0)  # length, minibatch, dimension --> minibatch, dimension, length
 
         # conv-bn-act again
+        x = self.pool3(x)
         x = self.conv3(x)
-        x = self.F_act(self.bn3(x))
-
-        # conv-bn-act again
-        x = self.conv4(x)
-        x = self.F_act(self.bn4(x))
+        x = self.act3(self.norm3(x))
 
         if self.final_shape is None:
             self.final_shape = x.shape

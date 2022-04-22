@@ -211,7 +211,8 @@ def draw_error_table(error_table, use_wandb=False, fig_size=(40.0, 4.0)):
         total_error += err
         total_count += cnt
 
-        ax.bar(serial, err / cnt, color=['g', 'b', 'r', 'y', 'm'][gt_table[indices[0]]])
+        if cnt > 0:
+            ax.bar(serial, err / cnt, color=['g', 'b', 'r', 'y', 'm'][gt_table[indices[0]]])
 
     ax.set_title(f'Error Table (Acc. {1.0 - total_error / total_count: .2f}%)', fontsize=18)
     ax.set_ylim(0.0, 1.0)

@@ -7,6 +7,7 @@ import wandb
 
 from models.utils import count_parameters
 from .train_core import train_multistep, train_mixup_multistep
+from optim import get_lr_scheduler
 from .evaluate import check_accuracy, check_accuracy_extended
 from .visualize import draw_learning_rate_record
 from .visualize import draw_roc_curve, draw_confusion, draw_error_table
@@ -32,9 +33,8 @@ def learning_rate_search(config, train_loader, val_loader,
         model.train()
 
         optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
-        scheduler = optim.lr_scheduler.StepLR(optimizer,
-                                              step_size=round(config['iterations'] * config['lr_decay_timing']),
-                                              gamma=config['lr_decay_gamma'])
+        scheduler = get_lr_scheduler(optimizer, scheduler_type='constant_with_decay',  # constant for search
+                                     iterations=config['iterations'], warmup_steps=config['iterations'])
 
         tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
         tr_ms(model, train_loader, preprocess_train, optimizer, scheduler, config, steps)
@@ -67,26 +67,36 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
 
     # search an appropriate starting learning rate if needed
     model_state = None
-    if config["LR"] is None:
+    if config.get('LR', None) is None:
         config['LR'], lr_search, model_state = learning_rate_search(config=config,
                                                                     train_loader=train_loader,
                                                                     val_loader=val_loader,
                                                                     preprocess_train=preprocess_train,
                                                                     preprocess_test=preprocess_test,
-                                                                    trials=30, steps=150)
+                                                                    trials=30,
+                                                                    steps=150)
         draw_learning_rate_record(lr_search, use_wandb=True)
 
     # generate model and its trainer
     model = config['generator'](**config).to(config['device'])
-    if model_state is not None:
-        model.load_state_dict(model_state)
+
+    config['output_length'] = model.get_output_length()
+    config['num_params'] = count_parameters(model)
+    for k, v in config.items():
+        if k not in wandb.config or wandb.config[k] is None:
+            wandb.config[k] = v
+
+    # if model_state is not None:
+    #     model.load_state_dict(model_state)
 
     optimizer = optim.AdamW(model.parameters(),
-                            lr=config['LR'],
+                            lr=config['LR'] * config.get('search_multiplier', 1.0),
                             weight_decay=config['weight_decay'])
-    scheduler = optim.lr_scheduler.StepLR(optimizer,
-                                          step_size=round(config['iterations'] * config['lr_decay_timing']),
-                                          gamma=config['lr_decay_gamma'])
+
+    scheduler = get_lr_scheduler(optimizer,
+                                 config['lr_scheduler_type'],
+                                 iterations=config['iterations'],
+                                 warmup_steps=config.get('warmup_steps', 10000))
 
     tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
 
@@ -113,14 +123,6 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
                                  preprocess=preprocess_test,
                                  config=config, repeat=10)
 
-        # log
-        if i == 0:
-            config['final_shape'] = model.get_final_shape()
-            config['num_params'] = count_parameters(model)
-            for k, v in config.items():
-                if k not in wandb.config or wandb.config[k] is None:
-                    wandb.config[k] = v
-
         wandb.log({'Loss': loss, 'Train Accuracy': train_acc, 'Validation Accuracy': val_acc},
                   step=(i + config["history_interval"]) * config["minibatch"])
 
@@ -131,8 +133,10 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
             if config['save_model']:
                 save_path = f'local/checkpoint_temp/{wandb.run.name}/'
                 os.makedirs(save_path, exist_ok=True)
-                best_checkpoint = {'model_state': best_model_state, 'config': config,
-                                   'optimizer': optimizer, 'scheduler': scheduler}
+                best_checkpoint = {'model_state': best_model_state,
+                                   'config': config,
+                                   'optimizer_state': optimizer.state_dict(),
+                                   'scheduler_state': scheduler.state_dict()}
                 torch.save(best_checkpoint, os.path.join(save_path, 'best_checkpoint.pt'))
 
     # calculate the test accuracies for best and last models
@@ -167,8 +171,10 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     if config['save_model']:
         save_path = f'local/checkpoint_temp/{wandb.run.name}/'
         os.makedirs(save_path, exist_ok=True)
-        last_checkpoint = {'model_state': last_model_state, 'config': config,
-                           'optimizer': optimizer, 'scheduler': scheduler}
+        last_checkpoint = {'model_state': last_model_state,
+                           'config': config,
+                           'optimizer_state': optimizer.state_dict(),
+                           'scheduler_state': scheduler.state_dict()}
         torch.save(last_checkpoint, os.path.join(save_path, 'last_checkpoint.pt'))
 
     # leave the message
