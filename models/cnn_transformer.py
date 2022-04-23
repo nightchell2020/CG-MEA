@@ -174,8 +174,6 @@ class CNNTransformer(nn.Module):
         x = self.conv3(x)
         x = self.act3(self.norm3(x))
 
-        if self.final_shape is None:
-            self.final_shape = x.shape
         x = self.final_pool(x).reshape((N, -1))
 
         # fully-connected layers
