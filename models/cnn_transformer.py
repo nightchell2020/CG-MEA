@@ -112,6 +112,7 @@ class CNNTransformer(nn.Module):
                                padding=cf['kernel_size']//2, bias=False)
         self.norm3 = norm_layer(2 * base_channels)
         self.act3 = self.nn_act()
+        base_channels = 2 * base_channels
 
         if final_pool == 'average':
             self.final_pool = nn.AdaptiveAvgPool1d(1)
