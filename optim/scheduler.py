@@ -8,7 +8,7 @@ lr_scheduler_list = [
     'cosine_decay_with_warmup_half',
     'cosine_decay_with_warmup_one_and_half',
     'cosine_decay_with_warmup_two_and_half',
-    'get_linear_with_warmup',
+    'linear_with_warmup',
 ]
 
 
@@ -78,11 +78,11 @@ def get_lr_scheduler(optimizer: Optimizer, scheduler_type: str,
                                             iterations=iterations,
                                             cycles=2.5,
                                             last_epoch=last_epoch)
-    elif scheduler_type == 'get_linear_with_warmup':
+    elif scheduler_type == 'linear_with_warmup':
         return get_linear_with_warmup(optimizer=optimizer,
                                       warmup_steps=warmup_steps,
                                       iterations=iterations,
                                       last_epoch=last_epoch)
     else:
         raise ValueError(f'ERROR: get_lr_scheduler(scheduler_type) input is not understandable: {scheduler_type}. '
-                         f'Check the input value again.')
+                         f'Check the input value again: {lr_scheduler_list}')

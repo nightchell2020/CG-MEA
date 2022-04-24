@@ -65,6 +65,10 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     print(f'{"*" * 30}{config["model"] + " train starts":^60}{"*" * 30}')
     print('*' * 120)
 
+    config['in_channels'] = preprocess_train(next(iter(train_loader)))['signal'].shape[1]
+    config['out_dims'] = len(config['class_label_to_name'])
+    config['history_interval'] = max(config['iterations'] // config['num_history'], 1)
+
     # search an appropriate starting learning rate if needed
     model_state = None
     if config.get('LR', None) is None:
@@ -79,12 +83,12 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
 
     # generate model and its trainer
     model = config['generator'](**config).to(config['device'])
-
     config['output_length'] = model.get_output_length()
     config['num_params'] = count_parameters(model)
-    for k, v in config.items():
-        if k not in wandb.config or wandb.config[k] is None:
-            wandb.config[k] = v
+    wandb.config.update(config)
+    # for k, v in config.items():
+    #     if k not in wandb.config or wandb.config[k] is None:
+    #         wandb.config[k] = v
 
     # if model_state is not None:
     #     model.load_state_dict(model_state)
@@ -123,8 +127,11 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
                                  preprocess=preprocess_test,
                                  config=config, repeat=10)
 
-        wandb.log({'Loss': loss, 'Train Accuracy': train_acc, 'Validation Accuracy': val_acc},
-                  step=(i + config["history_interval"]) * config["minibatch"])
+        wandb.log({'Loss': loss,
+                   'Train Accuracy': train_acc,
+                   'Validation Accuracy': val_acc,
+                   'Learning Rate': optimizer.state_dict()['param_groups'][0]['lr'],
+                   }, step=(i + config["history_interval"]) * config["minibatch"])
 
         # save the best model so far
         if best_val_acc < val_acc:

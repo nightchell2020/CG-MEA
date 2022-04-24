@@ -10,7 +10,7 @@ from .activation import get_activation_functional
 
 
 class TinyCNN1D(nn.Module):
-    def __init__(self, in_channels: int, out_dims: int, fc_stages: int, sequence_length: int,
+    def __init__(self, in_channels: int, out_dims: int, fc_stages: int, seq_length: int,
                  use_age: str, base_channels: int = 64, dropout: float = 0.3,
                  base_pool: str = 'max', final_pool: str = 'average', activation: str = 'relu', **kwargs):
         super().__init__()
@@ -39,8 +39,8 @@ class TinyCNN1D(nn.Module):
             {'kernel_size': 35},
             {'kernel_size': 9},
         ]
-        self.sequence_length = sequence_length
-        self.output_length = program_conv_filters(sequence_length=sequence_length,
+        self.sequence_length = seq_length
+        self.output_length = program_conv_filters(sequence_length=seq_length,
                                                   conv_filter_list=conv_filter_list,
                                                   output_lower_bound=7, output_upper_bound=15,
                                                   class_name=self.__class__.__name__)
@@ -109,7 +109,7 @@ class TinyCNN1D(nn.Module):
 
 
 class M5(nn.Module):
-    def __init__(self, in_channels, out_dims, fc_stages, sequence_length: int,
+    def __init__(self, in_channels, out_dims, fc_stages, seq_length: int,
                  use_age: str, base_channels=256, dropout: float = 0.3,
                  base_pool: str = 'max', final_pool: str = 'average', activation: str = 'relu', **kwargs):
         super().__init__()
@@ -141,8 +141,8 @@ class M5(nn.Module):
             {'kernel_size': 9},
             {'kernel_size': 9},
         ]
-        self.sequence_length = sequence_length
-        self.output_length = program_conv_filters(sequence_length=sequence_length,
+        self.sequence_length = seq_length
+        self.output_length = program_conv_filters(sequence_length=seq_length,
                                                   conv_filter_list=conv_filter_list,
                                                   output_lower_bound=7, output_upper_bound=15,
                                                   class_name=self.__class__.__name__)

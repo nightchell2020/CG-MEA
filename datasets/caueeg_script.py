@@ -273,12 +273,12 @@ def compose_transforms(config, verbose=False):
     ###############
     # signal crop #
     ###############
-    transform += [EegRandomCrop(crop_length=config['crop_length'],
+    transform += [EegRandomCrop(crop_length=config['seq_length'],
                                 length_limit=config.get('signal_length_limit', 10 ** 7),
                                 multiple=config.get('crop_multiple', 1),
                                 latency=config.get('latency', 0),
                                 return_timing=config.get('crop_timing_analysis', False))]
-    transform_longer += [EegRandomCrop(crop_length=config['longer_crop_length'],
+    transform_longer += [EegRandomCrop(crop_length=config['longer_seq_length'],
                                        length_limit=config.get('signal_length_limit', 10 ** 7),
                                        multiple=config.get('crop_multiple', 1),
                                        latency=config.get('latency', 0),

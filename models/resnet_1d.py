@@ -148,7 +148,7 @@ class ResNet1D(nn.Module):
                  conv_layers: List[int],
                  in_channels: int,
                  out_dims: int,
-                 sequence_length: int,
+                 seq_length: int,
                  base_channels: int,
                  use_age: str,
                  fc_stages: int,
@@ -209,8 +209,8 @@ class ResNet1D(nn.Module):
                 {'kernel_size': 9},
                 {'kernel_size': 9},
             ]
-        self.sequence_length = sequence_length
-        self.output_length = program_conv_filters(sequence_length=sequence_length,
+        self.sequence_length = seq_length
+        self.output_length = program_conv_filters(sequence_length=seq_length,
                                                   conv_filter_list=conv_filter_list,
                                                   output_lower_bound=7, output_upper_bound=15,
                                                   class_name=self.__class__.__name__)
