@@ -2,6 +2,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+activation_list = [
+    'relu',
+    'gelu',
+    'mish',
+]
+
+
 def get_activation_class(activation_type: str, class_name: str = ''):
     if activation_type == 'relu':
         return nn.ReLU

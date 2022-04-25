@@ -24,7 +24,7 @@ def learning_rate_search(config, train_loader, val_loader,
 
     # default learning rate range is set based on a minibatch size of 32
     min_log_lr = -2.4 + np.log10(config['minibatch'] / 32)
-    max_log_lr = -4.3 + np.log10(config['minibatch'] / 32)
+    max_log_lr = -4.5 + np.log10(config['minibatch'] / 32)
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
@@ -70,37 +70,32 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     config['history_interval'] = max(config['iterations'] // config['num_history'], 1)
 
     # search an appropriate starting learning rate if needed
-    model_state = None
     if config.get('LR', None) is None:
-        config['LR'], lr_search, model_state = learning_rate_search(config=config,
-                                                                    train_loader=train_loader,
-                                                                    val_loader=val_loader,
-                                                                    preprocess_train=preprocess_train,
-                                                                    preprocess_test=preprocess_test,
-                                                                    trials=30,
-                                                                    steps=150)
+        config['LR'], lr_search, _ = learning_rate_search(config=config,
+                                                          train_loader=train_loader,
+                                                          val_loader=val_loader,
+                                                          preprocess_train=preprocess_train,
+                                                          preprocess_test=preprocess_test,
+                                                          trials=30,
+                                                          steps=150)
         draw_learning_rate_record(lr_search, use_wandb=True)
 
     # generate model and its trainer
     model = config['generator'](**config).to(config['device'])
     config['output_length'] = model.get_output_length()
     config['num_params'] = count_parameters(model)
-    wandb.config.update(config)
-    # for k, v in config.items():
-    #     if k not in wandb.config or wandb.config[k] is None:
-    #         wandb.config[k] = v
-
-    # if model_state is not None:
-    #     model.load_state_dict(model_state)
+    config['LR'] = config['LR'] * config.get('search_multiplier', 1.0)
+    config['warmup_steps'] = config.get('warmup_steps', round(config['iterations'] * 0.05))
+    wandb.run.config.setdefaults(config)
 
     optimizer = optim.AdamW(model.parameters(),
-                            lr=config['LR'] * config.get('search_multiplier', 1.0),
+                            lr=config['LR'],
                             weight_decay=config['weight_decay'])
 
     scheduler = get_lr_scheduler(optimizer,
                                  config['lr_scheduler_type'],
                                  iterations=config['iterations'],
-                                 warmup_steps=config.get('warmup_steps', 10000))
+                                 warmup_steps=config['warmup_steps'])
 
     tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
 

@@ -1,6 +1,7 @@
 import os
 import json
 import pprint
+import math
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
@@ -91,31 +92,18 @@ def load_caueeg_task_datasets(dataset_path: str, task: str,
     try:
         with open(os.path.join(dataset_path, task + '.json'), 'r') as json_file:
             task_dict = json.load(json_file)
-    except FileNotFoundError() as e:
-        print(f"ERROR: load_caueeg_task_datasets(dataset_path) encounters an error of {e}. "
+
+        train_dataset = CauEegDataset(dataset_path, task_dict['train_split'],
+                                      load_event=load_event, file_format=file_format, transform=transform)
+        val_dataset = CauEegDataset(dataset_path, task_dict['validation_split'],
+                                    load_event=load_event, file_format=file_format, transform=transform)
+        test_dataset = CauEegDataset(dataset_path, task_dict['test_split'],
+                                     load_event=load_event, file_format=file_format, transform=transform)
+    except FileNotFoundError as e:
+        print(f"ERROR: load_caueeg_task_datasets(dataset_path={dataset_path}) encounters an error of {e}. "
               f"Make sure the dataset path is correct.")
-
-    if file_format == 'edf':
-        train_dataset = CauEegDataset(dataset_path, task_dict['train_split'],
-                                      load_event=load_event, file_format=file_format, transform=transform)
-
-        val_dataset = CauEegDataset(dataset_path, task_dict['validation_split'],
-                                    load_event=load_event, file_format=file_format, transform=transform)
-
-        test_dataset = CauEegDataset(dataset_path, task_dict['test_split'],
-                                     load_event=load_event, file_format=file_format, transform=transform)
-    elif file_format in ['feather', 'memmap']:
-        train_dataset = CauEegDataset(dataset_path, task_dict['train_split'],
-                                      load_event=load_event, file_format=file_format, transform=transform)
-
-        val_dataset = CauEegDataset(dataset_path, task_dict['validation_split'],
-                                    load_event=load_event, file_format=file_format, transform=transform)
-
-        test_dataset = CauEegDataset(dataset_path, task_dict['test_split'],
-                                     load_event=load_event, file_format=file_format, transform=transform)
-    else:
-        raise ValueError(f"load_caueeg_task_datasets(task) receives the invalid task name: {task}. "
-                         f"Make sure the task name is correct.")
+    except ValueError as e:
+        print(f"ERROR: load_caueeg_task_datasets(file_format={file_format}) encounters an error of {e}.")
 
     config = {k: v for k, v in task_dict.items()
               if k not in ['train_split', 'validation_split', 'test_split']}
@@ -266,6 +254,19 @@ def calculate_age_statistics(train_loader, verbose=False):
     return age_mean, age_std
 
 
+def calculate_stft_params(seq_length, hop_ratio=1.0 / 4.0, verbose=False):
+    n_fft = round(math.sqrt(2.0 * seq_length / hop_ratio))
+    hop_length = round(n_fft * hop_ratio)
+
+    if verbose:
+        print(f"Input sequence length: ({seq_length}) would become "
+              f"({math.floor(n_fft / 2.0) + 1}, {math.floor(seq_length / hop_length) + 1}) "
+              f"after the STFT with n_fft ({n_fft}) and hop_length ({hop_length}).")
+        print('\n' + '-' * 100 + '\n')
+
+    return n_fft, hop_length
+
+
 def compose_transforms(config, verbose=False):
     transform = []
     transform_longer = []
@@ -411,6 +412,13 @@ def compose_preprocess(config, train_loader, verbose=True):
     # STFT (1D -> 2D) #
     ###################
     if config.get('model', '1D').startswith('2D'):
+        n_fft, hop_length = calculate_stft_params(seq_length=config['seq_length'],
+                                                  hop_ratio=config['stft_params'].pop('hop_ratio', 1.0 / 4.0),
+                                                  verbose=False)
+
+        config['stft_params']['n_fft'] = n_fft
+        config['stft_params']['hop_length'] = hop_length
+
         preprocess_train += [EegSpectrogram(**config['stft_params'])]
         preprocess_test += [EegSpectrogram(**config['stft_params'])]
 
