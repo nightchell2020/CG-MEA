@@ -47,6 +47,10 @@ class CNNTransformer(nn.Module):
             raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
                              f"receives one of ['average', 'max'].")
 
+        if fc_stages < 1:
+            raise ValueError(f"{self.__class__.__name__}.__init__(fc_stages) receives "
+                             f"an integer equal to ore more than 1.")
+
         self.use_age = use_age
         if self.use_age == 'conv':
             in_channels += 1
@@ -112,7 +116,7 @@ class CNNTransformer(nn.Module):
                                padding=cf['kernel_size']//2, bias=False)
         self.norm3 = norm_layer(2 * base_channels)
         self.act3 = self.nn_act()
-        base_channels = 2 * base_channels
+        current_channels = 2 * base_channels
 
         if final_pool == 'average':
             self.final_pool = nn.AdaptiveAvgPool1d(1)
@@ -121,16 +125,16 @@ class CNNTransformer(nn.Module):
 
         fc_stage = []
         if self.use_age == 'fc':
-            base_channels = base_channels + 1
+            current_channels = current_channels + 1
 
-        for l in range(fc_stages):
-            layer = nn.Sequential(nn.Linear(base_channels, base_channels // 2, bias=False),
+        for i in range(fc_stages - 1):
+            layer = nn.Sequential(nn.Linear(current_channels, current_channels // 2, bias=False),
                                   nn.Dropout(p=dropout),
-                                  nn.BatchNorm1d(base_channels // 2),
+                                  nn.BatchNorm1d(current_channels // 2),
                                   self.nn_act())
-            base_channels = base_channels // 2
+            current_channels = current_channels // 2
             fc_stage.append(layer)
-        fc_stage.append(nn.Linear(base_channels, out_dims))
+        fc_stage.append(nn.Linear(current_channels, out_dims))
         self.fc_stage = nn.Sequential(*fc_stage)
 
     def reset_weights(self):

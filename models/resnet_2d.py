@@ -7,7 +7,7 @@ Modified from:
     - Wide ResNet paper: https://arxiv.org/abs/1605.07146
 """
 
-from typing import Callable, Optional, Type, Union, List, Any
+from typing import Callable, Optional, Type, Union, List, Any, Tuple
 
 import torch
 import torch.nn as nn
@@ -166,7 +166,7 @@ class ResNet2D(nn.Module):
             conv_layers: List[int],
             in_channels: int,
             out_dims: int,
-            seq_length: int,
+            seq_len_2d: Tuple[int],
             base_channels: int,
             use_age: str,
             fc_stages: int,
@@ -189,6 +189,10 @@ class ResNet2D(nn.Module):
         if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
             raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
                              f"receives one of ['average', 'max'].")
+
+        if fc_stages < 1:
+            raise ValueError(f"{self.__class__.__name__}.__init__(fc_stages) receives "
+                             f"an integer equal to ore more than 1.")
 
         self.use_age = use_age
         if self.use_age == 'conv':
@@ -226,36 +230,38 @@ class ResNet2D(nn.Module):
                 {'kernel_size': 3},
                 {'kernel_size': 3},
             ]
-        self.sequence_length = seq_length
-        self.output_length = program_conv_filters(sequence_length=seq_length,
+        self.seq_len_2d = seq_len_2d
+        self.output_length = program_conv_filters(sequence_length=min(seq_len_2d),
                                                   conv_filter_list=conv_filter_list,
-                                                  output_lower_bound=7, output_upper_bound=15,
-                                                  stride_pool_ratio=1.0,
+                                                  output_lower_bound=4, output_upper_bound=8,
+                                                  stride_to_pool_ratio=0.7,
                                                   class_name=self.__class__.__name__)
 
         cf = conv_filter_list[0]
-        self.pool0 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv0 = nn.Conv2d(in_channels, self.current_channels,
-                               kernel_size=(cf['kernel_size'], cf['kernel_size']),
-                               stride=(cf['stride'], cf['stride']), padding=cf['kernel_size']//2, bias=False)
-        self.norm0 = norm_layer(self.current_channels)
-        self.act0 = self.nn_act()
+        input_stage = []
+        if cf['pool'] > 1:
+            input_stage.append(self.base_pool(cf['pool']))
+        input_stage.append(nn.Conv2d(in_channels, self.current_channels,
+                                     kernel_size=(cf['kernel_size'], cf['kernel_size']),
+                                     stride=(cf['stride'], cf['stride']), padding=cf['kernel_size']//2, bias=False))
+        input_stage.append(norm_layer(self.current_channels))
+        input_stage.append(self.nn_act())
+        self.input_stage = nn.Sequential(*input_stage)
 
         cf = conv_filter_list[1]
-        self.pool1 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv_stage1 = self._make_conv_layer(block=block, planes=base_channels, blocks=conv_layers[0],
+        self.conv_stage1 = self._make_conv_stage(block=block, planes=base_channels, blocks=conv_layers[0],
                                                  stride=cf['stride'], activation=self.nn_act)
         cf = conv_filter_list[2]
         self.pool2 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv_stage2 = self._make_conv_layer(block=block, planes=2 * base_channels, blocks=conv_layers[1],
+        self.conv_stage2 = self._make_conv_stage(block=block, planes=2 * base_channels, blocks=conv_layers[1],
                                                  stride=cf['stride'], activation=self.nn_act)
         cf = conv_filter_list[3]
         self.pool3 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv_stage3 = self._make_conv_layer(block=block, planes=4 * base_channels, blocks=conv_layers[2],
+        self.conv_stage3 = self._make_conv_stage(block=block, planes=4 * base_channels, blocks=conv_layers[2],
                                                  stride=cf['stride'], activation=self.nn_act)
         cf = conv_filter_list[4]
         self.pool4 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv_stage4 = self._make_conv_layer(block=block, planes=8 * base_channels, blocks=conv_layers[3],
+        self.conv_stage4 = self._make_conv_stage(block=block, planes=8 * base_channels, blocks=conv_layers[3],
                                                  stride=cf['stride'], activation=self.nn_act)
 
         if final_pool == 'average':
@@ -267,7 +273,7 @@ class ResNet2D(nn.Module):
         if self.use_age == 'fc':
             self.current_channels = self.current_channels + 1
 
-        for l in range(fc_stages):
+        for i in range(fc_stages - 1):
             layer = nn.Sequential(nn.Linear(self.current_channels, self.current_channels // 2, bias=False),
                                   nn.Dropout(p=dropout),
                                   nn.BatchNorm1d(self.current_channels // 2),
@@ -281,9 +287,9 @@ class ResNet2D(nn.Module):
 
     def reset_weights(self):
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, (nn.Conv1d, nn.Conv2d)):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+            elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
             elif hasattr(m, 'reset_parameters'):
@@ -302,8 +308,8 @@ class ResNet2D(nn.Module):
     def get_output_length(self):
         return self.output_length
 
-    def _make_conv_layer(self, block: Type[Union[BasicBlock2D, Bottleneck2D]], planes: int, blocks: int,
-                         stride: int = 1, activation=nn.ReLU) -> nn.Sequential:
+    def _make_conv_stage(self, block: Type[Union[BasicBlock2D, Bottleneck2D]], planes: int, blocks: int,
+                         stride: int = 1, pre_pool: int = 1, activation=nn.ReLU) -> nn.Sequential:
         norm_layer = self._norm_layer
         downsample = None
 
@@ -314,6 +320,10 @@ class ResNet2D(nn.Module):
             )
 
         conv_layers = []
+
+        if pre_pool > 1:
+            conv_layers.append(self.base_pool(pre_pool))
+
         conv_layers.append(
             block(self.current_channels, planes, stride, downsample, self.groups,
                   self.base_channels, dilation=1, norm_layer=norm_layer, activation=activation)
@@ -336,21 +346,11 @@ class ResNet2D(nn.Module):
             age = age.reshape((N, 1, 1, 1)).expand(N, 1, H, W)
             x = torch.cat((x, age), dim=1)
 
-        x = self.pool0(x)
-        x = self.conv0(x)
-        x = self.norm0(x)
-        x = self.act0(x)
+        x = self.input_stage(x)
 
-        x = self.pool1(x)
         x = self.conv_stage1(x)
-
-        x = self.pool2(x)
         x = self.conv_stage2(x)
-
-        x = self.pool3(x)
         x = self.conv_stage3(x)
-
-        x = self.pool4(x)
         x = self.conv_stage4(x)
 
         x = self.final_pool(x)

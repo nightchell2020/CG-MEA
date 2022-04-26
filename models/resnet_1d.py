@@ -172,6 +172,10 @@ class ResNet1D(nn.Module):
             raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
                              f"receives one of ['average', 'max'].")
 
+        if fc_stages < 1:
+            raise ValueError(f"{self.__class__.__name__}.__init__(fc_stages) receives "
+                             f"an integer equal to ore more than 1.")
+
         self.use_age = use_age
         if self.use_age == 'conv':
             in_channels += 1
@@ -212,33 +216,32 @@ class ResNet1D(nn.Module):
         self.sequence_length = seq_length
         self.output_length = program_conv_filters(sequence_length=seq_length,
                                                   conv_filter_list=conv_filter_list,
-                                                  output_lower_bound=7, output_upper_bound=15,
+                                                  output_lower_bound=4, output_upper_bound=8,
                                                   class_name=self.__class__.__name__)
 
         cf = conv_filter_list[0]
-        self.pool0 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv0 = nn.Conv1d(in_channels=in_channels, out_channels=self.current_channels,
-                               kernel_size=cf['kernel_size'], stride=cf['stride'],
-                               padding=cf['kernel_size']//2, bias=False)
-        self.norm0 = norm_layer(self.current_channels)
-        self.act0 = self.nn_act()
+        input_stage = []
+        if cf['pool'] > 1:
+            input_stage.append(self.base_pool(cf['pool']))
+        input_stage.append(nn.Conv1d(in_channels=in_channels, out_channels=self.current_channels,
+                                     kernel_size=cf['kernel_size'], stride=cf['stride'],
+                                     padding=cf['kernel_size']//2, bias=False))
+        input_stage.append(norm_layer(self.current_channels))
+        input_stage.append(self.nn_act())
+        self.input_stage = nn.Sequential(*input_stage)
 
         cf = conv_filter_list[1]
-        self.pool1 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv_stage1 = self._make_conv_layer(block, base_channels, conv_layers[0], cf['kernel_size'],
-                                                 stride=cf['stride'], activation=self.nn_act)
+        self.conv_stage1 = self._make_conv_stage(block, base_channels, conv_layers[0], cf['kernel_size'],
+                                                 stride=cf['stride'], pre_pool=cf['pool'], activation=self.nn_act)
         cf = conv_filter_list[2]
-        self.pool2 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv_stage2 = self._make_conv_layer(block, 2 * base_channels, conv_layers[1], cf['kernel_size'],
-                                                 stride=cf['stride'], activation=self.nn_act)
+        self.conv_stage2 = self._make_conv_stage(block, 2 * base_channels, conv_layers[1], cf['kernel_size'],
+                                                 stride=cf['stride'], pre_pool=cf['pool'], activation=self.nn_act)
         cf = conv_filter_list[3]
-        self.pool3 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv_stage3 = self._make_conv_layer(block, 4 * base_channels, conv_layers[2], cf['kernel_size'],
-                                                 stride=cf['stride'], activation=self.nn_act)
+        self.conv_stage3 = self._make_conv_stage(block, 4 * base_channels, conv_layers[2], cf['kernel_size'],
+                                                 stride=cf['stride'], pre_pool=cf['pool'], activation=self.nn_act)
         cf = conv_filter_list[4]
-        self.pool4 = make_pool_or_not(self.base_pool, cf['pool'])
-        self.conv_stage4 = self._make_conv_layer(block, 8 * base_channels, conv_layers[3], cf['kernel_size'],
-                                                 stride=cf['stride'], activation=self.nn_act)
+        self.conv_stage4 = self._make_conv_stage(block, 8 * base_channels, conv_layers[3], cf['kernel_size'],
+                                                 stride=cf['stride'], pre_pool=cf['pool'], activation=self.nn_act)
 
         if final_pool == 'average':
             self.final_pool = nn.AdaptiveAvgPool1d(1)
@@ -249,7 +252,7 @@ class ResNet1D(nn.Module):
         if self.use_age == 'fc':
             self.current_channels = self.current_channels + 1
 
-        for l in range(fc_stages):
+        for i in range(fc_stages - 1):
             layer = nn.Sequential(nn.Linear(self.current_channels, self.current_channels // 2, bias=False),
                                   nn.Dropout(p=dropout),
                                   norm_layer(self.current_channels // 2),
@@ -261,9 +264,9 @@ class ResNet1D(nn.Module):
 
     def reset_weights(self):
         for m in self.modules():
-            if isinstance(m, nn.Conv1d):
+            if isinstance(m, (nn.Conv1d, nn.Conv2d)):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-            elif isinstance(m, (nn.BatchNorm1d,)):
+            elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
             elif isinstance(m, (nn.Linear,)):
@@ -284,8 +287,8 @@ class ResNet1D(nn.Module):
     def get_output_length(self):
         return self.output_length
 
-    def _make_conv_layer(self, block: Type[Union[BasicBlock1D, BottleneckBlock1D]], channels: int, blocks: int,
-                         kernel_size: int, stride: int = 1, activation=nn.ReLU) -> nn.Sequential:
+    def _make_conv_stage(self, block: Type[Union[BasicBlock1D, BottleneckBlock1D]], channels: int, blocks: int,
+                         kernel_size: int, stride: int = 1, pre_pool: int = 1, activation=nn.ReLU) -> nn.Sequential:
         norm_layer = self._norm_layer
         downsample = None
 
@@ -297,15 +300,21 @@ class ResNet1D(nn.Module):
             )
 
         conv_layers = []
+
+        if pre_pool > 1:
+            conv_layers.append(self.base_pool(pre_pool))
+
         conv_layers.append(
             block(in_channels=self.current_channels, out_channels=channels, kernel_size=kernel_size,
-                  base_channels=self.base_channels, stride=stride, downsample=downsample, groups=self.groups, activation=activation)
+                  base_channels=self.base_channels, stride=stride, downsample=downsample,
+                  groups=self.groups, activation=activation)
         )
 
         self.current_channels = channels * block.expansion
         for _ in range(1, blocks):
             conv_layers.append(block(in_channels=self.current_channels, out_channels=channels, kernel_size=kernel_size,
-                                     base_channels=self.base_channels, groups=self.groups, stride=1, activation=activation))
+                                     base_channels=self.base_channels,
+                                     groups=self.groups, stride=1, activation=activation))
 
         return nn.Sequential(*conv_layers)
 
@@ -315,24 +324,15 @@ class ResNet1D(nn.Module):
             age = age.reshape((N, 1, 1)).expand(N, 1, L)
             x = torch.cat((x, age), dim=1)
 
-        x = self.pool0(x)
-        x = self.conv0(x)
-        x = self.norm0(x)
-        x = self.act0(x)
+        x = self.input_stage(x)
 
-        x = self.pool1(x)
         x = self.conv_stage1(x)
-
-        x = self.pool2(x)
         x = self.conv_stage2(x)
-
-        x = self.pool3(x)
         x = self.conv_stage3(x)
-
-        x = self.pool4(x)
         x = self.conv_stage4(x)
 
-        x = self.final_pool(x).reshape((N, -1))
+        x = self.final_pool(x)
+        x = x.reshape((N, -1))
 
         if self.use_age == 'fc':
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)

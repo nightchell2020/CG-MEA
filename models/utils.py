@@ -14,9 +14,9 @@ def count_parameters(model):
 
 def program_conv_filters(sequence_length: int, conv_filter_list: List[Dict],
                          output_lower_bound: int, output_upper_bound: int,
-                         stride_pool_ratio: float = 3.00, trials: int = 5, class_name: str = ''):
+                         stride_to_pool_ratio: float = 1.00, trials: int = 5, class_name: str = ''):
     # desired
-    mid = (output_upper_bound - output_lower_bound ) / 2.0
+    mid = (output_upper_bound - output_lower_bound) / 2.0
     in_out_ratio = float(sequence_length) / mid
 
     base_stride = np.power(in_out_ratio / np.prod([cf['kernel_size'] for cf in conv_filter_list], dtype=np.float64),
@@ -25,13 +25,19 @@ def program_conv_filters(sequence_length: int, conv_filter_list: List[Dict],
     for i in range(len(conv_filter_list)):
         cf = conv_filter_list[i]
         if i == 0:
-            stride = max(1.0, base_stride * cf['kernel_size']) - 2.0
-            cf['pool'] = max(1, round(float(stride) / cf['kernel_size'] * stride_pool_ratio - 1.2))
+            total_stride = max(1.0, base_stride * cf['kernel_size'] * 0.7)
+            cf['pool'] = max(1, round(np.sqrt(total_stride / stride_to_pool_ratio) * stride_to_pool_ratio * 0.3))
+            cf['stride'] = max(1, round(total_stride / cf['pool']))
         else:
-            stride = max(1.0, base_stride * cf['kernel_size'])
-            cf['pool'] = max(1, round(float(stride) / cf['kernel_size'] * stride_pool_ratio))
+            total_stride = max(1.0, base_stride * cf['kernel_size'])
+            if stride_to_pool_ratio > 1.0:
+                cf['pool'] = max(1, round(np.sqrt(total_stride / stride_to_pool_ratio) * stride_to_pool_ratio))
+                cf['stride'] = max(1, round(total_stride / cf['pool']))
+            else:
+                cf['stride'] = max(1, round(np.sqrt(total_stride / stride_to_pool_ratio)))
+                cf['pool'] = max(1, round(total_stride / cf['stride']))
 
-        cf['stride'] = round(stride / cf['pool'])
+        # cf['r'] = np.sqrt(total_stride / stride_pool_ratio)
         # cf['dilation'] = 1
         conv_filter_list[i] = cf
 
@@ -55,10 +61,24 @@ def program_conv_filters(sequence_length: int, conv_filter_list: List[Dict],
                 current_length = (current_length + both_side_pad - effective_kernel_size - 1) // cf['stride'] + 1
                 str_debug += f">> {current_length}\n"
 
+            pool = conv_filter_list[pivot]['pool']
+            stride = conv_filter_list[pivot]['stride']
             if current_length < output_lower_bound:
-                conv_filter_list[pivot]['stride'] = max(1, conv_filter_list[pivot]['stride'] - 1)
+                if float(pool) / stride < stride_to_pool_ratio:
+                    if stride > 1:
+                        conv_filter_list[pivot]['stride'] = max(1, stride - 1)
+                    else:
+                        conv_filter_list[pivot]['pool'] = max(1, pool - 1)
+                else:
+                    if pool > 1:
+                        conv_filter_list[pivot]['pool'] = max(1, pool - 1)
+                    else:
+                        conv_filter_list[pivot]['stride'] = max(1, stride - 1)
             elif current_length > output_upper_bound:
-                conv_filter_list[pivot]['stride'] += 1
+                if float(pool) / stride < stride_to_pool_ratio:
+                    conv_filter_list[pivot]['pool'] = pool + 1
+                else:
+                    conv_filter_list[pivot]['stride'] = stride + 1
             else:
                 str_debug += f">> Success!"
                 success = True

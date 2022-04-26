@@ -1,4 +1,6 @@
 from .simple_cnn_1d import TinyCNN1D, M5
+from .vgg_1d import VGG1D
+from .vgg_2d import VGG2D
 from .resnet_1d import BasicBlock1D, BottleneckBlock1D
 from .resnet_1d import ResNet1D
 from .resnet_2d import BasicBlock2D, Bottleneck2D

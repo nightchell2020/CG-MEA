@@ -257,14 +257,15 @@ def calculate_age_statistics(train_loader, verbose=False):
 def calculate_stft_params(seq_length, hop_ratio=1.0 / 4.0, verbose=False):
     n_fft = round(math.sqrt(2.0 * seq_length / hop_ratio))
     hop_length = round(n_fft * hop_ratio)
+    seq_len_2d = (math.floor(n_fft / 2.0) + 1, math.floor(seq_length / hop_length) + 1)
 
     if verbose:
         print(f"Input sequence length: ({seq_length}) would become "
-              f"({math.floor(n_fft / 2.0) + 1}, {math.floor(seq_length / hop_length) + 1}) "
+              f"({seq_len_2d[0]}, {seq_len_2d[1]}) "
               f"after the STFT with n_fft ({n_fft}) and hop_length ({hop_length}).")
         print('\n' + '-' * 100 + '\n')
 
-    return n_fft, hop_length
+    return n_fft, hop_length, seq_len_2d
 
 
 def compose_transforms(config, verbose=False):
@@ -412,12 +413,13 @@ def compose_preprocess(config, train_loader, verbose=True):
     # STFT (1D -> 2D) #
     ###################
     if config.get('model', '1D').startswith('2D'):
-        n_fft, hop_length = calculate_stft_params(seq_length=config['seq_length'],
-                                                  hop_ratio=config['stft_params'].pop('hop_ratio', 1.0 / 4.0),
-                                                  verbose=False)
+        n_fft, hop_length, seq_len_2d = calculate_stft_params(seq_length=config['seq_length'],
+                                                              hop_ratio=config['stft_params'].pop('hop_ratio', 1/4.0),
+                                                              verbose=False)
 
         config['stft_params']['n_fft'] = n_fft
         config['stft_params']['hop_length'] = hop_length
+        config['seq_len_2d'] = seq_len_2d
 
         preprocess_train += [EegSpectrogram(**config['stft_params'])]
         preprocess_test += [EegSpectrogram(**config['stft_params'])]
