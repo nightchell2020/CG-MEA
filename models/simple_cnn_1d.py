@@ -82,6 +82,8 @@ class TinyCNN1D(nn.Module):
         fc_stage.append(nn.Linear(current_channels, out_dims))
         self.fc_stage = nn.Sequential(*fc_stage)
 
+        self.reset_weights()
+
     def reset_weights(self):
         for m in self.modules():
             if hasattr(m, 'reset_parameters'):
@@ -207,6 +209,8 @@ class M5(nn.Module):
             fc_stage.append(layer)
         fc_stage.append(nn.Linear(current_channels, out_dims))
         self.fc_stage = nn.Sequential(*fc_stage)
+
+        self.reset_weights()
 
     def reset_weights(self):
         for m in self.modules():

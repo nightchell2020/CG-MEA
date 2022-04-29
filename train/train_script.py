@@ -8,7 +8,9 @@ import wandb
 from models.utils import count_parameters
 from .train_core import train_multistep, train_mixup_multistep
 from optim import get_lr_scheduler
-from .evaluate import check_accuracy, check_accuracy_extended
+from .evaluate import check_accuracy
+from .evaluate import check_accuracy_extended
+from .evaluate import check_accuracy_multicrop
 from .visualize import draw_learning_rate_record
 from .visualize import draw_roc_curve, draw_confusion, draw_error_table
 
@@ -23,8 +25,8 @@ def learning_rate_search(config, train_loader, val_loader,
     best_model_state = None
 
     # default learning rate range is set based on a minibatch size of 32
-    min_log_lr = -2.4 + np.log10(config['minibatch'] / 32)
-    max_log_lr = -4.5 + np.log10(config['minibatch'] / 32)
+    min_log_lr = -3.0 + np.log10(config['minibatch'] / 32)
+    max_log_lr = -6.0 + np.log10(config['minibatch'] / 32)
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
@@ -59,7 +61,7 @@ def learning_rate_search(config, train_loader, val_loader,
     return 10 ** best_log_lr, learning_rate_record, best_model_state
 
 
-def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_longer,
+def train_with_wandb(config, train_loader, val_loader, test_loader, multicrop_test_loader,
                      preprocess_train, preprocess_test):
     print('*' * 120)
     print(f'{"*" * 30}{config["model"] + " train starts":^60}{"*" * 30}')
@@ -68,6 +70,7 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     config['in_channels'] = preprocess_train(next(iter(train_loader)))['signal'].shape[1]
     config['out_dims'] = len(config['class_label_to_name'])
     config['history_interval'] = max(config['iterations'] // config['num_history'], 1)
+    config['warmup_steps'] = config.get('warmup_steps', round(config['iterations'] * 0.05))
 
     # search an appropriate starting learning rate if needed
     if config.get('LR', None) is None:
@@ -77,7 +80,7 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
                                                           preprocess_train=preprocess_train,
                                                           preprocess_test=preprocess_test,
                                                           trials=30,
-                                                          steps=150)
+                                                          steps=200)
         draw_learning_rate_record(lr_search, use_wandb=True)
 
     # generate model and its trainer
@@ -85,7 +88,6 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     config['output_length'] = model.get_output_length()
     config['num_params'] = count_parameters(model)
     config['LR'] = config['LR'] * config.get('search_multiplier', 1.0)
-    config['warmup_steps'] = config.get('warmup_steps', round(config['iterations'] * 0.05))
     wandb.run.config.setdefaults(config)
 
     optimizer = optim.AdamW(model.parameters(),
@@ -164,10 +166,10 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
     model.load_state_dict(model_state)
     test_acc, score, target, test_confusion, error_table = test_result
 
-    # calculate the test accuracy for final model on much longer sequence
-    longer_test_acc = check_accuracy(model=model, loader=test_loader_longer,
-                                     preprocess=preprocess_test,
-                                     config=config, repeat=30)
+    # calculate the test accuracy of the final model using multiple crop averaging
+    multicrop_test_acc = check_accuracy_multicrop(model=model, loader=multicrop_test_loader,
+                                                  preprocess=preprocess_test,
+                                                  config=config, repeat=30)
 
     # save the model
     if config['save_model']:
@@ -181,10 +183,10 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, test_loader_
 
     # leave the message
     wandb.log({'Test Accuracy': test_acc,
-               '(Best / Last) Test Accuracy': ('Best' if last_test_acc < best_test_acc else 'Last',
-                                               round(best_test_acc, 2), round(last_test_acc, 2)),
+               '(Best, Last) Test Accuracy': ('Best' if last_test_acc < best_test_acc else 'Last',
+                                              round(best_test_acc, 2), round(last_test_acc, 2)),
                'Confusion Matrix (Array)': test_confusion,
-               'Test Accuracy (Longer)': longer_test_acc,
+               'Multi-Crop Test Accuracy': multicrop_test_acc,
                'Test Debug Table/Serial': error_table['Serial'],
                'Test Debug Table/Pred': error_table['Pred'],
                'Test Debug Table/GT': error_table['GT']})

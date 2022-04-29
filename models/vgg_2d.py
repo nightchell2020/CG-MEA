@@ -118,6 +118,23 @@ class VGG2D(nn.Module):
         fc_stage.append(nn.Linear(self.current_channels, out_dims, bias=True))
         self.fc_stage = nn.Sequential(*fc_stage)
 
+        self.reset_weights()
+
+    def reset_weights(self):
+        for m in self.modules():
+            if isinstance(m, (nn.Conv1d, nn.Conv2d)):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, (nn.Linear,)):
+                nn.init.normal_(m.weight, 0, 0.01)
+                nn.init.constant_(m.bias, 0)
+            elif hasattr(m, 'reset_parameters'):
+                m.reset_parameters()
+
     def _make_conv_stage(self, conv_filter, cfg, base_channels):
         conv_layers: List[nn.Module] = []
 
@@ -148,21 +165,6 @@ class VGG2D(nn.Module):
 
             self.current_channels = cfg['channel_mul'] * base_channels
         return nn.Sequential(*conv_layers)
-
-    def reset_weights(self):
-        for m in self.modules():
-            if isinstance(m, (nn.Conv1d, nn.Conv2d)):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-                if m.bias is not None:
-                    nn.init.constant_(m.bias, 0)
-            elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.GroupNorm)):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-            elif isinstance(m, (nn.Linear,)):
-                nn.init.normal_(m.weight, 0, 0.01)
-                nn.init.constant_(m.bias, 0)
-            elif hasattr(m, 'reset_parameters'):
-                m.reset_parameters()
 
     def get_output_length(self):
         return self.output_length

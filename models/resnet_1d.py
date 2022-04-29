@@ -14,7 +14,6 @@ import torch.nn as nn
 
 from .activation import get_activation_class
 from .utils import program_conv_filters
-from .utils import make_pool_or_not
 
 # __all__ = []
 
@@ -261,6 +260,8 @@ class ResNet1D(nn.Module):
             fc_stage.append(layer)
         fc_stage.append(nn.Linear(self.current_channels, out_dims))
         self.fc_stage = nn.Sequential(*fc_stage)
+
+        self.reset_weights()
 
     def reset_weights(self):
         for m in self.modules():

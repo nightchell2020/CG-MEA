@@ -2,25 +2,25 @@ import numpy as np
 import torch
 
 
-# class EegLimitMaxLength(object):
-#     """Cut off the start and end signals by the specified amount.
-#
-#     Args:
-#         max_length (int): Signal length limit to cut out the rest.
-#     """
-#
-#     def __init__(self, max_length: int):
-#         if isinstance(max_length, int) is False or max_length <= 0:
-#             raise ValueError(f'{self.__class__.__name__}.__init__(front_cut) '
-#                              f'needs a positive integer to initialize')
-#         self.max_length = max_length
-#
-#     def __call__(self, sample):
-#         sample['signal'] = sample['signal'][:, :self.max_length]
-#         return sample
-#
-#     def __repr__(self) -> str:
-#         return f"{self.__class__.__name__}(max_length={self.max_length})"
+class EegLimitMaxLength(object):
+    """Cut off the start and end signals by the specified amount.
+
+    Args:
+        max_length (int): Signal length limit to cut out the rest.
+    """
+
+    def __init__(self, max_length: int):
+        if isinstance(max_length, int) is False or max_length <= 0:
+            raise ValueError(f'{self.__class__.__name__}.__init__(front_cut) '
+                             f'needs a positive integer to initialize')
+        self.max_length = max_length
+
+    def __call__(self, sample):
+        sample['signal'] = sample['signal'][:, :self.max_length]
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(max_length={self.max_length})"
 
 
 class EegRandomCrop(object):

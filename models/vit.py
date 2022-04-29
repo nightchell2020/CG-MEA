@@ -1,18 +1,21 @@
 """
 Modified from:
-    - https://github.com/pytorch/vision/blob/main/torchvision/models/vision_transformer.py
+    - https://github.com/pytorch/vision/blob/main/torchvision/models/vision_transformer.pyp
+    - ViT paper: https://arxiv.org/abs/2010.11929
 """
 
-import math
 from collections import OrderedDict
 from functools import partial
-from typing import Any, Callable, List, NamedTuple, Optional
+from typing import Any, Callable, List, NamedTuple, Optional, Tuple
 
+import math
+import numpy as np
 import torch
 import torch.nn as nn
 
 from torchvision.ops.misc import ConvNormActivation
-from torchvision.utils import _log_api_usage_once
+
+from .utils import program_conv_filters
 
 
 __all__ = [
@@ -127,71 +130,83 @@ class VisionTransformer(nn.Module):
     """Vision Transformer as per https://arxiv.org/abs/2010.11929."""
 
     def __init__(
-        self,
-        image_size: int,
-        patch_size: int,
-        num_layers: int,
-        num_heads: int,
-        hidden_dim: int,
-        mlp_dim: int,
-        dropout: float = 0.0,
-        attention_dropout: float = 0.0,
-        num_classes: int = 1000,
-        representation_size: Optional[int] = None,
-        norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
-        conv_stem_configs: Optional[List[ConvStemConfig]] = None,
+            self,
+            seq_len_2d: Tuple[int, int],
+            size_min: int,
+            size_max: int,
+            in_channels: int,
+            out_dims: int,
+            use_age: str,
+            fc_stages: int,
+            num_layers: int,
+            num_heads: int,
+            hidden_dim: int,
+            mlp_dim: int,
+            dropout: float = 0.0,
+            attention_dropout: float = 0.0,
+            norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+            conv_stem_configs: Optional[List[ConvStemConfig]] = None,
+            **kwargs: Any,
     ):
         super().__init__()
-        # _log_api_usage_once(self)
 
-        if image_size % patch_size != 0:
-            raise ValueError(f"{self.__class__.__name__}.__init__(image_size, patch_size) "
-                             f"Input image shape indivisible by patch size.")
+        if use_age not in ['fc', 'conv', 'no']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
+                             f"receives one of ['fc', 'conv', 'no'].")
+        if fc_stages < 1:
+            raise ValueError(f"{self.__class__.__name__}.__init__(fc_stages) receives "
+                             f"an integer equal to ore more than 1.")
 
-        self.image_size = image_size
-        self.patch_size = patch_size
+        self.use_age = use_age
+        if self.use_age == 'conv':
+            in_channels += 1
+        self.fc_stages = fc_stages
+
+        self.image_h, self.image_w = seq_len_2d
         self.hidden_dim = hidden_dim
         self.mlp_dim = mlp_dim
         self.attention_dropout = attention_dropout
         self.dropout = dropout
-        self.num_classes = num_classes
-        self.representation_size = representation_size
+        self.num_classes = out_dims
         self.norm_layer = norm_layer
 
         if conv_stem_configs is not None:
+            raise NotImplementedError(f"{self.__class__.__name__}.__init__(conv_stem_configs) "
+                                      f"functionality is not implemented yet.")
             # As per https://arxiv.org/abs/2106.14881
-            seq_proj = nn.Sequential()
-            prev_channels = 3
-            for i, conv_stem_layer_config in enumerate(conv_stem_configs):
-                seq_proj.add_module(
-                    f"conv_bn_relu_{i}",
-                    ConvNormActivation(
-                        in_channels=prev_channels,
-                        out_channels=conv_stem_layer_config.out_channels,
-                        kernel_size=conv_stem_layer_config.kernel_size,
-                        stride=conv_stem_layer_config.stride,
-                        norm_layer=conv_stem_layer_config.norm_layer,
-                        activation_layer=conv_stem_layer_config.activation_layer,
-                    ),
-                )
-                prev_channels = conv_stem_layer_config.out_channels
-            seq_proj.add_module(
-                "conv_last", nn.Conv2d(in_channels=prev_channels, out_channels=hidden_dim, kernel_size=1)
-            )
-            self.conv_proj: nn.Module = seq_proj
+            # seq_proj = nn.Sequential()
+            # prev_channels = in_channels
+            # for i, conv_stem_layer_config in enumerate(conv_stem_configs):
+            #     seq_proj.add_module(
+            #         f"conv_bn_relu_{i}",
+            #         ConvNormActivation(
+            #             in_channels=prev_channels,
+            #             out_channels=conv_stem_layer_config.out_channels,
+            #             kernel_size=conv_stem_layer_config.kernel_size,
+            #             stride=conv_stem_layer_config.stride,
+            #             norm_layer=conv_stem_layer_config.norm_layer,
+            #             activation_layer=conv_stem_layer_config.activation_layer,
+            #         ),
+            #     )
+            #     prev_channels = conv_stem_layer_config.out_channels
+            # seq_proj.add_module(
+            #     "conv_last", nn.Conv2d(in_channels=prev_channels, out_channels=hidden_dim, kernel_size=1)
+            # )
+            # self.conv_proj: nn.Module = seq_proj
         else:
-            self.conv_proj = nn.Conv2d(
-                in_channels=3, out_channels=hidden_dim, kernel_size=patch_size, stride=patch_size
-            )
-
-        seq_length = (image_size // patch_size) ** 2
+            self.n_h, h_conv_filter = self._decide_patch_size(in_size=self.image_h,
+                                                              target_num_min=size_min, target_num_max=size_max)
+            self.n_w, w_conv_filter = self._decide_patch_size(in_size=self.image_w,
+                                                              target_num_min=size_min, target_num_max=size_max)
+            conv_filter = {k: (h_conv_filter[k], w_conv_filter[k]) for k in h_conv_filter.keys() if k != 'pool'}
+            self.conv_proj = nn.Conv2d(in_channels=in_channels, out_channels=hidden_dim, **conv_filter)
 
         # Add a class token
+        self.seq_length = self.n_h * self.n_w + 1
         self.class_token = nn.Parameter(torch.zeros(1, 1, hidden_dim))
-        seq_length += 1
 
         self.encoder = Encoder(
-            seq_length,
+            self.seq_length,
             num_layers,
             num_heads,
             hidden_dim,
@@ -200,17 +215,27 @@ class VisionTransformer(nn.Module):
             attention_dropout,
             norm_layer,
         )
-        self.seq_length = seq_length
 
+        prev_dim = hidden_dim
+        if self.use_age == 'fc':
+            prev_dim = prev_dim + 1
         heads_layers: OrderedDict[str, nn.Module] = OrderedDict()
-        if representation_size is None:
-            heads_layers["head"] = nn.Linear(hidden_dim, num_classes)
-        else:
-            heads_layers["pre_logits"] = nn.Linear(hidden_dim, representation_size)
-            heads_layers["act"] = nn.Tanh()
-            heads_layers["head"] = nn.Linear(representation_size, num_classes)
 
+        for i in range(self.fc_stages - 1):
+            # TODO: Dropout or Normalization layers can be added here.
+            # TODO: Activation function also can be changed.
+            heads_layers[f"linear{i + 1}"] = nn.Linear(prev_dim, prev_dim // 2)
+            heads_layers[f"act{i + 1}"] = nn.Tanh()
+            prev_dim = prev_dim // 2
+        heads_layers["head"] = nn.Linear(prev_dim, out_dims)
         self.heads = nn.Sequential(heads_layers)
+
+        self.reset_weights()
+
+    def reset_weights(self):
+        for m in self.modules():
+            if hasattr(m, 'reset_parameters'):
+                m.reset_parameters()
 
         if isinstance(self.conv_proj, nn.Conv2d):
             # Init the patchify stem
@@ -226,39 +251,62 @@ class VisionTransformer(nn.Module):
             if self.conv_proj.conv_last.bias is not None:
                 nn.init.zeros_(self.conv_proj.conv_last.bias)
 
-        if hasattr(self.heads, "pre_logits") and isinstance(self.heads.pre_logits, nn.Linear):
-            fan_in = self.heads.pre_logits.in_features
-            nn.init.trunc_normal_(self.heads.pre_logits.weight, std=math.sqrt(1 / fan_in))
-            nn.init.zeros_(self.heads.pre_logits.bias)
-
+        for i in range(self.fc_stages - 1):
+            linear_name = f"linear{i + 1}"
+            if hasattr(self.heads, linear_name) and isinstance(getattr(self.heads, linear_name), nn.Linear):
+                fan_in = getattr(self.heads, linear_name).in_features
+                nn.init.trunc_normal_(getattr(self.heads, linear_name).weight, std=math.sqrt(1 / fan_in))
+                nn.init.zeros_(getattr(self.heads, linear_name).bias)
         if isinstance(self.heads.head, nn.Linear):
             nn.init.zeros_(self.heads.head.weight)
             nn.init.zeros_(self.heads.head.bias)
 
-    def _process_input(self, x: torch.Tensor) -> torch.Tensor:
-        n, c, h, w = x.shape
-        p = self.patch_size
-        torch._assert(h == self.image_size, "Wrong image height!")
-        torch._assert(w == self.image_size, "Wrong image width!")
-        n_h = h // p
-        n_w = w // p
+    def _decide_patch_size(self, in_size: int, target_num_min: int, target_num_max: int):
+        success = False
+
+        for target_num in reversed(range(target_num_min, target_num_max + 1)):
+            kernel_size_base = int(np.ceil(in_size / target_num))
+
+            for kernel_size in range(kernel_size_base, kernel_size_base + kernel_size_base // 2 + 1):
+                conv_filter_list = [{'kernel_size': kernel_size}]
+                try:
+                    program_conv_filters(sequence_length=in_size,
+                                         conv_filter_list=conv_filter_list,
+                                         output_lower_bound=target_num,
+                                         output_upper_bound=target_num,
+                                         pad=False, stride_to_pool_ratio=0.0001,
+                                         trials=20, verbose=False)
+                except RuntimeError as e:
+                    # print('Failed:', target_num, kernel_size_base, conv_filter_list)
+                    pass
+                else:
+                    return target_num, conv_filter_list[0]
+
+        if success is False:
+            raise RuntimeError(f'{self.__class__.__name__}._decide_patch_size() '
+                               f'failed to calculate the proper patch size')
+
+    def get_output_length(self):
+        return self.seq_length
+
+    def forward(self, x: torch.Tensor, age: torch.Tensor):
+        # Reshape and permute the input tensor
+        n, _, h, w = x.size()
+        if self.use_age == 'conv':
+            age = age.reshape((n, 1, 1, 1)).expand(n, 1, h, w)
+            x = torch.cat((x, age), dim=1)
 
         # (n, c, h, w) -> (n, hidden_dim, n_h, n_w)
         x = self.conv_proj(x)
+
         # (n, hidden_dim, n_h, n_w) -> (n, hidden_dim, (n_h * n_w))
-        x = x.reshape(n, self.hidden_dim, n_h * n_w)
+        x = x.reshape(n, self.hidden_dim, self.n_h * self.n_w)
 
         # (n, hidden_dim, (n_h * n_w)) -> (n, (n_h * n_w), hidden_dim)
         # The self attention layer expects inputs in the format (N, S, E)
         # where S is the source sequence length, N is the batch size, E is the
         # embedding dimension
         x = x.permute(0, 2, 1)
-
-        return x
-
-    def forward(self, x: torch.Tensor):
-        # Reshape and permute the input tensor
-        x = self._process_input(x)
         n = x.shape[0]
 
         # Expand the class token to the full batch
@@ -270,24 +318,35 @@ class VisionTransformer(nn.Module):
         # Classifier "token" as used by standard language architectures
         x = x[:, 0]
 
+        if self.use_age == 'fc':
+            x = torch.cat((x, age.reshape(-1, 1)), dim=1)
         x = self.heads(x)
 
         return x
 
 
 def _vision_transformer(
-    patch_size: int,
-    num_layers: int,
-    num_heads: int,
-    hidden_dim: int,
-    mlp_dim: int,
-    **kwargs: Any,
+        seq_len_2d: Tuple[int, int],
+        size_min: int,
+        size_max: int,
+        in_channels: int,
+        out_dims: int,
+        use_age: str,
+        fc_stages: int,
+        num_layers: int,
+        num_heads: int,
+        hidden_dim: int,
+        mlp_dim: int,
+        **kwargs: Any,
 ) -> VisionTransformer:
-    image_size = kwargs.pop("image_size", 224)
-
     model = VisionTransformer(
-        image_size=image_size,
-        patch_size=patch_size,
+        seq_len_2d=seq_len_2d,
+        size_min=size_min,
+        size_max=size_max,
+        in_channels=in_channels,
+        out_dims=out_dims,
+        use_age=use_age,
+        fc_stages=fc_stages,
         num_layers=num_layers,
         num_heads=num_heads,
         hidden_dim=hidden_dim,
@@ -298,90 +357,70 @@ def _vision_transformer(
     return model
 
 
-def vit_b_16(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VisionTransformer:
+def vit_b_16(**kwargs: Any) -> VisionTransformer:
     """
     Constructs a vit_b_16 architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-        progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _vision_transformer(
         arch="vit_b_16",
-        patch_size=16,
+        size_min=14,
+        size_max=16,
         num_layers=12,
         num_heads=12,
         hidden_dim=768,
         mlp_dim=3072,
-        pretrained=pretrained,
-        progress=progress,
         **kwargs,
     )
 
 
-def vit_b_32(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VisionTransformer:
+def vit_b_32(**kwargs: Any) -> VisionTransformer:
     """
     Constructs a vit_b_32 architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-        progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _vision_transformer(
         arch="vit_b_32",
-        patch_size=32,
+        size_min=22,
+        size_max=32,
         num_layers=12,
         num_heads=12,
         hidden_dim=768,
         mlp_dim=3072,
-        pretrained=pretrained,
-        progress=progress,
         **kwargs,
     )
 
 
-def vit_l_16(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VisionTransformer:
+def vit_l_16(**kwargs: Any) -> VisionTransformer:
     """
     Constructs a vit_l_16 architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-        progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _vision_transformer(
         arch="vit_l_16",
-        patch_size=16,
+        size_min=14,
+        size_max=16,
         num_layers=24,
         num_heads=16,
         hidden_dim=1024,
         mlp_dim=4096,
-        pretrained=pretrained,
-        progress=progress,
         **kwargs,
     )
 
 
-def vit_l_32(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> VisionTransformer:
+def vit_l_32(**kwargs: Any) -> VisionTransformer:
     """
     Constructs a vit_l_32 architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
-
-    Args:
-        pretrained (bool): If True, returns a model pre-trained on ImageNet
-        progress (bool): If True, displays a progress bar of the download to stderr
     """
     return _vision_transformer(
         arch="vit_l_32",
-        patch_size=32,
+        size_min=22,
+        size_max=32,
         num_layers=24,
         num_heads=16,
         hidden_dim=1024,
         mlp_dim=4096,
-        pretrained=pretrained,
-        progress=progress,
         **kwargs,
     )
 
@@ -394,12 +433,12 @@ def interpolate_embeddings(
     reset_heads: bool = False,
 ) -> "OrderedDict[str, torch.Tensor]":
     """This function helps interpolating positional embeddings during checkpoint loading,
-    especially when you want to apply a pre-trained model on images with different resolution.
+    especially when you want to apply a pretrained model on images with different resolution.
 
     Args:
         image_size (int): Image size of the new model.
         patch_size (int): Patch size of the new model.
-        model_state (OrderedDict[str, torch.Tensor]): State dict of the pre-trained model.
+        model_state (OrderedDict[str, torch.Tensor]): State dict of the pretrained model.
         interpolation_mode (str): The algorithm used for upsampling. Default: bicubic.
         reset_heads (bool): If true, not copying the state of heads. Default: False.
 

@@ -122,3 +122,40 @@ def check_accuracy_extended(model, loader, preprocess, config, repeat=1):
 
     accuracy = 100.0 * correct / total
     return accuracy, score, target, confusion_matrix, error_table
+
+
+@torch.no_grad()
+def check_accuracy_multicrop(model, loader, preprocess, config, repeat=1):
+    model.eval()
+
+    # for accuracy
+    correct, total = (0, 0)
+
+    with torch.no_grad():
+        for k in range(repeat):
+            for sample_batched in loader:
+                # preprocessing (this includes to-device operation)
+                preprocess(sample_batched)
+
+                # apply model on whole batch directly on device
+                x = sample_batched['signal']
+                age = sample_batched['age']
+                y = sample_batched['class_label']
+                output = model(x, age)
+
+                if config['criterion'] == 'cross-entropy':
+                    s = F.softmax(output, dim=1)
+                elif config['criterion'] == 'multi-bce':
+                    s = torch.sigmoid(output)
+
+                s = s.mean(dim=0, keepdims=True)  # torch.mean(s, dim=0, keepdims=True)
+                y = y[0]
+
+                # calculate accuracy
+                pred = s.argmax(dim=-1)
+                correct += pred.squeeze().eq(y).sum().item()
+                total += pred.shape[0]
+
+    accuracy = 100.0 * correct / total
+
+    return accuracy

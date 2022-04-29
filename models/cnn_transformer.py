@@ -137,6 +137,8 @@ class CNNTransformer(nn.Module):
         fc_stage.append(nn.Linear(current_channels, out_dims))
         self.fc_stage = nn.Sequential(*fc_stage)
 
+        self.reset_weights()
+
     def reset_weights(self):
         for m in self.modules():
             if hasattr(m, 'reset_parameters'):
@@ -169,10 +171,10 @@ class CNNTransformer(nn.Module):
         x = self.act2(self.norm2(x))
 
         # transformer encoder layers
-        x = x.permute(2, 0, 1)  # minibatch, dimension, length --> length, minibatch, dimension
+        x = torch.permute(x, (2, 0, 1))  # minibatch, dimension, length --> length, minibatch, dimension
         x = x + self.pos_encoder(x)
         x = self.transformer_encoder(x)
-        x = x.permute(1, 2, 0)  # length, minibatch, dimension --> minibatch, dimension, length
+        x = torch.permute(x, (1, 2, 0))  # length, minibatch, dimension --> minibatch, dimension, length
 
         # conv-bn-act again
         x = self.pool3(x)

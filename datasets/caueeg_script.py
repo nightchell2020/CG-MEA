@@ -34,6 +34,7 @@ def load_caueeg_config(dataset_path: str):
         print(
             f"ERROR: load_caueeg_config(dataset_path) encounters an error of {e}. "
             f"Make sure the dataset path is correct.")
+        raise
 
     config = {k: v for k, v in annotation.items() if k != 'data'}
     return config
@@ -59,6 +60,7 @@ def load_caueeg_full_dataset(dataset_path: str,
         print(
             f"ERROR: load_caueeg_full(dataset_path) encounters an error of {e}. "
             f"Make sure the dataset path is correct.")
+        raise
 
     eeg_dataset = CauEegDataset(dataset_path, annotation['data'],
                                 load_event=load_event,
@@ -102,8 +104,10 @@ def load_caueeg_task_datasets(dataset_path: str, task: str,
     except FileNotFoundError as e:
         print(f"ERROR: load_caueeg_task_datasets(dataset_path={dataset_path}) encounters an error of {e}. "
               f"Make sure the dataset path is correct.")
+        raise
     except ValueError as e:
         print(f"ERROR: load_caueeg_task_datasets(file_format={file_format}) encounters an error of {e}.")
+        raise
 
     config = {k: v for k, v in task_dict.items()
               if k not in ['train_split', 'validation_split', 'test_split']}
@@ -161,6 +165,7 @@ def load_caueeg_task_split(dataset_path: str, task: str, split: str,
     except FileNotFoundError() as e:
         print(f"ERROR: load_caueeg_task_split(dataset_path) encounters an error of {e}. "
               f"Make sure the dataset path is correct.")
+        raise
 
     if split in ['train', 'training', 'train_split', 'training_split']:
         dataset = CauEegDataset(dataset_path, task_dict['train_split'],
@@ -270,7 +275,7 @@ def calculate_stft_params(seq_length, hop_ratio=1.0 / 4.0, verbose=False):
 
 def compose_transforms(config, verbose=False):
     transform = []
-    transform_longer = []
+    transform_multicrop = []
 
     ###############
     # signal crop #
@@ -280,11 +285,11 @@ def compose_transforms(config, verbose=False):
                                 multiple=config.get('crop_multiple', 1),
                                 latency=config.get('latency', 0),
                                 return_timing=config.get('crop_timing_analysis', False))]
-    transform_longer += [EegRandomCrop(crop_length=config['longer_seq_length'],
-                                       length_limit=config.get('signal_length_limit', 10 ** 7),
-                                       multiple=config.get('crop_multiple', 1),
-                                       latency=config.get('latency', 0),
-                                       return_timing=config.get('crop_timing_analysis', False))]
+    transform_multicrop += [EegRandomCrop(crop_length=config['seq_length'],
+                                          length_limit=config.get('signal_length_limit', 10 ** 7),
+                                          multiple=config.get('test_crop_multiple', 8),
+                                          latency=config.get('latency', 0),
+                                          return_timing=config.get('crop_timing_analysis', False))]
 
     ###################################
     # usage of EKG or photic channels #
@@ -297,15 +302,15 @@ def compose_transforms(config, verbose=False):
 
     elif config['EKG'] == 'O' and config['photic'] == 'X':
         transform += [EegDropChannels([channel_photic])]
-        transform_longer += [EegDropChannels([channel_photic])]
+        transform_multicrop += [EegDropChannels([channel_photic])]
 
     elif config['EKG'] == 'X' and config['photic'] == 'O':
         transform += [EegDropChannels([channel_ekg])]
-        transform_longer += [EegDropChannels([channel_ekg])]
+        transform_multicrop += [EegDropChannels([channel_ekg])]
 
     elif config['EKG'] == 'X' and config['photic'] == 'X':
         transform += [EegDropChannels([channel_ekg, channel_photic])]
-        transform_longer += [EegDropChannels([channel_ekg, channel_photic])]
+        transform_multicrop += [EegDropChannels([channel_ekg, channel_photic])]
 
     else:
         raise ValueError(f"Both config['EKG'] and config['photic'] have to be set to one of ['O', 'X']")
@@ -314,26 +319,26 @@ def compose_transforms(config, verbose=False):
     # numpy to tensor #
     ###################
     transform += [EegToTensor()]
-    transform_longer += [EegToTensor()]
+    transform_multicrop += [EegToTensor()]
 
     #####################
     # transform-compose #
     #####################
     # transform = [TransformTimeChecker(t, '', '>50') for t in transform]
-    # transform_longer = [TransformTimeChecker(t, '', '>50') for t in transform_longer]
+    # transform_multicrop = [TransformTimeChecker(t, '', '>50') for t in transform_multicrop]
 
     transform = transforms.Compose(transform)
-    transform_longer = transforms.Compose(transform_longer)
+    transform_multicrop = transforms.Compose(transform_multicrop)
 
     if verbose:
         print('transform:', transform)
         print('\n' + '-' * 100 + '\n')
 
-        print('transform_longer:', transform_longer)
+        print('transform_multicrop:', transform_multicrop)
         print('\n' + '-' * 100 + '\n')
         print()
 
-    return transform, transform_longer
+    return transform, transform_multicrop
 
 
 def compose_preprocess(config, train_loader, verbose=True):
@@ -413,12 +418,13 @@ def compose_preprocess(config, train_loader, verbose=True):
     # STFT (1D -> 2D) #
     ###################
     if config.get('model', '1D').startswith('2D'):
+        stft_params = config.pop('stft_params', {})
         n_fft, hop_length, seq_len_2d = calculate_stft_params(seq_length=config['seq_length'],
-                                                              hop_ratio=config['stft_params'].pop('hop_ratio', 1/4.0),
+                                                              hop_ratio=stft_params.pop('hop_ratio', 1/4.0),
                                                               verbose=False)
-
-        config['stft_params']['n_fft'] = n_fft
-        config['stft_params']['hop_length'] = hop_length
+        config['stft_params'] = {'n_fft': n_fft,
+                                 'hop_length': hop_length,
+                                 **stft_params}
         config['seq_len_2d'] = seq_len_2d
 
         preprocess_train += [EegSpectrogram(**config['stft_params'])]
@@ -471,7 +477,7 @@ def compose_preprocess(config, train_loader, verbose=True):
     return preprocess_train, preprocess_test
 
 
-def make_dataloader(config, train_dataset, val_dataset, test_dataset, longer_test_dataset, verbose=False):
+def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_test_dataset, verbose=False):
     if config['device'].type == 'cuda':
         num_workers = 0  # A number other than 0 causes an error
         pin_memory = True
@@ -514,13 +520,13 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, longer_tes
                              pin_memory=pin_memory,
                              collate_fn=eeg_collate_fn)
 
-    longer_test_loader = DataLoader(longer_test_dataset,
-                                    batch_size=batch_size // 2 if batch_size // 2 >= 1 else 1,  # to save the memory
-                                    shuffle=False,
-                                    drop_last=False,
-                                    num_workers=num_workers,
-                                    pin_memory=pin_memory,
-                                    collate_fn=eeg_collate_fn)
+    multicrop_test_loader = DataLoader(multicrop_test_dataset,
+                                       batch_size=1,  # Multiple crops will consist of the minibatch
+                                       shuffle=False,
+                                       drop_last=False,
+                                       num_workers=num_workers,
+                                       pin_memory=pin_memory,
+                                       collate_fn=eeg_collate_fn)
 
     if verbose:
         print('train_loader:')
@@ -535,11 +541,11 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, longer_tes
         print(test_loader)
         print('\n' + '-' * 100 + '\n')
 
-        print('test_loader_longer:')
-        print(longer_test_loader)
+        print('multicrop_test_loader:')
+        print(multicrop_test_loader)
         print('\n' + '-' * 100 + '\n')
 
-    return train_loader, val_loader, test_loader, longer_test_loader
+    return train_loader, val_loader, test_loader, multicrop_test_loader
 
 
 def build_dataset_for_train(config, verbose=False):
@@ -547,9 +553,9 @@ def build_dataset_for_train(config, verbose=False):
     config_dataset = load_caueeg_config(config['dataset_path'])
     config.update(**config_dataset)
 
-    transform, transform_longer = compose_transforms(config, verbose=verbose)
+    transform, transform_multicrop = compose_transforms(config, verbose=verbose)
     config['transform'] = transform
-    config['transform_longer'] = transform_longer
+    config['transform_multicrop'] = transform_multicrop
 
     config_task, train_dataset, val_dataset, test_dataset = load_caueeg_task_datasets(dataset_path=config['dataset_path'],
                                                                                       task=config['task'],
@@ -559,20 +565,20 @@ def build_dataset_for_train(config, verbose=False):
                                                                                       verbose=verbose)
     config.update(**config_task)
 
-    _, longer_test_dataset = load_caueeg_task_split(dataset_path=config['dataset_path'],
-                                                    task=config['task'],
-                                                    split='test',
-                                                    load_event=config['load_event'],
-                                                    file_format=config['file_format'],
-                                                    transform=transform_longer,
-                                                    verbose=verbose)
+    _, multicrop_test_dataset = load_caueeg_task_split(dataset_path=config['dataset_path'],
+                                                       task=config['task'],
+                                                       split='test',
+                                                       load_event=config['load_event'],
+                                                       file_format=config['file_format'],
+                                                       transform=transform_multicrop,
+                                                       verbose=verbose)
 
-    train_loader, val_loader, test_loader, longer_test_loader = make_dataloader(config,
-                                                                                train_dataset,
-                                                                                val_dataset,
-                                                                                test_dataset,
-                                                                                longer_test_dataset,
-                                                                                verbose=False)
+    train_loader, val_loader, test_loader, multicrop_test_loader = make_dataloader(config,
+                                                                                   train_dataset,
+                                                                                   val_dataset,
+                                                                                   test_dataset,
+                                                                                   multicrop_test_dataset,
+                                                                                   verbose=False)
 
     preprocess_train, preprocess_test = compose_preprocess(config, train_loader, verbose=verbose)
     config['preprocess_train'] = preprocess_train
@@ -592,4 +598,4 @@ def build_dataset_for_train(config, verbose=False):
                 break
         print('\n' + '-' * 100 + '\n')
 
-    return train_loader, val_loader, test_loader, longer_test_loader
+    return train_loader, val_loader, test_loader, multicrop_test_loader

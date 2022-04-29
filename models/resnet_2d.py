@@ -14,7 +14,6 @@ import torch.nn as nn
 
 from .activation import get_activation_class
 from .utils import program_conv_filters
-from .utils import make_pool_or_not
 
 __all__ = ["ResNet2D",
            "resnet18_2d",
@@ -252,15 +251,12 @@ class ResNet2D(nn.Module):
         self.conv_stage1 = self._make_conv_stage(block=block, planes=base_channels, blocks=conv_layers[0],
                                                  stride=cf['stride'], activation=self.nn_act)
         cf = conv_filter_list[2]
-        self.pool2 = make_pool_or_not(self.base_pool, cf['pool'])
         self.conv_stage2 = self._make_conv_stage(block=block, planes=2 * base_channels, blocks=conv_layers[1],
                                                  stride=cf['stride'], activation=self.nn_act)
         cf = conv_filter_list[3]
-        self.pool3 = make_pool_or_not(self.base_pool, cf['pool'])
         self.conv_stage3 = self._make_conv_stage(block=block, planes=4 * base_channels, blocks=conv_layers[2],
                                                  stride=cf['stride'], activation=self.nn_act)
         cf = conv_filter_list[4]
-        self.pool4 = make_pool_or_not(self.base_pool, cf['pool'])
         self.conv_stage4 = self._make_conv_stage(block=block, planes=8 * base_channels, blocks=conv_layers[3],
                                                  stride=cf['stride'], activation=self.nn_act)
 
