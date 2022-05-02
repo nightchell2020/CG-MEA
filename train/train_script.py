@@ -88,7 +88,7 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, multicrop_te
                                                        train_loader=train_loader, val_loader=val_loader,
                                                        preprocess_train=preprocess_train,
                                                        preprocess_test=preprocess_test,
-                                                       trials=5, steps=10)  # TODO: Modify this #################################################################
+                                                       trials=25, steps=300)
         draw_learning_rate_record(lr_search, use_wandb=True)
 
     # generate the trainers
