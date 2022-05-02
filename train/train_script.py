@@ -3,6 +3,7 @@ from copy import deepcopy
 import numpy as np
 import torch
 import torch.optim as optim
+from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
 
 from models.utils import count_parameters
@@ -17,7 +18,7 @@ from .visualize import draw_roc_curve, draw_confusion, draw_error_table
 # __all__ = []
 
 
-def learning_rate_search(config, train_loader, val_loader,
+def learning_rate_search(config, model, train_loader, val_loader,
                          preprocess_train, preprocess_test,
                          trials, steps):
     learning_rate_record = []
@@ -31,7 +32,7 @@ def learning_rate_search(config, train_loader, val_loader,
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
 
-        model = config['generator'](**config).to(config['device'])
+        model.reset_weights()
         model.train()
 
         optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
@@ -52,13 +53,14 @@ def learning_rate_search(config, train_loader, val_loader,
             best_accuracy = (train_accuracy + val_accuracy) / 2
             best_model_state = deepcopy(model.state_dict())
 
-        del model, optimizer, scheduler
+        del optimizer, scheduler
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
 
+    model.load_state_dict(best_model_state)
     best_log_lr = learning_rate_record[np.argmax([(tr + vl)/2 for _, tr, vl in learning_rate_record])][0]
 
-    return 10 ** best_log_lr, learning_rate_record, best_model_state
+    return 10 ** best_log_lr, learning_rate_record
 
 
 def train_with_wandb(config, train_loader, val_loader, test_loader, multicrop_test_loader,
@@ -67,35 +69,37 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, multicrop_te
     print(f'{"*" * 30}{config["model"] + " train starts":^60}{"*" * 30}')
     print('*' * 120)
 
+    # generate the model and update some configurations
     config['in_channels'] = preprocess_train(next(iter(train_loader)))['signal'].shape[1]
     config['out_dims'] = len(config['class_label_to_name'])
+    model = config['generator'](**config).to(config['device'])
+    if config['ddp']:
+        model = DDP(model, device_ids=[config['device']])
+
+    config['output_length'] = model.get_output_length()
+    config['num_params'] = count_parameters(model)
     config['history_interval'] = max(config['iterations'] // config['num_history'], 1)
     config['warmup_steps'] = config.get('warmup_steps', round(config['iterations'] * 0.05))
+    wandb.run.config.setdefaults(config)
 
     # search an appropriate starting learning rate if needed
     if config.get('LR', None) is None:
-        config['LR'], lr_search, _ = learning_rate_search(config=config,
-                                                          train_loader=train_loader,
-                                                          val_loader=val_loader,
-                                                          preprocess_train=preprocess_train,
-                                                          preprocess_test=preprocess_test,
-                                                          trials=30,
-                                                          steps=200)
+        config['LR'], lr_search = learning_rate_search(config=config, model=model,
+                                                       train_loader=train_loader, val_loader=val_loader,
+                                                       preprocess_train=preprocess_train,
+                                                       preprocess_test=preprocess_test,
+                                                       trials=5, steps=10)  # TODO: Modify this #################################################################
         draw_learning_rate_record(lr_search, use_wandb=True)
 
-    # generate model and its trainer
-    model = config['generator'](**config).to(config['device'])
-    config['output_length'] = model.get_output_length()
-    config['num_params'] = count_parameters(model)
+    # generate the trainers
+    # model.reset_weights()  # This line can be remained or commented out.
     config['LR'] = config['LR'] * config.get('search_multiplier', 1.0)
     wandb.run.config.setdefaults(config)
 
-    optimizer = optim.AdamW(model.parameters(),
-                            lr=config['LR'],
+    optimizer = optim.AdamW(model.parameters(), lr=config['LR'],
                             weight_decay=config['weight_decay'])
 
-    scheduler = get_lr_scheduler(optimizer,
-                                 config['lr_scheduler_type'],
+    scheduler = get_lr_scheduler(optimizer, config['lr_scheduler_type'],
                                  iterations=config['iterations'],
                                  warmup_steps=config['warmup_steps'])
 
@@ -118,92 +122,94 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, multicrop_te
                                 optimizer=optimizer,
                                 scheduler=scheduler, config=config,
                                 steps=config["history_interval"])
-
         # validation
         val_acc = check_accuracy(model=model, loader=val_loader,
                                  preprocess=preprocess_test,
                                  config=config, repeat=10)
+        # log
+        if config['ddp'] is False or config['ddp_rank'] == 0:
+            wandb.log({'Loss': loss,
+                       'Train Accuracy': train_acc,
+                       'Validation Accuracy': val_acc,
+                       'Learning Rate': optimizer.state_dict()['param_groups'][0]['lr'],
+                      }, step=(i + config["history_interval"]) * config["minibatch"])
 
-        wandb.log({'Loss': loss,
-                   'Train Accuracy': train_acc,
-                   'Validation Accuracy': val_acc,
-                   'Learning Rate': optimizer.state_dict()['param_groups'][0]['lr'],
-                   }, step=(i + config["history_interval"]) * config["minibatch"])
-
-        # save the best model so far
-        if best_val_acc < val_acc:
-            best_val_acc = val_acc
-            best_model_state = deepcopy(model.state_dict())
-            if config['save_model']:
-                save_path = f'local/checkpoint_temp/{wandb.run.name}/'
-                os.makedirs(save_path, exist_ok=True)
-                best_checkpoint = {'model_state': best_model_state,
-                                   'config': config,
-                                   'optimizer_state': optimizer.state_dict(),
-                                   'scheduler_state': scheduler.state_dict()}
-                torch.save(best_checkpoint, os.path.join(save_path, 'best_checkpoint.pt'))
+            # save the best model so far
+            if best_val_acc < val_acc:
+                best_val_acc = val_acc
+                best_model_state = deepcopy(model.state_dict())
+                if config['save_model']:
+                    save_path = f'local/checkpoint_temp/{wandb.run.name}/'
+                    os.makedirs(save_path, exist_ok=True)
+                    best_checkpoint = {'model_state': best_model_state,
+                                    'config': config,
+                                    'optimizer_state': optimizer.state_dict(),
+                                    'scheduler_state': scheduler.state_dict()}
+                    torch.save(best_checkpoint, os.path.join(save_path, 'best_checkpoint.pt'))
 
     # calculate the test accuracies for best and last models
-    last_model_state = deepcopy(model.state_dict())
-    last_test_result = check_accuracy_extended(model=model, loader=test_loader,
-                                               preprocess=preprocess_test,
-                                               config=config, repeat=30)
-    last_test_acc = last_test_result[0]
+    if config['ddp'] is False or config['ddp_rank'] == 0:
+        last_model_state = deepcopy(model.state_dict())
+        last_test_result = check_accuracy_extended(model=model, loader=test_loader,
+                                                preprocess=preprocess_test,
+                                                config=config, repeat=30)
+        last_test_acc = last_test_result[0]
 
-    model.load_state_dict(best_model_state)
-    best_test_result = check_accuracy_extended(model=model, loader=test_loader,
-                                               preprocess=preprocess_test,
-                                               config=config, repeat=30)
-    best_test_acc = best_test_result[0]
+        model.load_state_dict(best_model_state)
+        best_test_result = check_accuracy_extended(model=model, loader=test_loader,
+                                                preprocess=preprocess_test,
+                                                config=config, repeat=30)
+        best_test_acc = best_test_result[0]
 
-    if last_test_acc < best_test_acc:
-        model_state = best_model_state
-        test_result = best_test_result
-    else:
-        model_state = last_model_state
-        test_result = last_test_result
+        if last_test_acc < best_test_acc:
+            model_state = best_model_state
+            test_result = best_test_result
+        else:
+            model_state = last_model_state
+            test_result = last_test_result
 
-    model.load_state_dict(model_state)
-    test_acc, score, target, test_confusion, error_table = test_result
+        model.load_state_dict(model_state)
+        test_acc, score, target, test_confusion, error_table = test_result
 
-    # calculate the test accuracy of the final model using multiple crop averaging
-    multicrop_test_acc = check_accuracy_multicrop(model=model, loader=multicrop_test_loader,
-                                                  preprocess=preprocess_test,
-                                                  config=config, repeat=30)
+        # calculate the test accuracy of the final model using multiple crop averaging
+        multicrop_test_acc = check_accuracy_multicrop(model=model, loader=multicrop_test_loader,
+                                                    preprocess=preprocess_test,
+                                                    config=config, repeat=30)
 
-    # save the model
-    if config['save_model']:
-        save_path = f'local/checkpoint_temp/{wandb.run.name}/'
-        os.makedirs(save_path, exist_ok=True)
-        last_checkpoint = {'model_state': last_model_state,
-                           'config': config,
-                           'optimizer_state': optimizer.state_dict(),
-                           'scheduler_state': scheduler.state_dict()}
-        torch.save(last_checkpoint, os.path.join(save_path, 'last_checkpoint.pt'))
+        # save the model
+        if config['save_model']:
+            save_path = f'local/checkpoint_temp/{wandb.run.name}/'
+            os.makedirs(save_path, exist_ok=True)
+            last_checkpoint = {'model_state': last_model_state,
+                            'config': config,
+                            'optimizer_state': optimizer.state_dict(),
+                            'scheduler_state': scheduler.state_dict()}
+            torch.save(last_checkpoint, os.path.join(save_path, 'last_checkpoint.pt'))
 
-    # leave the message
-    wandb.log({'Test Accuracy': test_acc,
-               '(Best, Last) Test Accuracy': ('Best' if last_test_acc < best_test_acc else 'Last',
-                                              round(best_test_acc, 2), round(last_test_acc, 2)),
-               'Confusion Matrix (Array)': test_confusion,
-               'Multi-Crop Test Accuracy': multicrop_test_acc,
-               'Test Debug Table/Serial': error_table['Serial'],
-               'Test Debug Table/Pred': error_table['Pred'],
-               'Test Debug Table/GT': error_table['GT']})
+        # leave the message
+        wandb.log({'Test Accuracy': test_acc,
+                '(Best, Last) Test Accuracy': ('Best' if last_test_acc < best_test_acc else 'Last',
+                                                round(best_test_acc, 2), round(last_test_acc, 2)),
+                'Confusion Matrix (Array)': test_confusion,
+                'Multi-Crop Test Accuracy': multicrop_test_acc,
+                'Test Debug Table/Serial': error_table['Serial'],
+                'Test Debug Table/Pred': error_table['Pred'],
+                'Test Debug Table/GT': error_table['GT']})
 
-    if config['draw_result']:
-        draw_roc_curve(score, target, config['class_label_to_name'], use_wandb=True)
-        draw_confusion(test_confusion, config['class_label_to_name'], use_wandb=True)
-        draw_error_table(error_table, use_wandb=True)
+        if config['draw_result']:
+            draw_roc_curve(score, target, config['class_label_to_name'], use_wandb=True)
+            draw_confusion(test_confusion, config['class_label_to_name'], use_wandb=True)
+            draw_error_table(error_table, use_wandb=True)
 
-        # leave these disabled to save the wandb resources
-        # wandb.log({"Confusion Matrix": wandb.plot.confusion_matrix(y_true=target,
-        #                                                            preds=score.argmax(axis=-1),
-        #                                                            class_names=config['class_label_to_name'])})
-        # wandb.log({"ROC Curve": wandb.plot.roc_curve(target, score, labels=config['class_label_to_name'])})
+            # leave these disabled to save the wandb resources
+            # wandb.log({"Confusion Matrix": wandb.plot.confusion_matrix(y_true=target,
+            #                                                            preds=score.argmax(axis=-1),
+            #                                                            class_names=config['class_label_to_name'])})
+            # wandb.log({"ROC Curve": wandb.plot.roc_curve(target, score, labels=config['class_label_to_name'])})
+
+        del last_model_state
 
     # release memory
-    del optimizer, scheduler
-    del last_model_state, best_model_state
+    del optimizer, scheduler, best_model_state
 
     return model

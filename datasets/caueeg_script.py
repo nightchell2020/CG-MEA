@@ -5,6 +5,7 @@ import math
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 
 from .caueeg_dataset import CauEegDataset
 from .pipeline import EegRandomCrop
@@ -487,10 +488,16 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_
 
     batch_size = config['minibatch'] // config.get('crop_multiple', 1)
 
+    if config.get('ddp', False):
+        train_sampler = DistributedSampler(train_dataset)
+    else:
+        train_sampler = None
+
     if config.get('mode', None) == 'eval':
         train_loader = DataLoader(train_dataset,
                                   batch_size=batch_size,
                                   shuffle=False,
+                                  sampler=train_sampler,
                                   drop_last=False,
                                   num_workers=num_workers,
                                   pin_memory=pin_memory,
