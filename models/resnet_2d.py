@@ -161,7 +161,7 @@ class Bottleneck2D(nn.Module):
 class ResNet2D(nn.Module):
     def __init__(
             self,
-            block: Type[Union[BasicBlock2D, Bottleneck2D]],
+            block: str,
             conv_layers: List[int],
             in_channels: int,
             out_dims: int,
@@ -180,6 +180,10 @@ class ResNet2D(nn.Module):
             **kwargs
     ) -> None:
         super().__init__()
+
+        if block not in ['basic', 'bottleneck']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(block) "
+                             f"receives one of ['basic', 'bottleneck'].")
 
         if use_age not in ['fc', 'conv', 'no']:
             raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
@@ -213,7 +217,8 @@ class ResNet2D(nn.Module):
         elif base_pool == 'max':
             self.base_pool = nn.MaxPool1d
 
-        if block.__name__ == BasicBlock2D.__name__:
+        if block == 'basic':
+            block = BasicBlock2D
             conv_filter_list = [
                 {'kernel_size': 7},
                 {'kernel_size': 3},  # 3 or 5 to reflect the composition of 9conv and 9conv
@@ -221,7 +226,8 @@ class ResNet2D(nn.Module):
                 {'kernel_size': 3},  # 3 or 5 to reflect the composition of 9conv and 9conv
                 {'kernel_size': 3},  # 3 or 5 to reflect the composition of 9conv and 9conv
             ]
-        else:
+        else:  # bottleneck case
+            block = Bottleneck2D
             conv_filter_list = [
                 {'kernel_size': 7},
                 {'kernel_size': 3},
@@ -229,6 +235,7 @@ class ResNet2D(nn.Module):
                 {'kernel_size': 3},
                 {'kernel_size': 3},
             ]
+
         self.seq_len_2d = seq_len_2d
         self.output_length = program_conv_filters(sequence_length=min(seq_len_2d),
                                                   conv_filter_list=conv_filter_list,

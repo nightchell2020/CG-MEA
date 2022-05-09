@@ -3,10 +3,8 @@ from copy import deepcopy
 import numpy as np
 import torch
 import torch.optim as optim
-from torch.nn.parallel import DistributedDataParallel as DDP
 import wandb
 
-from models.utils import count_parameters
 from .train_core import train_multistep, train_mixup_multistep
 from optim import get_lr_scheduler
 from .evaluate import check_accuracy
@@ -63,40 +61,33 @@ def learning_rate_search(config, model, train_loader, val_loader,
     return 10 ** best_log_lr, learning_rate_record
 
 
-def train_with_wandb(config, train_loader, val_loader, test_loader, multicrop_test_loader,
+def train_with_wandb(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
                      preprocess_train, preprocess_test):
-    print('*' * 120)
-    print(f'{"*" * 30}{config["model"] + " train starts":^60}{"*" * 30}')
-    print('*' * 120)
+    # logging, evaluating, and saving happens only for the main process of DDP
+    main_process = config['ddp'] is False or config['device'] == 0
 
-    # generate the model and update some configurations
-    config['in_channels'] = preprocess_train(next(iter(train_loader)))['signal'].shape[1]
-    config['out_dims'] = len(config['class_label_to_name'])
-    model = config['generator'](**config).to(config['device'])
-    if config['ddp']:
-        model = DDP(model, device_ids=[config['device']])
-
-    config['output_length'] = model.get_output_length()
-    config['num_params'] = count_parameters(model)
-    config['history_interval'] = max(config['iterations'] // config['num_history'], 1)
-    config['warmup_steps'] = config.get('warmup_steps', round(config['iterations'] * 0.05))
-    wandb.run.config.setdefaults(config)
+    # training iteration and other conditions
+    config['iterations'] = round(config['total_samples'] / config['minibatch'] / config.get('ddp_size', 1))
+    history_interval = max(config['iterations'] // config['num_history'], 1)
+    config['warmup_steps'] = max(round(config['iterations'] * config['warmup_ratio']), config['warmup_min'])
 
     # search an appropriate starting learning rate if needed
-    if config.get('LR', None) is None:
-        config['LR'], lr_search = learning_rate_search(config=config, model=model,
-                                                       train_loader=train_loader, val_loader=val_loader,
-                                                       preprocess_train=preprocess_train,
-                                                       preprocess_test=preprocess_test,
-                                                       trials=25, steps=300)
-        draw_learning_rate_record(lr_search, use_wandb=True)
+    if config['search_lr']:
+        config['base_lr'], lr_search = learning_rate_search(config=config, model=model,
+                                                            train_loader=train_loader, val_loader=val_loader,
+                                                            preprocess_train=preprocess_train,
+                                                            preprocess_test=preprocess_test,
+                                                            trials=25, steps=300)
+
+        # model.reset_weights()  # This line can be remained or commented out.
+
+        if main_process:
+            draw_learning_rate_record(lr_search, use_wandb=True)
 
     # generate the trainers
-    # model.reset_weights()  # This line can be remained or commented out.
-    config['LR'] = config['LR'] * config.get('search_multiplier', 1.0)
-    wandb.run.config.setdefaults(config)
+    config['base_lr'] = config['base_lr'] * config.get('search_multiplier', 1.0)
 
-    optimizer = optim.AdamW(model.parameters(), lr=config['LR'],
+    optimizer = optim.AdamW(model.parameters(), lr=config['base_lr'],
                             weight_decay=config['weight_decay'])
 
     scheduler = get_lr_scheduler(optimizer, config['lr_scheduler_type'],
@@ -105,60 +96,68 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, multicrop_te
 
     tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
 
-    # track gradients and weights statistics if needed
-    if config.get('watch_model', None):
-        wandb.watch(model, log='all',
-                    log_freq=config['history_interval'],
-                    log_graph=True)
+    if main_process:
+        # track gradients and weights statistics if needed
+        if config.get('watch_model', None):
+            wandb.watch(model, log='all',
+                        log_freq=history_interval,
+                        log_graph=True)
+
+        # update configurations
+        wandb.config.update(config)  # wandb.run.config.setdefaults(config)
+
+        # directory to save
+        if config['save_model']:
+            save_path = f'local/checkpoint_temp/{wandb.run.name}/'
+            if 'cwd' in config:
+                save_path = os.path.join(config['cwd'], save_path)
+            os.makedirs(save_path, exist_ok=True)
 
     # train and validation routine
     best_val_acc = 0
     best_model_state = deepcopy(model.state_dict())
-    for i in range(0, config["iterations"], config["history_interval"]):
-        # train 'history_interval' steps
+    for i in range(0, config["iterations"], history_interval):
+        # train for 'history_interval' steps
         loss, train_acc = tr_ms(model=model,
                                 loader=train_loader,
                                 preprocess=preprocess_train,
                                 optimizer=optimizer,
                                 scheduler=scheduler, config=config,
-                                steps=config["history_interval"])
+                                steps=history_interval)
         # validation
         val_acc = check_accuracy(model=model, loader=val_loader,
                                  preprocess=preprocess_test,
                                  config=config, repeat=10)
         # log
-        if config['ddp'] is False or config['ddp_rank'] == 0:
+        if main_process:
             wandb.log({'Loss': loss,
                        'Train Accuracy': train_acc,
                        'Validation Accuracy': val_acc,
                        'Learning Rate': optimizer.state_dict()['param_groups'][0]['lr'],
-                      }, step=(i + config["history_interval"]) * config["minibatch"])
+                       }, step=(i + history_interval) * config["minibatch"])
 
             # save the best model so far
             if best_val_acc < val_acc:
                 best_val_acc = val_acc
                 best_model_state = deepcopy(model.state_dict())
                 if config['save_model']:
-                    save_path = f'local/checkpoint_temp/{wandb.run.name}/'
-                    os.makedirs(save_path, exist_ok=True)
-                    best_checkpoint = {'model_state': best_model_state,
-                                    'config': config,
-                                    'optimizer_state': optimizer.state_dict(),
-                                    'scheduler_state': scheduler.state_dict()}
+                    best_checkpoint = {'model_state': best_model_state, 'config': config,
+                                       'optimizer_state': optimizer.state_dict(),
+                                       'scheduler_state': scheduler.state_dict()}
                     torch.save(best_checkpoint, os.path.join(save_path, 'best_checkpoint.pt'))
 
-    # calculate the test accuracies for best and last models
-    if config['ddp'] is False or config['ddp_rank'] == 0:
+    # calculate the test accuracy for best and last models
+    if main_process:
         last_model_state = deepcopy(model.state_dict())
         last_test_result = check_accuracy_extended(model=model, loader=test_loader,
-                                                preprocess=preprocess_test,
-                                                config=config, repeat=30)
+                                                   preprocess=preprocess_test,
+                                                   config=config, repeat=30)
         last_test_acc = last_test_result[0]
 
         model.load_state_dict(best_model_state)
         best_test_result = check_accuracy_extended(model=model, loader=test_loader,
-                                                preprocess=preprocess_test,
-                                                config=config, repeat=30)
+                                                   preprocess=preprocess_test,
+                                                   config=config, repeat=30)
         best_test_acc = best_test_result[0]
 
         if last_test_acc < best_test_acc:
@@ -173,28 +172,25 @@ def train_with_wandb(config, train_loader, val_loader, test_loader, multicrop_te
 
         # calculate the test accuracy of the final model using multiple crop averaging
         multicrop_test_acc = check_accuracy_multicrop(model=model, loader=multicrop_test_loader,
-                                                    preprocess=preprocess_test,
-                                                    config=config, repeat=30)
+                                                      preprocess=preprocess_test,
+                                                      config=config, repeat=30)
 
         # save the model
         if config['save_model']:
-            save_path = f'local/checkpoint_temp/{wandb.run.name}/'
-            os.makedirs(save_path, exist_ok=True)
-            last_checkpoint = {'model_state': last_model_state,
-                            'config': config,
-                            'optimizer_state': optimizer.state_dict(),
-                            'scheduler_state': scheduler.state_dict()}
+            last_checkpoint = {'model_state': last_model_state, 'config': config,
+                               'optimizer_state': optimizer.state_dict(),
+                               'scheduler_state': scheduler.state_dict()}
             torch.save(last_checkpoint, os.path.join(save_path, 'last_checkpoint.pt'))
 
         # leave the message
         wandb.log({'Test Accuracy': test_acc,
-                '(Best, Last) Test Accuracy': ('Best' if last_test_acc < best_test_acc else 'Last',
-                                                round(best_test_acc, 2), round(last_test_acc, 2)),
-                'Confusion Matrix (Array)': test_confusion,
-                'Multi-Crop Test Accuracy': multicrop_test_acc,
-                'Test Debug Table/Serial': error_table['Serial'],
-                'Test Debug Table/Pred': error_table['Pred'],
-                'Test Debug Table/GT': error_table['GT']})
+                   '(Best, Last) Test Accuracy': ('Best' if last_test_acc < best_test_acc else 'Last',
+                                                  round(best_test_acc, 2), round(last_test_acc, 2)),
+                   'Confusion Matrix (Array)': test_confusion,
+                   'Multi-Crop Test Accuracy': multicrop_test_acc,
+                   'Test Debug Table/Serial': error_table['Serial'],
+                   'Test Debug Table/Pred': error_table['Pred'],
+                   'Test Debug Table/GT': error_table['GT']})
 
         if config['draw_result']:
             draw_roc_curve(score, target, config['class_label_to_name'], use_wandb=True)

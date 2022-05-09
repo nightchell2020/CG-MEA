@@ -1,0 +1,11 @@
+defaults:
+  - base_train
+
+# Training iteration
+# total_samples: 1e+8
+# minibatch: ???  # decided during runtime
+
+# GPU
+# device: ???  decided during runtime
+ddp: true
+# ddp_size: ???  decided during runtime

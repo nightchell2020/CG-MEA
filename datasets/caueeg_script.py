@@ -31,7 +31,7 @@ def load_caueeg_config(dataset_path: str):
     try:
         with open(os.path.join(dataset_path, 'annotation.json'), 'r') as json_file:
             annotation = json.load(json_file)
-    except FileNotFoundError() as e:
+    except FileNotFoundError as e:
         print(
             f"ERROR: load_caueeg_config(dataset_path) encounters an error of {e}. "
             f"Make sure the dataset path is correct.")
@@ -52,12 +52,12 @@ def load_caueeg_full_dataset(dataset_path: str,
         transform (callable): Preprocessing process to apply during loading signals.
 
     Returns:
-        The PyTorch dataset instance for whole CAUEEG dataset.
+        The PyTorch dataset instance for the entire CAUEEG dataset.
     """
     try:
         with open(os.path.join(dataset_path, 'annotation.json'), 'r') as json_file:
             annotation = json.load(json_file)
-    except FileNotFoundError() as e:
+    except FileNotFoundError as e:
         print(
             f"ERROR: load_caueeg_full(dataset_path) encounters an error of {e}. "
             f"Make sure the dataset path is correct.")
@@ -163,7 +163,7 @@ def load_caueeg_task_split(dataset_path: str, task: str, split: str,
     try:
         with open(os.path.join(dataset_path, task + '.json'), 'r') as json_file:
             task_dict = json.load(json_file)
-    except FileNotFoundError() as e:
+    except FileNotFoundError as e:
         print(f"ERROR: load_caueeg_task_split(dataset_path) encounters an error of {e}. "
               f"Make sure the dataset path is correct.")
         raise
@@ -363,7 +363,7 @@ def compose_preprocess(config, train_loader, verbose=True):
     ##################################################
     # additive Gaussian noise for augmentation (age) #
     ##################################################
-    if config.get('mode', None) == 'eval':
+    if config.get('run_mode', None) == 'eval':
         pass
     elif config.get('awgn_age') is None or config['awgn_age'] <= 1e-12:
         pass
@@ -394,7 +394,7 @@ def compose_preprocess(config, train_loader, verbose=True):
     ########################################################
     # additive Gaussian noise for augmentation (1D signal) #
     ########################################################
-    if config.get('mode', None) == 'eval':
+    if config.get('run_mode', None) == 'eval':
         pass
     elif config.get('awgn') is None or config['awgn'] <= 1e-12:
         pass
@@ -406,7 +406,7 @@ def compose_preprocess(config, train_loader, verbose=True):
     ##############################################################
     # multiplicative Gaussian noise for augmentation (1D signal) #
     ##############################################################
-    if config.get('mode', None) == 'eval':
+    if config.get('run_mode', None) == 'eval':
         pass
     elif config.get('mgn') is None or config['mgn'] <= 1e-12:
         pass
@@ -486,14 +486,35 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_
         num_workers = 0
         pin_memory = False
 
-    batch_size = config['minibatch'] // config.get('crop_multiple', 1)
+    batch_size = config['minibatch'] / config.get('crop_multiple', 1)
+    if batch_size < 1 or batch_size % 1 > 1e-12:
+        raise ValueError(f"ERROR: config['minibatch']={config['minibatch']} "
+                         f"is not multiple of config['crop_multiple']={config['crop_multiple']}.")
+    batch_size = round(batch_size)
+
+    multi_batch_size = config['minibatch'] / config.get('test_crop_multiple', 1)
+    if multi_batch_size < 1 or multi_batch_size % 1 > 1e-12:
+        raise ValueError(f"ERROR: config['minibatch']={config['minibatch']} "
+                         f"is not multiple of config['test_crop_multiple']={config['test_crop_multiple']}.")
+    multi_batch_size = round(multi_batch_size)
 
     if config.get('ddp', False):
         train_sampler = DistributedSampler(train_dataset)
+        val_sampler = DistributedSampler(val_dataset)
     else:
         train_sampler = None
+        val_sampler = None
 
-    if config.get('mode', None) == 'eval':
+    if config.get('run_mode', None) == 'train':
+        train_loader = DataLoader(train_dataset,
+                                  batch_size=batch_size,
+                                  shuffle=True,
+                                  sampler=train_sampler,
+                                  drop_last=True,
+                                  num_workers=num_workers,
+                                  pin_memory=pin_memory,
+                                  collate_fn=eeg_collate_fn)
+    else:
         train_loader = DataLoader(train_dataset,
                                   batch_size=batch_size,
                                   shuffle=False,
@@ -502,18 +523,11 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_
                                   num_workers=num_workers,
                                   pin_memory=pin_memory,
                                   collate_fn=eeg_collate_fn)
-    else:
-        train_loader = DataLoader(train_dataset,
-                                  batch_size=batch_size,
-                                  shuffle=True,
-                                  drop_last=True,
-                                  num_workers=num_workers,
-                                  pin_memory=pin_memory,
-                                  collate_fn=eeg_collate_fn)
 
     val_loader = DataLoader(val_dataset,
                             batch_size=batch_size,
                             shuffle=False,
+                            sampler=val_sampler,
                             drop_last=False,
                             num_workers=num_workers,
                             pin_memory=pin_memory,
@@ -528,7 +542,7 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_
                              collate_fn=eeg_collate_fn)
 
     multicrop_test_loader = DataLoader(multicrop_test_dataset,
-                                       batch_size=1,  # Multiple crops will consist of the minibatch
+                                       batch_size=multi_batch_size,
                                        shuffle=False,
                                        drop_last=False,
                                        num_workers=num_workers,
@@ -556,15 +570,18 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_
 
 
 def build_dataset_for_train(config, verbose=False):
+    dataset_path = config['dataset_path']
+    if 'cwd' in config:
+        dataset_path = os.path.join(config['cwd'], dataset_path)
 
-    config_dataset = load_caueeg_config(config['dataset_path'])
+    config_dataset = load_caueeg_config(dataset_path)
     config.update(**config_dataset)
 
     transform, transform_multicrop = compose_transforms(config, verbose=verbose)
     config['transform'] = transform
     config['transform_multicrop'] = transform_multicrop
 
-    config_task, train_dataset, val_dataset, test_dataset = load_caueeg_task_datasets(dataset_path=config['dataset_path'],
+    config_task, train_dataset, val_dataset, test_dataset = load_caueeg_task_datasets(dataset_path=dataset_path,
                                                                                       task=config['task'],
                                                                                       load_event=config['load_event'],
                                                                                       file_format=config['file_format'],
@@ -572,7 +589,7 @@ def build_dataset_for_train(config, verbose=False):
                                                                                       verbose=verbose)
     config.update(**config_task)
 
-    _, multicrop_test_dataset = load_caueeg_task_split(dataset_path=config['dataset_path'],
+    _, multicrop_test_dataset = load_caueeg_task_split(dataset_path=dataset_path,
                                                        task=config['task'],
                                                        split='test',
                                                        load_event=config['load_event'],
@@ -590,6 +607,8 @@ def build_dataset_for_train(config, verbose=False):
     preprocess_train, preprocess_test = compose_preprocess(config, train_loader, verbose=verbose)
     config['preprocess_train'] = preprocess_train
     config['preprocess_test'] = preprocess_test
+    config['in_channels'] = preprocess_train(next(iter(train_loader)))['signal'].shape[1]
+    config['out_dims'] = len(config['class_label_to_name'])
 
     if verbose:
         for i_batch, sample_batched in enumerate(train_loader):

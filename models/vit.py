@@ -16,12 +16,15 @@ import torch.nn as nn
 from torchvision.ops.misc import ConvNormActivation
 
 from .utils import program_conv_filters
+from .activation import get_activation_class
 
 
 __all__ = [
     "VisionTransformer",
+    "vit_b_8",
     "vit_b_16",
     "vit_b_32",
+    "vit_l_8",
     "vit_l_16",
     "vit_l_32",
 ]
@@ -38,10 +41,10 @@ class ConvStemConfig(NamedTuple):
 class MLPBlock(nn.Sequential):
     """Transformer MLP block."""
 
-    def __init__(self, in_dim: int, mlp_dim: int, dropout: float):
+    def __init__(self, in_dim: int, mlp_dim: int, dropout: float, nn_act: nn.Module):
         super().__init__()
         self.linear_1 = nn.Linear(in_dim, mlp_dim)
-        self.act = nn.GELU()
+        self.act = nn_act()
         self.dropout_1 = nn.Dropout(dropout)
         self.linear_2 = nn.Linear(mlp_dim, in_dim)
         self.dropout_2 = nn.Dropout(dropout)
@@ -62,6 +65,7 @@ class EncoderBlock(nn.Module):
         mlp_dim: int,
         dropout: float,
         attention_dropout: float,
+        nn_act: nn.Module,
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
     ):
         super().__init__()
@@ -74,7 +78,7 @@ class EncoderBlock(nn.Module):
 
         # MLP block
         self.ln_2 = norm_layer(hidden_dim)
-        self.mlp = MLPBlock(hidden_dim, mlp_dim, dropout)
+        self.mlp = MLPBlock(hidden_dim, mlp_dim, dropout, nn_act)
 
     def forward(self, input: torch.Tensor):
         torch._assert(input.dim() == 3, f"Expected (seq_length, batch_size, hidden_dim) got {input.shape}")
@@ -100,6 +104,7 @@ class Encoder(nn.Module):
         mlp_dim: int,
         dropout: float,
         attention_dropout: float,
+        nn_act: nn.Module,
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
     ):
         super().__init__()
@@ -115,6 +120,7 @@ class Encoder(nn.Module):
                 mlp_dim,
                 dropout,
                 attention_dropout,
+                nn_act,
                 norm_layer,
             )
         self.layers = nn.Sequential(layers)
@@ -144,6 +150,7 @@ class VisionTransformer(nn.Module):
             mlp_dim: int,
             dropout: float = 0.0,
             attention_dropout: float = 0.0,
+            activation: str = 'gelu',
             norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
             conv_stem_configs: Optional[List[ConvStemConfig]] = None,
             **kwargs: Any,
@@ -161,6 +168,9 @@ class VisionTransformer(nn.Module):
         if self.use_age == 'conv':
             in_channels += 1
         self.fc_stages = fc_stages
+
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
+        self.activation = activation
 
         self.image_h, self.image_w = seq_len_2d
         self.hidden_dim = hidden_dim
@@ -213,6 +223,7 @@ class VisionTransformer(nn.Module):
             mlp_dim,
             dropout,
             attention_dropout,
+            self.nn_act,
             norm_layer,
         )
 
@@ -223,9 +234,8 @@ class VisionTransformer(nn.Module):
 
         for i in range(self.fc_stages - 1):
             # TODO: Dropout or Normalization layers can be added here.
-            # TODO: Activation function also can be changed.
             heads_layers[f"linear{i + 1}"] = nn.Linear(prev_dim, prev_dim // 2)
-            heads_layers[f"act{i + 1}"] = nn.Tanh()
+            heads_layers[f"act{i + 1}"] = self.nn_act()
             prev_dim = prev_dim // 2
         heads_layers["head"] = nn.Linear(prev_dim, out_dims)
         self.heads = nn.Sequential(heads_layers)
@@ -255,7 +265,10 @@ class VisionTransformer(nn.Module):
             linear_name = f"linear{i + 1}"
             if hasattr(self.heads, linear_name) and isinstance(getattr(self.heads, linear_name), nn.Linear):
                 fan_in = getattr(self.heads, linear_name).in_features
-                nn.init.trunc_normal_(getattr(self.heads, linear_name).weight, std=math.sqrt(1 / fan_in))
+                if self.activation == 'tanh':
+                    nn.init.trunc_normal_(getattr(self.heads, linear_name).weight, std=math.sqrt(1 / fan_in))
+                else:
+                    nn.init.trunc_normal_(getattr(self.heads, linear_name).weight, std=math.sqrt(2.0 / fan_in))
                 nn.init.zeros_(getattr(self.heads, linear_name).bias)
         if isinstance(self.heads.head, nn.Linear):
             nn.init.zeros_(self.heads.head.weight)
@@ -357,6 +370,23 @@ def _vision_transformer(
     return model
 
 
+def vit_b_8(**kwargs: Any) -> VisionTransformer:
+    """
+    Constructs a vit_b_8 architecture from
+    `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
+    """
+    return _vision_transformer(
+        arch="vit_b_8",
+        size_min=7,
+        size_max=9,
+        num_layers=12,
+        num_heads=12,
+        hidden_dim=768,
+        mlp_dim=3072,
+        **kwargs,
+    )
+
+
 def vit_b_16(**kwargs: Any) -> VisionTransformer:
     """
     Constructs a vit_b_16 architecture from
@@ -387,6 +417,23 @@ def vit_b_32(**kwargs: Any) -> VisionTransformer:
         num_heads=12,
         hidden_dim=768,
         mlp_dim=3072,
+        **kwargs,
+    )
+
+
+def vit_l_8(**kwargs: Any) -> VisionTransformer:
+    """
+    Constructs a vit_l_8 architecture from
+    `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
+    """
+    return _vision_transformer(
+        arch="vit_l_8",
+        size_min=7,
+        size_max=9,
+        num_layers=24,
+        num_heads=16,
+        hidden_dim=1024,
+        mlp_dim=4096,
         **kwargs,
     )
 

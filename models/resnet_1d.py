@@ -143,7 +143,7 @@ class BottleneckBlock1D(nn.Module):
 
 class ResNet1D(nn.Module):
     def __init__(self,
-                 block: Type[Union[BasicBlock1D, BottleneckBlock1D]],
+                 block: str,
                  conv_layers: List[int],
                  in_channels: int,
                  out_dims: int,
@@ -162,6 +162,10 @@ class ResNet1D(nn.Module):
                  **kwargs) -> None:
 
         super().__init__()
+
+        if block not in ['basic', 'bottleneck']:
+            raise ValueError(f"{self.__class__.__name__}.__init__(block) "
+                             f"receives one of ['basic', 'bottleneck'].")
 
         if use_age not in ['fc', 'conv', 'no']:
             raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
@@ -196,7 +200,8 @@ class ResNet1D(nn.Module):
         elif base_pool == 'max':
             self.base_pool = nn.MaxPool1d
 
-        if block.__name__ == BasicBlock1D.__name__:
+        if block == 'basic':
+            block = BasicBlock1D
             conv_filter_list = [
                 {'kernel_size': 41},
                 {'kernel_size': 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
@@ -204,7 +209,8 @@ class ResNet1D(nn.Module):
                 {'kernel_size': 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
                 {'kernel_size': 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
             ]
-        else:
+        else: # bottleneck case
+            block = BottleneckBlock1D
             conv_filter_list = [
                 {'kernel_size': 41},
                 {'kernel_size': 9},
@@ -212,6 +218,7 @@ class ResNet1D(nn.Module):
                 {'kernel_size': 9},
                 {'kernel_size': 9},
             ]
+
         self.sequence_length = seq_length
         self.output_length = program_conv_filters(sequence_length=seq_length,
                                                   conv_filter_list=conv_filter_list,
