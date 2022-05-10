@@ -18,8 +18,11 @@ mixup: 0.0
 
 # log
 num_history: 500
-draw_result: true
 save_model: true
+
+# wandb
+use_wandb: true
+draw_result: true
 watch_model: true
 
 # GPU

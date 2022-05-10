@@ -11,16 +11,16 @@ command:
   - ${args_no_hyphens}
 
 parameters:
-#  ### TODO: Remove this area
-#  train.total_samples:
-#    values:
-#      - 1000
-#  train.search_lr:
-#    values:
-#      - false
-#  train.num_history:
-#    values:
-#      - 5
+  ### TODO: Remove this area
+  train.total_samples:
+    values:
+      - 500
+  train.search_lr:
+    values:
+      - false
+  train.num_history:
+    values:
+      - 2
 
   ########
   # Data #

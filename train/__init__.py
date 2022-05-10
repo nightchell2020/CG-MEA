@@ -1,5 +1,5 @@
 from .train_core import train_multistep, train_mixup_multistep
-from .train_script import learning_rate_search, train_with_wandb
+from .train_script import learning_rate_search, train_script
 from .evaluate import check_accuracy
 from .evaluate import check_accuracy_extended
 from .evaluate import check_accuracy_multicrop

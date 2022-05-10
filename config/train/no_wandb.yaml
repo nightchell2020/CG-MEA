@@ -1,0 +1,7 @@
+defaults:
+  - base_train
+  - _self_
+
+# wandb
+use_wandb: false
+watch_model: false

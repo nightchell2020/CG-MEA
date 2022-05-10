@@ -2,7 +2,6 @@ from copy import deepcopy
 from omegaconf import DictConfig, OmegaConf
 import hydra
 from hydra.core.hydra_config import HydraConfig
-import wandb
 import pprint
 
 import torch
@@ -41,7 +40,7 @@ def check_device_env(cfg_default):
                              f'Check the environment again!!')
 
 
-def prepare_and_run_train(rank, world_size, config):
+def prepare_and_run_train(rank, world_size, config, wandb_run=None):
     # setup for distributed training
     use_ddp = config.get('ddp', False)
 
@@ -51,12 +50,15 @@ def prepare_and_run_train(rank, world_size, config):
         torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
         config = deepcopy(config)
         config['device'] = rank
+        if config['use_wandb'] and rank == 0:
+            config['wandb_run'] = wandb_run
 
     # compose dataset
     train_loader, val_loader, test_loader, multicrop_test_loader = build_dataset_for_train(config)
 
     # generate the model and update some configurations
     model = hydra.utils.instantiate(config)
+
     if use_ddp:
         torch.cuda.set_device(config['device'])
         model.cuda(config['device'])
@@ -69,8 +71,8 @@ def prepare_and_run_train(rank, world_size, config):
         config['num_params'] = count_parameters(model)
 
     # train
-    model = train_with_wandb(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
-                             config['preprocess_train'], config['preprocess_test'])
+    train_script(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
+                 config['preprocess_train'], config['preprocess_test'])
 
     # cleanup
     if use_ddp:
@@ -81,39 +83,30 @@ def prepare_and_run_train(rank, world_size, config):
 def my_app(cfg: DictConfig) -> None:
     # initialize the configurations
     # print(OmegaConf.to_yaml(cfg))
-    cfg_default = {**OmegaConf.to_container(cfg.data), **OmegaConf.to_container(cfg.train),
-                   **OmegaConf.to_container(cfg.model), 'cwd': HydraConfig.get().runtime.cwd}
+    config = {**OmegaConf.to_container(cfg.data), **OmegaConf.to_container(cfg.train),
+              **OmegaConf.to_container(cfg.model), 'cwd': HydraConfig.get().runtime.cwd}
 
     # check the workstation environment and update some configurations
-    check_device_env(cfg_default)
+    check_device_env(config)
 
-    # initialize the wandb
-    wandb_run = wandb.init(project=cfg_default.get('project', None))
-    wandb.run.name = wandb.run.id
+    # connect wandb
+    wandb_run = None
+    if config['use_wandb']:
+        wandb_run = wandb.init(project=config.get('project', 'noname'))
+        wandb.run.name = wandb.run.id
 
-    with wandb_run:
-        config = {}
+    # build the dataset and train the model
+    if config.get('ddp', False):
+        mp.spawn(prepare_and_run_train,
+                 args=(config['ddp_size'], config, wandb_run),
+                 nprocs=config['ddp_size'],
+                 join=True)
+    else:
+        prepare_and_run_train(rank=None, world_size=None, config=config)
 
-        # load default configurations not selected by wandb.sweep
-        for k, v in cfg_default.items():
-            if k not in [wandb_key.split('.')[-1] for wandb_key in wandb.config.keys()]:
-                config[k] = v
-
-        # load the selected configurations from wandb sweep with preventing callables from type-conversion to str
-        for k, v in wandb.config.items():
-            k = k.split('.')[-1]
-            if k not in config:
-                config[k] = v
-
-        # build the dataset and train the model
-        if config.get('ddp', False):
-            config['wandb_run'] = wandb_run
-            mp.spawn(prepare_and_run_train,
-                     args=(config['ddp_size'], config,),
-                     nprocs=config['ddp_size'],
-                     join=True)
-        else:
-            prepare_and_run_train(rank=None, world_size=None, config=config)
+    # finish wandb
+    if config['use_wandb']:
+        wandb_run.finish()
 
 
 if __name__ == "__main__":
