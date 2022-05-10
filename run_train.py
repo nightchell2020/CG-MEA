@@ -58,12 +58,15 @@ def prepare_and_run_train(rank, world_size, config):
     # generate the model and update some configurations
     model = hydra.utils.instantiate(config)
     if use_ddp:
+        torch.cuda.set_device(config['device'])
+        model.cuda(config['device'])
         model = DDP(model, device_ids=[config['device']])
+        config['output_length'] = model.module.get_output_length()
+        config['num_params'] = count_parameters(model)
     else:
         model = model.to(config['device'])
-
-    config['output_length'] = model.get_output_length()
-    config['num_params'] = count_parameters(model)
+        config['output_length'] = model.get_output_length()
+        config['num_params'] = count_parameters(model)
 
     # train
     model = train_with_wandb(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
@@ -85,7 +88,7 @@ def my_app(cfg: DictConfig) -> None:
     check_device_env(cfg_default)
 
     # initialize the wandb
-    wandb_run = wandb.init(project=f"{cfg_default['project']}")
+    wandb_run = wandb.init(project=cfg_default.get('project', None))
     wandb.run.name = wandb.run.id
 
     with wandb_run:
@@ -104,6 +107,7 @@ def my_app(cfg: DictConfig) -> None:
 
         # build the dataset and train the model
         if config.get('ddp', False):
+            config['wandb_run'] = wandb_run
             mp.spawn(prepare_and_run_train,
                      args=(config['ddp_size'], config,),
                      nprocs=config['ddp_size'],

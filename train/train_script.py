@@ -65,6 +65,8 @@ def train_with_wandb(config, model, train_loader, val_loader, test_loader, multi
                      preprocess_train, preprocess_test):
     # logging, evaluating, and saving happens only for the main process of DDP
     main_process = config['ddp'] is False or config['device'] == 0
+    if 'wandb_run' in config:
+        wandb.run = config.pop('wandb_run')
 
     # training iteration and other conditions
     config['iterations'] = round(config['total_samples'] / config['minibatch'] / config.get('ddp_size', 1))

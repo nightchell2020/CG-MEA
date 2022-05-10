@@ -479,12 +479,12 @@ def compose_preprocess(config, train_loader, verbose=True):
 
 
 def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_test_dataset, verbose=False):
-    if config['device'].type == 'cuda':
-        num_workers = 0  # A number other than 0 causes an error
-        pin_memory = True
-    else:
+    if config['device'] == 'cpu':
         num_workers = 0
         pin_memory = False
+    else:
+        num_workers = 0  # A number other than 0 causes an error
+        pin_memory = True
 
     batch_size = config['minibatch'] / config.get('crop_multiple', 1)
     if batch_size < 1 or batch_size % 1 > 1e-12:
@@ -499,7 +499,7 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_
     multi_batch_size = round(multi_batch_size)
 
     if config.get('ddp', False):
-        train_sampler = DistributedSampler(train_dataset)
+        train_sampler = DistributedSampler(train_dataset, shuffle=True)
         val_sampler = DistributedSampler(val_dataset)
     else:
         train_sampler = None
@@ -508,7 +508,7 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_
     if config.get('run_mode', None) == 'train':
         train_loader = DataLoader(train_dataset,
                                   batch_size=batch_size,
-                                  shuffle=True,
+                                  shuffle=(train_sampler is None),
                                   sampler=train_sampler,
                                   drop_last=True,
                                   num_workers=num_workers,

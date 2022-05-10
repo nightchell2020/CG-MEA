@@ -1,27 +1,26 @@
 project: sweep-test
 entity: ipis-mjkim
 method: random
-name: sweep-task1
+name: sweep-task2
 program: run_train.py
 command:
   - ${env}
   - python
   - ${program}
-  - "data=task1"
+  - "data=task2"
   - ${args_no_hyphens}
 
 parameters:
-  ### DEBUG : TODO: Remove!!
-  train.total_samples:
-    values:
-      - 1000
-  train.search_lr:
-    values:
-      - false
-  train.num_history:
-    values:
-      - 5
-  ### DEBUG : TODO: Remove!!
+#  ### TODO: Remove this area
+#  train.total_samples:
+#    values:
+#      - 1000
+#  train.search_lr:
+#    values:
+#      - false
+#  train.num_history:
+#    values:
+#      - 5
 
   ########
   # Data #

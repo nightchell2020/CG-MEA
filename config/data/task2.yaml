@@ -1,0 +1,8 @@
+defaults:
+  - base_data
+  - _self_
+
+task: task2
+dataset_path: local/dataset/02_Curated_Data_220419/
+file_format: memmap
+crop_multiple: 4
