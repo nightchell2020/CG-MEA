@@ -1,7 +1,6 @@
-project: sweep-test
+project: caueeg-task2
 entity: ipis-mjkim
 method: random
-name: sweep-task2
 program: run_train.py
 command:
   - ${env}
@@ -11,16 +10,6 @@ command:
   - ${args_no_hyphens}
 
 parameters:
-  ### TODO: Remove this area
-  train.total_samples:
-    values:
-      - 500
-  train.search_lr:
-    values:
-      - false
-  train.num_history:
-    values:
-      - 2
 
   ########
   # Data #

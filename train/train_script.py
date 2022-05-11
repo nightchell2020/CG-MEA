@@ -32,7 +32,10 @@ def learning_rate_search(config, model, train_loader, val_loader,
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
 
-        model.reset_weights()
+        if config['ddp']:
+            model.module.reset_weights()
+        else:
+            model.reset_weights()
         model.train()
 
         optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
@@ -67,8 +70,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                  preprocess_train, preprocess_test):
     # only the main process of DDP logs, evaluates, and saves
     main_process = config['ddp'] is False or config['device'] == 0
-    if 'wandb_run' in config:
-        wandb.run = config.pop('wandb_run')
+    if main_process and config['use_wandb']:
+        wandb.init(reinit=True)
 
     # training iteration and other conditions
     config['iterations'] = round(config['total_samples'] / config['minibatch'] / config.get('ddp_size', 1))

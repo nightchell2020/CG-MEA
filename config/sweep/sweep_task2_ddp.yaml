@@ -8,20 +8,10 @@ command:
   - python
   - ${program}
   - "data=task2"
-  - "train=train_ddp"
+  - "train=tiny_ddp"  # train_ddp
   - ${args_no_hyphens}
 
 parameters:
-#  ### TODO: Remove this area
-#  train.total_samples:
-#    values:
-#      - 1000
-#  train.search_lr:
-#    values:
-#      - false
-#  train.num_history:
-#    values:
-#      - 5
 
   ########
   # Data #

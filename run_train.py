@@ -40,7 +40,7 @@ def check_device_env(cfg_default):
                              f'Check the environment again!!')
 
 
-def prepare_and_run_train(rank, world_size, config, wandb_run=None):
+def prepare_and_run_train(rank, world_size, config):
     # setup for distributed training
     use_ddp = config.get('ddp', False)
 
@@ -50,8 +50,6 @@ def prepare_and_run_train(rank, world_size, config, wandb_run=None):
         torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
         config = deepcopy(config)
         config['device'] = rank
-        if config['use_wandb'] and rank == 0:
-            config['wandb_run'] = wandb_run
 
     # compose dataset
     train_loader, val_loader, test_loader, multicrop_test_loader = build_dataset_for_train(config)
@@ -92,13 +90,13 @@ def my_app(cfg: DictConfig) -> None:
     # connect wandb
     wandb_run = None
     if config['use_wandb']:
-        wandb_run = wandb.init(project=config.get('project', 'noname'))
+        wandb_run = wandb.init(project=config.get('project', 'noname'), reinit=True)
         wandb.run.name = wandb.run.id
 
     # build the dataset and train the model
     if config.get('ddp', False):
         mp.spawn(prepare_and_run_train,
-                 args=(config['ddp_size'], config, wandb_run),
+                 args=(config['ddp_size'], config),
                  nprocs=config['ddp_size'],
                  join=True)
     else:
