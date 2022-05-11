@@ -41,6 +41,12 @@ def check_device_env(cfg_default):
 
 
 def prepare_and_run_train(rank, world_size, config):
+    # fix the seed for reproducibility
+    seed = config.get('seed', 0)
+    seed = seed + rank if rank is not None else seed
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+
     # setup for distributed training
     use_ddp = config.get('ddp', False)
 
@@ -63,6 +69,7 @@ def prepare_and_run_train(rank, world_size, config):
         model = DDP(model, device_ids=[config['device']])
         config['output_length'] = model.module.get_output_length()
         config['num_params'] = count_parameters(model)
+        torch.distributed.barrier()
     else:
         model = model.to(config['device'])
         config['output_length'] = model.get_output_length()

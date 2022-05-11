@@ -126,6 +126,9 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     best_model_state = deepcopy(model.state_dict())
 
     for i in range(0, config["iterations"], history_interval):
+        if config.get('ddp', False):
+            torch.distributed.barrier()
+
         # train for 'history_interval' steps
         loss, train_acc = tr_ms(model=model,
                                 loader=train_loader,
