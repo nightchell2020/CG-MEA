@@ -71,7 +71,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     # only the main process of DDP logs, evaluates, and saves
     main_process = config['ddp'] is False or config['device'] == 0
     if main_process and config['use_wandb']:
-        wandb.init(reinit=True)
+        wandb.init(project=config.get('project', 'noname'), reinit=True)
+        wandb.run.name = wandb.run.id
 
     # training iteration and other conditions
     config['iterations'] = round(config['total_samples'] / config['minibatch'] / config.get('ddp_size', 1))
@@ -222,12 +223,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
             draw_confusion(test_confusion, config['class_label_to_name'], use_wandb=config['use_wandb'])
             draw_error_table(error_table, use_wandb=config['use_wandb'])
 
-            # leave these disabled to save the wandb resources
-            # if config['use_wandb']:
-            #     wandb.log({"Confusion Matrix": wandb.plot.confusion_matrix(y_true=target,
-            #                                                                preds=score.argmax(axis=-1),
-            #                                                                class_names=config['class_label_to_name'])})
-            #     wandb.log({"ROC Curve": wandb.plot.roc_curve(target, score, labels=config['class_label_to_name'])})
+        if config['use_wandb']:
+            wandb.run.finish()
 
         del last_model_state
 

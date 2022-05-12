@@ -1,51 +1,63 @@
+import os
 from copy import deepcopy
+import gc
 from omegaconf import DictConfig, OmegaConf
 import hydra
 from hydra.core.hydra_config import HydraConfig
-import pprint
 
+import numpy as np
 import torch
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.multiprocessing as mp
 
-from train.train_script import *
-from datasets.caueeg_script import *
+from train.train_script import train_script
+from datasets.caueeg_script import build_dataset_for_train
 from models.utils import count_parameters
 
 
-def check_device_env(cfg_default):
+def check_device_env(config):
     if not torch.cuda.is_available():
         raise ValueError('ERROR: No GPU is available. Check the environment again!!')
 
     # assign GPU
-    cfg_default['device'] = torch.device(cfg_default.get('device', 'cuda')
+    config['device'] = torch.device(config.get('device', 'cuda')
                                          if torch.cuda.is_available() else 'cpu')
 
     # set the minibatch size according to the GPU memory
     device_name = torch.cuda.get_device_name(0)
+    large_model = config['model'] in ['1D-ResNet-101', '1D-ResNeXt-101', '1D-Wide-ResNet-101',
+                                      '2D-ResNet-101', '2D-ResNeXt-101', '2D-Wide-ResNet-101',
+                                      '2D-ViT-B-8', '2D-ViT-B-16', '2D-ViT-B-32',
+                                      '2D-ViT-L-8', '2D-ViT-L-16', '2D-ViT-L-32']
     if '3090' in device_name:
-        cfg_default['minibatch'] = 160
+        config['minibatch'] = 160 if not large_model else 128
     elif '2080' in device_name:
-        cfg_default['minibatch'] = 96
+        config['minibatch'] = 96 if not large_model else 64
     elif '1070' in device_name:
-        cfg_default['minibatch'] = 64
+        config['minibatch'] = 64 if not large_model else 48
 
     # distributed training
-    if cfg_default.get('ddp', False):
+    if config.get('ddp', False):
         world_size = torch.cuda.device_count()
         if world_size > 1:
-            cfg_default['ddp_size'] = cfg_default.get('ddp_size', world_size)
+            config['ddp_size'] = config.get('ddp_size', world_size)
         else:
             raise ValueError(f'ERROR: There are not sufficient GPUs to launch the DDP training: {world_size}. '
                              f'Check the environment again!!')
 
 
 def prepare_and_run_train(rank, world_size, config):
-    # fix the seed for reproducibility
-    seed = config.get('seed', 0)
-    seed = seed + rank if rank is not None else seed
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+    # collect some garbage
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize()
+
+    # fix the seed for reproducibility (a negative seed value means not fixing)
+    if config.get('seed', 0) >= 0:
+        seed = config.get('seed', 0)
+        seed = seed + rank if rank is not None else seed
+        torch.manual_seed(seed)
+        np.random.seed(seed)
 
     # setup for distributed training
     use_ddp = config.get('ddp', False)
@@ -94,12 +106,6 @@ def my_app(cfg: DictConfig) -> None:
     # check the workstation environment and update some configurations
     check_device_env(config)
 
-    # connect wandb
-    wandb_run = None
-    if config['use_wandb']:
-        wandb_run = wandb.init(project=config.get('project', 'noname'), reinit=True)
-        wandb.run.name = wandb.run.id
-
     # build the dataset and train the model
     if config.get('ddp', False):
         mp.spawn(prepare_and_run_train,
@@ -108,10 +114,6 @@ def my_app(cfg: DictConfig) -> None:
                  join=True)
     else:
         prepare_and_run_train(rank=None, world_size=None, config=config)
-
-    # finish wandb
-    if config['use_wandb']:
-        wandb_run.finish()
 
 
 if __name__ == "__main__":

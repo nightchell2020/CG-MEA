@@ -1,5 +1,8 @@
 run_mode: train
 
+# reproducibility
+seed: 0
+
 # Training iteration
 base_lr: 1e-4
 search_lr: true
@@ -29,4 +32,3 @@ watch_model: true
 # device: ???  decided during runtime
 ddp: false
 # ddp_size: ???  decided during runtime
-
