@@ -67,8 +67,6 @@ def prepare_and_run_train(rank, world_size, config):
     # compose dataset
     train_loader, val_loader, test_loader, multicrop_test_loader = build_dataset_for_train(config)
 
-    from torchsummaryX import summary
-    summary
     # generate the model and update some configurations
     model = hydra.utils.instantiate(config)
 
