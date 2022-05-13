@@ -8,7 +8,7 @@ command:
   - python
   - ${program}
   - "data=task2"
-  - "train=tiny_ddp"  # train_ddp
+  - "train=ddp"  # tiny_ddp
   - ${args_no_hyphens}
 
 parameters:
@@ -69,8 +69,13 @@ parameters:
   #    - 1.5
   #    - 2.0
 
+#  train.weight_decay:
+#    distribution: log_uniform_values
+#    max: 0.05
+#    min: 1e-05
+
   train.weight_decay:
-    distribution: log_uniform_values
+    distribution: uniform
     max: 0.05
     min: 1e-05
 

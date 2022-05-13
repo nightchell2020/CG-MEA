@@ -140,7 +140,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         # validation
         val_acc = check_accuracy(model=model, loader=val_loader,
                                  preprocess=preprocess_test,
-                                 config=config, repeat=10)
+                                 config=config, repeat=30)
         # log
         if main_process:
             if config['use_wandb']:

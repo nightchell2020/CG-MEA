@@ -3,17 +3,17 @@ defaults:
   - _self_
 
 # Training iteration
-total_samples: 1e+8
+total_samples: 8.0e+7
 # minibatch: ???  # decided during runtime
 
 # log
-num_history: 1000
+num_history: 500
 
 # wandb
 watch_model: false
 
 # GPU
-# device: ???  decided during runtime
+# device: ???  # decided during runtime
 ddp: true
-ddp_size: 3
-# ddp_size: ???  decided during runtime
+ddp_size: ???  # decided during runtime
+# ddp_size: 3

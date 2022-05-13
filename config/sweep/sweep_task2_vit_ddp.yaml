@@ -1,12 +1,14 @@
-project: caueeg-task2
+project: sweep-test
 entity: ipis-mjkim
 method: random
+name: sweep-task2-ddp
 program: run_train.py
 command:
   - ${env}
   - python
   - ${program}
   - "data=task2"
+  - "train=ddp"  # tiny_ddp
   - ${args_no_hyphens}
 
 parameters:
@@ -52,12 +54,12 @@ parameters:
 
   train.lr_scheduler_type:
     values:
-      - constant_with_decay
-      - constant_with_twice_decay
+#      - constant_with_decay
+#      - constant_with_twice_decay
       - transformer_style
       - cosine_decay_with_warmup_half
       - cosine_decay_with_warmup_one_and_half
-      # - cosine_decay_with_warmup_two_and_half
+      - cosine_decay_with_warmup_two_and_half
       - linear_decay_with_warmup
 
   #search_multiplier:
@@ -67,8 +69,13 @@ parameters:
   #    - 1.5
   #    - 2.0
 
+#  train.weight_decay:
+#    distribution: log_uniform_values
+#    max: 0.05
+#    min: 1e-05
+
   train.weight_decay:
-    distribution: log_uniform_values
+    distribution: uniform
     max: 0.05
     min: 1e-05
 
@@ -93,30 +100,30 @@ parameters:
       # - 1D-VGG-11
       # - 1D-VGG-13
       # - 1D-VGG-16
-      - 1D-VGG-19
-      - 1D-ResNet-18
-      - 1D-ResNet-50
-      - 1D-ResNet-101
-      - 1D-ResNeXt-50
-      - 1D-ResNeXt-101
-      - 1D-Wide-ResNet-50
-      - 1D-Wide-ResNet-101
+      # - 1D-VGG-19
+      # - 1D-ResNet-18
+      # - 1D-ResNet-50
+      # - 1D-ResNet-101
+      # - 1D-ResNeXt-50
+      # - 1D-ResNeXt-101
+      # - 1D-Wide-ResNet-50
+      # - 1D-Wide-ResNet-101
       - 1D-CNN-Transformer
       # - 2D-VGG-11
       # - 2D-VGG-13
       # - 2D-VGG-16
-      - 2D-VGG-19
-      - 2D-ResNet-18
-      - 2D-ResNet-50
-      - 2D-ResNet-101
-      - 2D-ResNeXt-50
-      - 2D-ResNeXt-101
-      - 2D-Wide-ResNet-50
-      - 2D-Wide-ResNet-101
+      # - 2D-VGG-19
+      # - 2D-ResNet-18
+      # - 2D-ResNet-50
+      # - 2D-ResNet-101
+      # - 2D-ResNeXt-50
+      # - 2D-ResNeXt-101
+      # - 2D-Wide-ResNet-50
+      # - 2D-Wide-ResNet-101
       - 2D-ViT-B-8
       - 2D-ViT-B-16
       # - 2D-ViT-B-32
-      # - 2D-ViT-L-8
+      - 2D-ViT-L-8
       # - 2D-ViT-L-16
       # - 2D-ViT-L-32
 

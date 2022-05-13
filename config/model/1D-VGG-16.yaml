@@ -4,3 +4,4 @@ defaults:
   - _self_
 
 model: 1D-VGG-16
+minibatch: 512

@@ -5,3 +5,4 @@ defaults:
 
 _target_: models.vit.vit_l_32
 model: 2D-ViT-L-32
+minibatch: 2

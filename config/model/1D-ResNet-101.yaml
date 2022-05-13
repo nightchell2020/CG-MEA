@@ -6,3 +6,4 @@ defaults:
 model: 1D-ResNet-101
 conv_layers: [3, 4, 23, 3]
 block: bottleneck
+minibatch: 320

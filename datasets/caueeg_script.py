@@ -379,10 +379,8 @@ def compose_preprocess(config, train_loader, verbose=True):
         if 'signal_mean' not in config or 'signal_std' not in config:
             config['signal_mean'], config['signal_std'] = calculate_signal_statistics(train_loader,
                                                                                       repeats=5, verbose=False)
-        preprocess_train += [EegNormalizeMeanStd(mean=config['signal_mean'],
-                                                 std=config['signal_std'])]
-        preprocess_test += [EegNormalizeMeanStd(mean=config['signal_mean'],
-                                                std=config['signal_std'])]
+        preprocess_train += [EegNormalizeMeanStd(mean=config['signal_mean'], std=config['signal_std'])]
+        preprocess_test += [EegNormalizeMeanStd(mean=config['signal_mean'], std=config['signal_std'])]
     elif config['input_norm'] == 'datapoint':
         preprocess_train += [EegNormalizePerSignal()]
         preprocess_test += [EegNormalizePerSignal()]

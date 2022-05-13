@@ -20,21 +20,16 @@ def check_device_env(config):
         raise ValueError('ERROR: No GPU is available. Check the environment again!!')
 
     # assign GPU
-    config['device'] = torch.device(config.get('device', 'cuda')
-                                         if torch.cuda.is_available() else 'cpu')
+    config['device'] = torch.device(config.get('device', 'cuda') if torch.cuda.is_available() else 'cpu')
 
     # set the minibatch size according to the GPU memory
     device_name = torch.cuda.get_device_name(0)
-    large_model = config['model'] in ['1D-ResNet-101', '1D-ResNeXt-101', '1D-Wide-ResNet-101',
-                                      '2D-ResNet-101', '2D-ResNeXt-101', '2D-Wide-ResNet-101',
-                                      '2D-ViT-B-8', '2D-ViT-B-16', '2D-ViT-B-32',
-                                      '2D-ViT-L-8', '2D-ViT-L-16', '2D-ViT-L-32']
     if '3090' in device_name:
-        config['minibatch'] = 160 if not large_model else 128
+        pass
     elif '2080' in device_name:
-        config['minibatch'] = 96 if not large_model else 64
+        config['minibatch'] = config['minibatch'] // 2
     elif '1070' in device_name:
-        config['minibatch'] = 64 if not large_model else 48
+        config['minibatch'] = config['minibatch'] // 4
 
     # distributed training
     if config.get('ddp', False):
@@ -72,6 +67,8 @@ def prepare_and_run_train(rank, world_size, config):
     # compose dataset
     train_loader, val_loader, test_loader, multicrop_test_loader = build_dataset_for_train(config)
 
+    from torchsummaryX import summary
+    summary
     # generate the model and update some configurations
     model = hydra.utils.instantiate(config)
 

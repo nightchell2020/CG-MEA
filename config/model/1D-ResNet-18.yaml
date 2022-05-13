@@ -6,3 +6,4 @@ defaults:
 model: 1D-ResNet-18
 conv_layers: [2, 2, 2, 2]
 block: basic
+minibatch: 512

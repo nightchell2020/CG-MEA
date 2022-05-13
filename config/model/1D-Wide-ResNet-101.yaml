@@ -7,3 +7,4 @@ model: 1D-Wide-ResNet-101
 conv_layers: [3, 4, 23, 3]
 block: bottleneck
 width_per_group: 128
+minibatch: 384

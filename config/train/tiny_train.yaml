@@ -4,10 +4,10 @@ defaults:
 
 # Training iteration
 search_lr: false
-total_samples: 500
+total_samples: 1500
 
 # log
-num_history: 2
+num_history: 5
 save_model: false
 
 # wandb
