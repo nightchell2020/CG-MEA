@@ -3,7 +3,7 @@ defaults:
   - _self_
 
 # Training iteration
-total_samples: 8.0e+7
+total_samples: 6.0e+7
 # minibatch: ???  # decided during runtime
 
 # log

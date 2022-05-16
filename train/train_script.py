@@ -26,8 +26,8 @@ def learning_rate_search(config, model, train_loader, val_loader,
     best_model_state = None
 
     # default learning rate range is set based on a minibatch size of 32
-    min_log_lr = -3.0 + np.log10(config['minibatch'] / 32)
-    max_log_lr = -6.0 + np.log10(config['minibatch'] / 32)
+    min_log_lr = -3.0 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
+    max_log_lr = -6.0 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
