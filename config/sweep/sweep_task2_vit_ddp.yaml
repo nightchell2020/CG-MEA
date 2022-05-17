@@ -18,15 +18,15 @@ parameters:
   ########
   data.seq_length:
     values:
-      - 1000  # 5 sec
-      - 2000  # 10 sec
+      # - 1000  # 5 sec
+      # - 2000  # 10 sec
       - 3000  # 15 sec
       - 4000  # 20 sec
 
   data.EKG:
     values:
       - O
-      - X
+      # - X
 
   data.photic:
     values:
@@ -56,11 +56,11 @@ parameters:
     values:
 #      - constant_with_decay
 #      - constant_with_twice_decay
-      - transformer_style
-      - cosine_decay_with_warmup_half
+      # - transformer_style
+      # - cosine_decay_with_warmup_half
       - cosine_decay_with_warmup_one_and_half
-      - cosine_decay_with_warmup_two_and_half
-      - linear_decay_with_warmup
+      # - cosine_decay_with_warmup_two_and_half
+      # - linear_decay_with_warmup
 
   #search_multiplier:
   #  values:
@@ -81,7 +81,7 @@ parameters:
 
   train.mixup:
     values:
-      - 0
+      # - 0
       - 0.1
       - 0.2
       - 0.3
@@ -108,7 +108,7 @@ parameters:
       # - 1D-ResNeXt-101
       # - 1D-Wide-ResNet-50
       # - 1D-Wide-ResNet-101
-      - 1D-CNN-Transformer
+      # - 1D-CNN-Transformer
       # - 2D-VGG-11
       # - 2D-VGG-13
       # - 2D-VGG-16
@@ -130,20 +130,20 @@ parameters:
   model.fc_stages:
     distribution: int_uniform
     max: 5
-    min: 2
+    min: 3
 
   model.use_age:
     values:
       - fc
-      - conv
+      # - conv
 
   model.dropout:
     distribution: uniform
     max: 0.5
-    min: 0
+    min: 0.3
 
   model.activation:
     values:
-      - relu
-      - gelu
+      # - relu
+      # - gelu
       - mish

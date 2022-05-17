@@ -494,7 +494,7 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_
     if multi_batch_size < 1 or multi_batch_size % 1 > 1e-12:
         raise ValueError(f"ERROR: config['minibatch']={config['minibatch']} "
                          f"is not multiple of config['test_crop_multiple']={config['test_crop_multiple']}.")
-    multi_batch_size = round(multi_batch_size)
+    config['multi_batch_size'] = round(multi_batch_size)
 
     if config.get('ddp', False):
         train_sampler = DistributedSampler(train_dataset, shuffle=True)
@@ -540,7 +540,7 @@ def make_dataloader(config, train_dataset, val_dataset, test_dataset, multicrop_
                              collate_fn=eeg_collate_fn)
 
     multicrop_test_loader = DataLoader(multicrop_test_dataset,
-                                       batch_size=multi_batch_size,
+                                       batch_size=config['multi_batch_size'],
                                        shuffle=False,
                                        drop_last=False,
                                        num_workers=num_workers,
