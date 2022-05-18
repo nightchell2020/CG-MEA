@@ -109,15 +109,23 @@ def draw_confusion(confusion, class_label_to_name, use_wandb=False):
 
 def draw_roc_curve(score, target, class_label_to_name, use_wandb=False):
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
+    lw = 1.5
 
     # Binarize the output
     n_classes = len(class_label_to_name)
     target = label_binarize(target, classes=np.arange(n_classes))
 
+    if n_classes == 2 and target.shape[1] == 1:
+        target_temp = np.zeros((target.shape[0], 2), dtype=target.dtype)
+        target_temp[:, [0]] = (target == 0)
+        target_temp[:, [1]] = target
+        target = target_temp
+
     # Compute ROC curve and ROC area for each class
     fpr = dict()
     tpr = dict()
     roc_auc = dict()
+
     for i in range(n_classes):
         fpr[i], tpr[i], _ = roc_curve(target[:, i], score[:, i])
         roc_auc[i] = auc(fpr[i], tpr[i])
@@ -134,7 +142,7 @@ def draw_roc_curve(score, target, class_label_to_name, use_wandb=False):
     for i in range(n_classes):
         mean_tpr += np.interp(all_fpr, fpr[i], tpr[i])
 
-    # Finally average it and compute AUC
+    # Finally, average it and compute AUC
     mean_tpr /= n_classes
 
     fpr["macro"] = all_fpr
@@ -144,7 +152,6 @@ def draw_roc_curve(score, target, class_label_to_name, use_wandb=False):
     # draw class-agnostic ROC curve
     fig = plt.figure(num=1, clear=True, figsize=(8.5, 4.0), constrained_layout=True)
     ax = fig.add_subplot(1, 2, 1)
-    lw = 1.5
     colors = cycle(['limegreen', 'mediumpurple', 'darkorange',
                     'dodgerblue', 'lightcoral', 'goldenrod',
                     'indigo', 'darkgreen', 'navy', 'brown'])
@@ -212,7 +219,7 @@ def draw_error_table(error_table, use_wandb=False, fig_size=(40.0, 4.0)):
         total_count += cnt
 
         if cnt > 0:
-            ax.bar(serial, err / cnt, color=['g', 'b', 'r', 'y', 'm'][gt_table[indices[0]]])
+            ax.bar(serial, err / cnt, color=['tab:green', 'tab:orange', 'tab:red', 'tab:blue', 'tab:purple'][gt_table[indices[0]]])
 
     ax.set_title(f'Error Table (Acc. {1.0 - total_error / total_count: .2f}%)', fontsize=18)
     ax.set_ylim(0.0, 1.0)
