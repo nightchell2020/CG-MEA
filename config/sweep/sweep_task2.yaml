@@ -16,7 +16,7 @@ parameters:
   ########
   data.seq_length:
     values:
-      - 1000  # 5 sec
+      # - 1000  # 5 sec
       - 2000  # 10 sec
       - 3000  # 15 sec
       - 4000  # 20 sec
@@ -67,10 +67,16 @@ parameters:
   #    - 1.5
   #    - 2.0
 
+#  train.weight_decay:
+#    distribution: log_uniform_values
+#    max: 0.05
+#    min: 1e-05
+
   train.weight_decay:
-    distribution: log_uniform_values
+    distribution: uniform
     max: 0.05
     min: 1e-05
+
 
   train.mixup:
     values:
