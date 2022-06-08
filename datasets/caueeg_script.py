@@ -75,7 +75,7 @@ def load_caueeg_full_dataset(dataset_path: str,
 
 def load_caueeg_task_datasets(dataset_path: str, task: str,
                               load_event: bool = True, file_format: str = 'edf', transform=None, verbose=False):
-    """Load the CAUEEG datasets for the target task as PyTorch dataset instances.
+    """Load the CAUEEG datasets for the target benchmark task as PyTorch dataset instances.
 
     Args:
         dataset_path (str): The file path where the dataset files are located.
@@ -88,6 +88,12 @@ def load_caueeg_task_datasets(dataset_path: str, task: str,
     Returns:
         The PyTorch dataset instances for the train, validation, and test sets for task1 and their configurations.
     """
+    task = task.lower()
+    if task == 'abnormal':
+        task = 'task1'
+    elif task == 'dementia':
+        task = 'task2'
+
     if task not in ['task1', 'task2']:
         raise ValueError(f"load_caueeg_task_datasets(task) receives the invalid task name: {task}. "
                          f"Make sure the task name is correct.")
@@ -142,7 +148,7 @@ def load_caueeg_task_datasets(dataset_path: str, task: str,
 
 def load_caueeg_task_split(dataset_path: str, task: str, split: str,
                            load_event: bool = True, file_format: str = 'edf', transform=None, verbose=False):
-    """Load the CAUEEG dataset for the specified split of the target task as a PyTorch dataset instance.
+    """Load the CAUEEG dataset for the specified split of the target benchmark task as a PyTorch dataset instance.
 
     Args:
         dataset_path (str): The file path where the dataset files are located.
@@ -156,6 +162,12 @@ def load_caueeg_task_split(dataset_path: str, task: str, split: str,
     Returns:
         A PyTorch dataset instance for the specified split for task1 and their configurations.
     """
+    task = task.lower()
+    if task == 'abnormal':
+        task = 'task1'
+    elif task == 'dementia':
+        task = 'task2'
+
     if task not in ['task1', 'task2']:
         raise ValueError(f"load_caueeg_task_split(task) receives the invalid task name: {task}. "
                          f"Make sure the task name is correct.")
@@ -389,18 +401,6 @@ def compose_preprocess(config, train_loader, verbose=True):
     else:
         raise ValueError(f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']")
 
-    ########################################################
-    # additive Gaussian noise for augmentation (1D signal) #
-    ########################################################
-    if config.get('run_mode', None) == 'eval':
-        pass
-    elif config.get('awgn') is None or config['awgn'] <= 1e-12:
-        pass
-    elif config['awgn'] > 0.0:
-        preprocess_train += [EegAdditiveGaussianNoise(mean=0.0, std=config['awgn'])]
-    else:
-        raise ValueError(f"config['awgn'] have to be None or a positive floating point number")
-
     ##############################################################
     # multiplicative Gaussian noise for augmentation (1D signal) #
     ##############################################################
@@ -412,6 +412,18 @@ def compose_preprocess(config, train_loader, verbose=True):
         preprocess_train += [EegMultiplicativeGaussianNoise(mean=0.0, std=config['mgn'])]
     else:
         raise ValueError(f"config['mgn'] have to be None or a positive floating point number")
+
+    ########################################################
+    # additive Gaussian noise for augmentation (1D signal) #
+    ########################################################
+    if config.get('run_mode', None) == 'eval':
+        pass
+    elif config.get('awgn') is None or config['awgn'] <= 1e-12:
+        pass
+    elif config['awgn'] > 0.0:
+        preprocess_train += [EegAdditiveGaussianNoise(mean=0.0, std=config['awgn'])]
+    else:
+        raise ValueError(f"config['awgn'] have to be None or a positive floating point number")
 
     ###################
     # STFT (1D -> 2D) #
