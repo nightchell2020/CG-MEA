@@ -10,7 +10,7 @@ search_multiplier: 1.0
 lr_scheduler_type: constant_with_decay
 warmup_ratio: 0.05
 warmup_min: 3000
-total_samples: 4.0e+7
+total_samples: 5.0e+7
 # iterations: ???  # decided during runtime
 
 # regularization
@@ -25,7 +25,7 @@ save_model: true
 # wandb
 use_wandb: true
 draw_result: true
-watch_model: true
+watch_model: false
 
 # GPU
 # device: ???  decided during runtime
