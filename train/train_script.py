@@ -32,7 +32,7 @@ def learning_rate_search(config, model, train_loader, val_loader,
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
 
-        if config['ddp']:
+        if config.get('ddp', False):
             model.module.reset_weights()
         else:
             model.reset_weights()
@@ -61,7 +61,11 @@ def learning_rate_search(config, model, train_loader, val_loader,
         torch.cuda.synchronize()
 
     model.load_state_dict(best_model_state)
-    best_log_lr = learning_rate_record[np.argmax([(tr + vl)/2 for _, tr, vl in learning_rate_record])][0]
+
+    # find the best starting point (if a tie occurs, average them)
+    midpoints = np.array([(tr + vl) / 2 for _, tr, vl in learning_rate_record])
+    induces = np.argwhere(midpoints == np.max(midpoints))
+    best_log_lr = np.average(np.array([log_lr for log_lr, _, _ in learning_rate_record])[induces])
 
     return 10 ** best_log_lr, learning_rate_record
 
@@ -85,7 +89,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                                                             train_loader=train_loader, val_loader=val_loader,
                                                             preprocess_train=preprocess_train,
                                                             preprocess_test=preprocess_test,
-                                                            trials=25, steps=300)
+                                                            trials=20, steps=500)
 
         # model.reset_weights()  # This line can be remained or commented out.
 
