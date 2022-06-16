@@ -23,21 +23,16 @@ def learning_rate_search(config, model, train_loader, val_loader,
                          trials, steps):
     learning_rate_record = []
     best_accuracy = 0
-    best_model_state = None
+    # best_model_state = None
 
     # default learning rate range is set based on a minibatch size of 32
-    min_log_lr = -3.0 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
+    min_log_lr = -3.2 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
     max_log_lr = -6.0 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
 
-        if config.get('ddp', False):
-            model.module.reset_weights()
-        else:
-            model.reset_weights()
-        model.train()
-
+        model.module.reset_weights() if config.get('ddp', False) else model.reset_weights()
         optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
         scheduler = get_lr_scheduler(optimizer, scheduler_type='constant_with_decay',  # constant for search
                                      iterations=config['iterations'], warmup_steps=config['iterations'])
@@ -54,13 +49,13 @@ def learning_rate_search(config, model, train_loader, val_loader,
         # keep the best model
         if best_accuracy < (train_accuracy + val_accuracy) / 2:
             best_accuracy = (train_accuracy + val_accuracy) / 2
-            best_model_state = deepcopy(model.state_dict())
+            # best_model_state = deepcopy(model.state_dict())
 
         del optimizer, scheduler
         torch.cuda.empty_cache()
         torch.cuda.synchronize()
 
-    model.load_state_dict(best_model_state)
+    # model.load_state_dict(best_model_state)
 
     # find the best starting point (if a tie occurs, average them)
     midpoints = np.array([(tr + vl) / 2 for _, tr, vl in learning_rate_record])
@@ -91,10 +86,11 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                                                             preprocess_test=preprocess_test,
                                                             trials=20, steps=500)
 
-        # model.reset_weights()  # This line can be remained or commented out.
-
         if main_process:
             draw_learning_rate_record(lr_search, use_wandb=config['use_wandb'])
+
+        # This line can be remained or commented out.
+        model.module.reset_weights() if config.get('ddp', False) else model.reset_weights()
 
     # generate the trainers
     config['base_lr'] = config['base_lr'] * config.get('search_multiplier', 1.0)
@@ -131,9 +127,6 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     best_model_state = deepcopy(model.state_dict())
 
     for i in range(0, config["iterations"], history_interval):
-        if config.get('ddp', False):
-            torch.distributed.barrier()
-
         # train for 'history_interval' steps
         loss, train_acc = tr_ms(model=model,
                                 loader=train_loader,
