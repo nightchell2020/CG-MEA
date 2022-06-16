@@ -1,4 +1,5 @@
 import os
+from copy import deepcopy
 import pyedflib
 
 import numpy as np

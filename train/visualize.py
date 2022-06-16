@@ -3,9 +3,47 @@ import warnings
 import numpy as np
 from sklearn.metrics import roc_curve, auc  # roc_auc_score
 from sklearn.preprocessing import label_binarize
+import matplotlib
 import matplotlib.pyplot as plt
 from plotly.tools import mpl_to_plotly
 import wandb
+
+from train.evaluate import calculate_class_wise_metrics
+
+
+def draw_learning_rate_record(learning_rate_record, use_wandb=False):
+    plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
+
+    fig = plt.figure(num=1, clear=True, constrained_layout=True, figsize=(7.0, 4.0))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_title('Learning Rate Search')
+    ax.set_xlabel('Learning rate in log-scale')
+    ax.set_ylabel('Accuracy')
+
+    train_accs = np.array([[log_lr, tr] for log_lr, tr, vl in learning_rate_record])
+    val_accs = np.array([[log_lr, vl] for log_lr, tr, vl in learning_rate_record])
+    midpoints = np.array([[log_lr, (tr + vl)/2] for log_lr, tr, vl in learning_rate_record])
+    idx = np.argmax(midpoints[:, 1])
+
+    ax.plot(train_accs[:, 0], train_accs[:, 1], 'o',
+            color='tab:red', alpha=0.6, label='Train')
+    ax.plot(val_accs[:, 0], val_accs[:, 1], 'o',
+            color='tab:blue', alpha=0.6, label='Validation')
+    ax.plot(midpoints[:, 0], midpoints[:, 1], '-',
+            color='tab:purple', alpha=0.8, linewidth=1.0, label='Midpoint')
+    ax.plot(midpoints[idx, 0], midpoints[idx, 1], 'o',
+            color='tab:pink', alpha=1, markersize=10)
+    ax.legend(loc='lower center').get_frame().set_facecolor('snow')
+
+    if use_wandb:
+        warnings.filterwarnings(action='ignore')
+        wandb.log({"Learning Rate Search": mpl_to_plotly(fig)})
+        warnings.filterwarnings(action='default')
+    else:
+        plt.show()
+
+    fig.clear()
+    plt.close(fig)
 
 
 def draw_loss_plot(losses, lr_decay_step=None):
@@ -72,34 +110,158 @@ def draw_accuracy_history(train_acc_history, val_acc_history, history_interval, 
     plt.close(fig)
 
 
-def draw_confusion(confusion, class_label_to_name, use_wandb=False):
-    C = len(class_label_to_name)
+def draw_heatmap(data, row_labels, col_labels, ax,
+                 draw_cbar=False, cbar_label="", imshow_kw=None, cbar_kw=None):
+    """ Draw a heatmap from a numpy array and two lists of labels.
 
+    Args:
+        data (np.array): A 2D numpy array of shape (M, N).
+        row_labels (list): A list or array of length M with the labels for the rows.
+        col_labels (list): A list or array of length N with the labels for the columns.
+        ax (matplotlib.axes.Axes): A `matplotlib.axes.Axes` instance to which the heatmap is plotted.
+        draw_cbar (bool): Whether to draw the colormap or not.
+        cbar_label (str, optional): The label for the colorbar.
+        cbar_kw (dict, optional): A dictionary with arguments to `matplotlib.Figure.colorbar`.
+        kwargs (dict): All other arguments are forwarded to `imshow`.
+
+    Returns:
+        im (AxesImage): The drawn AxesImage.
+    """
+    if imshow_kw is None:
+        imshow_kw = dict()
+
+    if cbar_kw is None:
+        cbar_kw = dict()
+
+    # Plot the heatmap
+    im = ax.imshow(data, interpolation='nearest', **imshow_kw)
+
+    # Create colorbar
+    # cax = fig.add_axes([ax.get_position().x1 + 0.01, ax.get_position().y0 + 0.005, 0.02, ax.get_position().height])
+    if draw_cbar:
+        cbar = ax.figure.colorbar(im, ax=ax, **cbar_kw)
+        cbar.ax.set_ylabel(cbar_label, rotation=-90, va="bottom")
+
+    # Show all ticks and label them with the respective list entries.
+    ax.set_xticks(np.arange(data.shape[1]), labels=col_labels)
+    ax.set_yticks(np.arange(data.shape[0]), labels=row_labels)
+
+    # Let the horizontal axes labeling appear on top.
+    ax.tick_params(top=False, bottom=True,
+                   labeltop=False, labelbottom=True)
+
+    # Rotate the tick labels and set their alignment.
+    plt.setp(ax.get_xticklabels(), rotation=45, ha="right",
+             rotation_mode="anchor")
+
+    # Turn spines off and create white grid.
+    ax.spines[:].set_visible(False)
+
+    ax.set_xticks(np.arange(data.shape[1]+1)-.5, minor=True)
+    ax.set_yticks(np.arange(data.shape[0]+1)-.5, minor=True)
+    ax.grid(which="minor", color="w", linestyle='-', linewidth=2.5)
+    ax.tick_params(which="minor", bottom=False, left=False)
+
+    return im
+
+
+def annotate_heatmap(im, data=None, anno_format="{x:.2f}",
+                     text_colors=("black", "white"),
+                     threshold=None, text_kw=None):
+    """ A function to annotate a heatmap.
+
+    Args:
+        im (AxesImage): The AxesImage to be labeled.
+        data (numpy array, optional): Data to annotate. If None (the default) uses the data recorded in AxesImage.
+        anno_format (str, optional): The format of the annotations inside the heatmap.
+        text_colors (list of str, optional): A pair of colors.
+            The first is used for values below a threshold, the second for those above.
+        threshold (float, optional): Ratio in data units according to which the colors from text_colors are applied.
+            If None (the default) uses the middle of the colormap as separation.
+        text_kw (dict): All other arguments are forwarded to each call to `text` used to create the text labels.
+
+    Returns:
+        texts (list of str):
+    """
+    if text_kw is None:
+        text_kw = dict()
+
+    if data is None:
+        data = im.get_array()
+
+    # Normalize the threshold to the images color range.
+    if threshold is None:
+        threshold = im.norm(data.max()) / 2.0
+
+    # Set default alignment to center, but allow it to be
+    # overwritten by text_kw.
+    kw = dict(horizontalalignment="center",
+              verticalalignment="center")
+    kw.update(text_kw)
+
+    # Get the formatter in case a string is supplied
+    if isinstance(anno_format, str):
+        anno_format = matplotlib.ticker.StrMethodFormatter(anno_format)
+
+    # Loop over the data and create a `Text` for each "pixel".
+    # Change the text's color depending on the data.
+    for i in range(data.shape[0]):
+        for j in range(data.shape[1]):
+            kw.update(color=text_colors[int(im.norm(data[i, j]) > threshold)])
+            im.axes.text(j, i, anno_format(data[i, j], None), **kw)
+
+
+def draw_confusion(confusion, class_label_to_name, normalized=False, use_wandb=False):
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
-    plt.rcParams['image.cmap'] = 'jet'  # 'nipy_spectral'
-
     fig = plt.figure(num=1, clear=True, figsize=(4.0, 4.0), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
-    ax.imshow(confusion, alpha=0.8)
 
-    ax.set_xticks(np.arange(C))
-    ax.set_yticks(np.arange(C))
-    ax.set_xticklabels(class_label_to_name)
-    ax.set_yticklabels(class_label_to_name)
+    data = confusion
+    anno_format = "{x:d}"
+    if normalized:
+        data = confusion / confusion.sum(axis=1, keepdims=True)
+        anno_format = "{x:.2f}"
 
-    for r in range(C):
-        for c in range(C):
-            ax.text(c, r, confusion[r, c],
-                    ha="center", va="center", color='k')
+    im = draw_heatmap(data, class_label_to_name, class_label_to_name,
+                      ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
+                      draw_cbar=True, cbar_label="", cbar_kw={'alpha': 0.9})
+
+    annotate_heatmap(im, anno_format=anno_format, text_colors=("black", "white"), threshold=0.7)
 
     ax.set_title('Confusion Matrix')
     ax.set_xlabel('Prediction')
     ax.set_ylabel('Ground Truth')
-    plt.setp(ax.get_xticklabels(), rotation=45, ha="right", rotation_mode="anchor")
 
     # draw
     if use_wandb:
         wandb.log({'Confusion Matrix (Image)': wandb.Image(plt)})
+    else:
+        plt.show()
+
+    fig.clear()
+    plt.close(fig)
+
+
+def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False):
+    plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
+    fig = plt.figure(num=1, clear=True, figsize=(8.0, 4.0), constrained_layout=True)
+    ax = fig.add_subplot(1, 1, 1)
+
+    class_wise_metrics = calculate_class_wise_metrics(confusion)
+
+    im = draw_heatmap(data=np.array([*class_wise_metrics.values()]).T,  # np.ones((C, len(class_wise_metrics))),
+                      row_labels=class_label_to_name, col_labels=[*class_wise_metrics.keys()],
+                      ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
+                      draw_cbar=False,  cbar_label="", cbar_kw={'alpha': 0.9})
+
+    annotate_heatmap(im, data=np.array([*class_wise_metrics.values()]).T,
+                     anno_format="{x:.2f}", text_colors=("black", "white"), threshold=0.7)
+
+    ax.set_title('Class-wise metrics')
+
+    # draw
+    if use_wandb:
+        wandb.log({'Class-wise Metrics (Image)': wandb.Image(plt)})
     else:
         plt.show()
 
@@ -232,39 +394,3 @@ def draw_error_table(error_table, use_wandb=False, fig_size=(40.0, 4.0)):
 
     fig.clear()
     plt.close(fig)
-
-
-def draw_learning_rate_record(learning_rate_record, use_wandb=False):
-    plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
-
-    fig = plt.figure(num=1, clear=True, constrained_layout=True, figsize=(7.0, 4.0))
-    ax = fig.add_subplot(1, 1, 1)
-    ax.set_title('Learning Rate Search')
-    ax.set_xlabel('Learning rate in log-scale')
-    ax.set_ylabel('Accuracy')
-
-    train_accs = np.array([[log_lr, tr] for log_lr, tr, vl in learning_rate_record])
-    val_accs = np.array([[log_lr, vl] for log_lr, tr, vl in learning_rate_record])
-    midpoints = np.array([[log_lr, (tr + vl)/2] for log_lr, tr, vl in learning_rate_record])
-    idx = np.argmax(midpoints[:, 1])
-
-    ax.plot(train_accs[:, 0], train_accs[:, 1], 'o',
-            color='tab:red', alpha=0.6, label='Train')
-    ax.plot(val_accs[:, 0], val_accs[:, 1], 'o',
-            color='tab:blue', alpha=0.6, label='Validation')
-    ax.plot(midpoints[:, 0], midpoints[:, 1], '-',
-            color='tab:purple', alpha=0.8, linewidth=1.0, label='Midpoint')
-    ax.plot(midpoints[idx, 0], midpoints[idx, 1], 'o',
-            color='tab:pink', alpha=1, markersize=10)
-    ax.legend(loc='lower center').get_frame().set_facecolor('snow')
-
-    if use_wandb:
-        warnings.filterwarnings(action='ignore')
-        wandb.log({"Learning Rate Search": mpl_to_plotly(fig)})
-        warnings.filterwarnings(action='default')
-    else:
-        plt.show()
-
-    fig.clear()
-    plt.close(fig)
-
