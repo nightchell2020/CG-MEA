@@ -20,8 +20,9 @@ parameters:
     values:
       # - 1000  # 5 sec
       - 2000  # 10 sec
-      - 3000  # 15 sec
       - 4000  # 20 sec
+      - 6000  # 30 sec
+      - 12000  # 60 sec
 
   data.EKG:
     values:
