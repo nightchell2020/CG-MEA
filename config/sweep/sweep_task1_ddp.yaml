@@ -1,13 +1,13 @@
-project: sweep-test
+project: sweep_task1_ddp
 entity: ipis-mjkim
 method: random
-name: sweep-task2-ddp
+name: sweep-task1-ddp
 program: run_train.py
 command:
   - ${env}
   - python
   - ${program}
-  - "data=task2"
+  - "data=task1"
   - "train=ddp"  # tiny_ddp
   - ${args_no_hyphens}
 
@@ -55,13 +55,13 @@ parameters:
 
   train.lr_scheduler_type:
     values:
-#      - constant_with_decay
-#      - constant_with_twice_decay
-      # - transformer_style
-      # - cosine_decay_with_warmup_half
+      - constant_with_decay
+      - constant_with_twice_decay
+      - transformer_style
+      - cosine_decay_with_warmup_half
       - cosine_decay_with_warmup_one_and_half
       # - cosine_decay_with_warmup_two_and_half
-      # - linear_decay_with_warmup
+      - linear_decay_with_warmup
 
   #search_multiplier:
   #  values:
@@ -121,30 +121,30 @@ parameters:
       # - 2D-ResNeXt-101
       # - 2D-Wide-ResNet-50
       # - 2D-Wide-ResNet-101
-      - 2D-ViT-B-8
+      # - 2D-ViT-B-8
       - 2D-ViT-B-16
       # - 2D-ViT-B-32
-      - 2D-ViT-L-8
+      # - 2D-ViT-L-8
       # - 2D-ViT-L-16
       # - 2D-ViT-L-32
 
   model.fc_stages:
     distribution: int_uniform
     max: 5
-    min: 3
+    min: 2
 
   model.use_age:
     values:
       - fc
-      # - conv
+      - conv
 
   model.dropout:
     distribution: uniform
     max: 0.5
-    min: 0.3
+    min: 0.2
 
   model.activation:
     values:
       # - relu
-      # - gelu
+      - gelu
       - mish
