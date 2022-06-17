@@ -23,7 +23,6 @@ def draw_learning_rate_record(learning_rate_record, use_wandb=False):
     train_accs = np.array([[log_lr, tr] for log_lr, tr, vl in learning_rate_record])
     val_accs = np.array([[log_lr, vl] for log_lr, tr, vl in learning_rate_record])
     midpoints = np.array([[log_lr, (tr + vl)/2] for log_lr, tr, vl in learning_rate_record])
-    idx = np.argmax(midpoints[:, 1])
 
     ax.plot(train_accs[:, 0], train_accs[:, 1], 'o',
             color='tab:red', alpha=0.6, label='Train')
@@ -31,8 +30,14 @@ def draw_learning_rate_record(learning_rate_record, use_wandb=False):
             color='tab:blue', alpha=0.6, label='Validation')
     ax.plot(midpoints[:, 0], midpoints[:, 1], '-',
             color='tab:purple', alpha=0.8, linewidth=1.0, label='Midpoint')
-    ax.plot(midpoints[idx, 0], midpoints[idx, 1], 'o',
-            color='tab:pink', alpha=1, markersize=10)
+
+    midpoints = np.array([(tr + vl) / 2 for _, tr, vl in learning_rate_record])
+    induces = np.argwhere(midpoints == np.max(midpoints))
+    best_log_lr = np.average(np.array([log_lr for log_lr, _, _ in learning_rate_record])[induces])
+
+    ax.vlines(best_log_lr, 0, 1, transform=ax.get_xaxis_transform(),
+              colors='m', alpha=0.5, linestyle='solid')
+
     ax.legend(loc='lower center').get_frame().set_facecolor('snow')
 
     if use_wandb:
