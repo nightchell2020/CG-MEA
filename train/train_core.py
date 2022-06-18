@@ -35,8 +35,11 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, config, ste
                 y_oh = F.one_hot(y, num_classes=output.size(dim=1))
                 s = torch.sigmoid(output)
                 loss = F.binary_cross_entropy_with_logits(output, y_oh.float())
+            elif config['criterion'] == 'svm':
+                s = output
+                loss = F.multi_margin_loss(output, y)
             else:
-                raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce']")
+                raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce', 'svm']")
 
             # backward and update
             loss.backward()

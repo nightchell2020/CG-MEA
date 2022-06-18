@@ -22,6 +22,8 @@ def estimate_score(model, sample_batched, preprocess, config):
         score = F.softmax(output, dim=1)
     elif config['criterion'] == 'multi-bce':
         score = torch.sigmoid(output)
+    elif config['criterion'] == 'svm':
+        score = output
     else:
         raise ValueError(f"estimate_score(): cannot parse config['criterion']={config['criterion']}.")
     return score

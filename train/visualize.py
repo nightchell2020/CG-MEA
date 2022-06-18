@@ -33,10 +33,9 @@ def draw_learning_rate_record(learning_rate_record, use_wandb=False):
 
     midpoints = np.array([(tr + vl) / 2 for _, tr, vl in learning_rate_record])
     induces = np.argwhere(midpoints == np.max(midpoints))
-    best_log_lr = np.average(np.array([log_lr for log_lr, _, _ in learning_rate_record])[induces])
+    starting_log_lr = np.average(np.array([log_lr for log_lr, _, _ in learning_rate_record])[induces])
 
-    ax.vlines(best_log_lr, 0, 1, transform=ax.get_xaxis_transform(),
-              colors='m', alpha=0.5, linestyle='solid')
+    plt.axvline(x=starting_log_lr, color='tab:pink', linestyle='--', linewidth=1.0)
 
     ax.legend(loc='lower center').get_frame().set_facecolor('snow')
 
