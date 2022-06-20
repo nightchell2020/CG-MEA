@@ -11,7 +11,7 @@ import wandb
 from train.evaluate import calculate_class_wise_metrics
 
 
-def draw_learning_rate_record(learning_rate_record, use_wandb=False):
+def draw_lr_search_record(learning_rate_record, use_wandb=False):
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
 
     fig = plt.figure(num=1, clear=True, constrained_layout=True, figsize=(7.0, 4.0))
@@ -35,9 +35,10 @@ def draw_learning_rate_record(learning_rate_record, use_wandb=False):
     induces = np.argwhere(midpoints == np.max(midpoints))
     starting_log_lr = np.average(np.array([log_lr for log_lr, _, _ in learning_rate_record])[induces])
 
-    plt.axvline(x=starting_log_lr, color='tab:pink', linestyle='--', linewidth=1.0)
+    ax.plot(starting_log_lr, np.max(midpoints), 'o',
+            color='cyan', alpha=0.8, linewidth=2.0, label='Start LR')
 
-    ax.legend(loc='lower center').get_frame().set_facecolor('snow')
+    ax.legend(loc='lower center', fancybox=True, framealpha=0.7).get_frame().set_facecolor('white')
 
     if use_wandb:
         warnings.filterwarnings(action='ignore')

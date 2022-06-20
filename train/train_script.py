@@ -12,7 +12,7 @@ from optim import get_lr_scheduler
 from .evaluate import check_accuracy
 from .evaluate import check_accuracy_extended
 from .evaluate import check_accuracy_multicrop
-from .visualize import draw_learning_rate_record
+from .visualize import draw_lr_search_record
 from .visualize import draw_roc_curve, draw_confusion, draw_error_table
 
 # __all__ = []
@@ -56,7 +56,6 @@ def learning_rate_search(config, model, train_loader, val_loader,
         torch.cuda.synchronize()
 
     # model.load_state_dict(best_model_state)
-
     # find the best starting point (if a tie occurs, average them)
     midpoints = np.array([(tr + vl) / 2 for _, tr, vl in learning_rate_record])
     induces = np.argwhere(midpoints == np.max(midpoints))
@@ -87,7 +86,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                                                             trials=20, steps=500)
 
         if main_process:
-            draw_learning_rate_record(lr_search, use_wandb=config['use_wandb'])
+            draw_lr_search_record(lr_search, use_wandb=config['use_wandb'])
 
         # This line can be remained or commented out.
         model.module.reset_weights() if config.get('ddp', False) else model.reset_weights()
