@@ -3,7 +3,7 @@ defaults:
   - _self_
 
 # Training iteration
-search_lr: true
+search_lr: false
 total_samples: 1500
 
 # log

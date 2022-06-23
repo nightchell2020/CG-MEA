@@ -1,6 +1,6 @@
 """
 Modified from:
-    - https://github.com/pytorch/vision/blob/main/torchvision/models/vision_transformer.pyp
+    - https://github.com/pytorch/vision/blob/main/torchvision/models/vision_transformer.py
     - ViT paper: https://arxiv.org/abs/2010.11929
 """
 

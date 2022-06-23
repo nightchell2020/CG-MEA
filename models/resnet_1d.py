@@ -167,6 +167,7 @@ class ResNet1D(nn.Module):
             raise ValueError(f"{self.__class__.__name__}.__init__(block) "
                              f"receives one of ['basic', 'bottleneck'].")
 
+
         if use_age not in ['fc', 'conv', 'no']:
             raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
                              f"receives one of ['fc', 'conv', 'no'].")

@@ -126,8 +126,8 @@ def draw_heatmap(data, row_labels, col_labels, ax,
         ax (matplotlib.axes.Axes): A `matplotlib.axes.Axes` instance to which the heatmap is plotted.
         draw_cbar (bool): Whether to draw the colormap or not.
         cbar_label (str, optional): The label for the colorbar.
+        imshow_kw (dict): All other arguments are forwarded to `imshow`.
         cbar_kw (dict, optional): A dictionary with arguments to `matplotlib.Figure.colorbar`.
-        kwargs (dict): All other arguments are forwarded to `imshow`.
 
     Returns:
         im (AxesImage): The drawn AxesImage.
@@ -229,7 +229,7 @@ def draw_confusion(confusion, class_label_to_name, normalized=False, use_wandb=F
 
     im = draw_heatmap(data, class_label_to_name, class_label_to_name,
                       ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
-                      draw_cbar=True, cbar_label="", cbar_kw={'alpha': 0.9})
+                      draw_cbar=True, cbar_label="", cbar_kw={})
 
     annotate_heatmap(im, anno_format=anno_format, text_colors=("black", "white"), threshold=0.7)
 
