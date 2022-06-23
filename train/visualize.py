@@ -216,14 +216,14 @@ def annotate_heatmap(im, data=None, anno_format="{x:.2f}",
             im.axes.text(j, i, anno_format(data[i, j], None), **kw)
 
 
-def draw_confusion(confusion, class_label_to_name, normalized=False, use_wandb=False):
+def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=False):
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
     fig = plt.figure(num=1, clear=True, figsize=(4.0, 4.0), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
 
     data = confusion
     anno_format = "{x:d}"
-    if normalized:
+    if normalize:
         data = confusion / confusion.sum(axis=1, keepdims=True)
         anno_format = "{x:.2f}"
 

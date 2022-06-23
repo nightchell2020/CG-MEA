@@ -154,10 +154,9 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                 best_val_acc = val_acc
                 best_model_state = deepcopy(model.state_dict())
                 if config['save_model']:
-                    best_checkpoint = {'model_state': best_model_state, 'config': config,
-                                       'optimizer_state': optimizer.state_dict(),
-                                       'scheduler_state': scheduler.state_dict()}
-                    torch.save(best_checkpoint, os.path.join(save_path, 'best_checkpoint.pt'))
+                    checkpoint = {'model_state': best_model_state, 'config': config,
+                                  'optimizer_state': optimizer.state_dict(), 'scheduler_state': scheduler.state_dict()}
+                    torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
 
     # calculate the test accuracy for best and last models
     if main_process:
@@ -190,10 +189,9 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
 
         # save the model
         if config['save_model']:
-            last_checkpoint = {'model_state': last_model_state, 'config': config,
-                               'optimizer_state': optimizer.state_dict(),
-                               'scheduler_state': scheduler.state_dict()}
-            torch.save(last_checkpoint, os.path.join(save_path, 'last_checkpoint.pt'))
+            checkpoint = {'model_state': model_state, 'config': config,
+                          'optimizer_state': optimizer.state_dict(), 'scheduler_state': scheduler.state_dict()}
+            torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
 
         # leave the message
         if config['use_wandb']:
