@@ -35,7 +35,7 @@ def learning_rate_search(config, model, train_loader, val_loader,
         model.module.reset_weights() if config.get('ddp', False) else model.reset_weights()
         optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
         scheduler = get_lr_scheduler(optimizer, scheduler_type='constant_with_decay',  # constant for search
-                                     iterations=config['iterations'], warmup_steps=config['iterations'])
+                                     iterations=config['total_samples'], warmup_steps=config['total_samples'])
 
         tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
         tr_ms(model, train_loader, preprocess_train, optimizer, scheduler, config, steps)
@@ -68,9 +68,30 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                  preprocess_train, preprocess_test):
     # only the main process of DDP logs, evaluates, and saves
     main_process = config['ddp'] is False or config['device'] == 0
-    if main_process and config['use_wandb']:
-        wandb.init(project=config.get('project', 'noname'), reinit=True)
-        wandb.run.name = wandb.run.id
+    resume = 'resume' in config.keys()
+
+    if resume:
+        # load configuration if resuming
+        save_path = f'local/checkpoint_temp/{config["resume"]}/'
+        if 'cwd' in config:
+            save_path = os.path.join(config['cwd'], save_path)
+        run_name = config['resume']
+        ckpt = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
+        model.load_state_dict(ckpt['model_state'])
+        config = ckpt['config']
+        if config.get('search_lr', False):
+            config.pop('search_lr')
+        config['resume'] = run_name
+
+        # wandb resume
+        if main_process and config['use_wandb']:
+            wandb.init(project=config.get('project', 'noname'), id=run_name, resume='must')
+            wandb.config.update(config, allow_val_change=True)
+    else:
+        # wandb init
+        if main_process and config['use_wandb']:
+            wandb.init(project=config.get('project', 'noname'), reinit=True)
+            wandb.run.name = wandb.run.id
 
     # training iteration and other conditions
     config['iterations'] = round(config['total_samples'] / config['minibatch'] / config.get('ddp_size', 1))
@@ -78,7 +99,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     config['warmup_steps'] = max(round(config['iterations'] * config['warmup_ratio']), config['warmup_min'])
 
     # search an appropriate starting learning rate if needed
-    if config['search_lr']:
+    if config.get('search_lr', False):
         config['base_lr'], lr_search = learning_rate_search(config=config, model=model,
                                                             train_loader=train_loader, val_loader=val_loader,
                                                             preprocess_train=preprocess_train,
@@ -114,7 +135,6 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
 
         # directory to save
         run_name = wandb.run.name if config['use_wandb'] else datetime.now().strftime("%Y_%m%d_%H%M")
-
         if config['save_model']:
             save_path = f'local/checkpoint_temp/{run_name}/'
             if 'cwd' in config:
@@ -124,8 +144,18 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     # train and validation routine
     best_val_acc = 0
     best_model_state = deepcopy(model.state_dict())
+    i_step = 0
 
-    for i in range(0, config["iterations"], history_interval):
+    # load if resuming
+    if resume:
+        # load model
+        ckpt = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
+        optimizer.load_state_dict(ckpt['optimizer_state'])
+        scheduler.load_state_dict(ckpt['scheduler_state'])
+        i_step = ckpt['optimizer_state']['state'][0]['step']
+
+    while i_step < config["iterations"]:
+        i_step += history_interval
         # train for 'history_interval' steps
         loss, train_acc = tr_ms(model=model,
                                 loader=train_loader,
@@ -144,9 +174,9 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                            'Train Accuracy': train_acc,
                            'Validation Accuracy': val_acc,
                            'Learning Rate': optimizer.state_dict()['param_groups'][0]['lr'],
-                           }, step=(i + history_interval) * config["minibatch"])
+                           }, step=i_step * config["minibatch"])
             else:
-                print(f"{i:7>} / {config['iterations']:>7} iter - "
+                print(f"{i_step:7>} / {config['iterations']:>7} iter - "
                       f"Loss: {loss:.4}, Train Acc.: {train_acc:.4}, Val. Acc.: {val_acc:.4}")
 
             # save the best model so far

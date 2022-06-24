@@ -2,6 +2,7 @@ import os
 from copy import deepcopy
 import gc
 from omegaconf import DictConfig, OmegaConf
+from collections import OrderedDict
 import hydra
 from hydra.core.hydra_config import HydraConfig
 
@@ -81,6 +82,26 @@ def prepare_and_run_train(rank, world_size, config):
         model = model.to(config['device'])
         config['output_length'] = model.get_output_length()
         config['num_params'] = count_parameters(model)
+
+    # load pretrained model if needed
+    if 'pretrain' in config.keys():
+        save_path = f'local/checkpoint/{config["pretrain"]}/'
+        if 'cwd' in config:
+            save_path = os.path.join(config['cwd'], save_path)
+
+        ckpt = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
+
+        if ckpt['config']['ddp'] == config['ddp']:
+            model.load_state_dict(ckpt['model_state'])
+        elif ckpt['config']['ddp']:
+            model_state_ddp = deepcopy(ckpt['model_state'])
+            model_state = OrderedDict()
+            for k, v in model_state_ddp.items():
+                name = k[7:]  # remove 'module.' of DataParallel/DistributedDataParallel
+                model_state[name] = v
+            model.load_state_dict(model_state)
+        else:
+            model.module.load_state_dict(ckpt['model_state'])
 
     # train
     train_script(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
