@@ -76,6 +76,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         if 'cwd' in config:
             save_path = os.path.join(config['cwd'], save_path)
         run_name = config['resume']
+        project = config.get('project', 'noname')
+
         ckpt = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
         model.load_state_dict(ckpt['model_state'])
         config = ckpt['config']
@@ -83,9 +85,12 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
             config.pop('search_lr')
         config['resume'] = run_name
 
+        pprint.pprint(f'Training resumes from {run_name}', width=120)
+        pprint.pprint(config, width=120)
+
         # wandb resume
         if main_process and config['use_wandb']:
-            wandb.init(project=config.get('project', 'noname'), id=run_name, resume='must')
+            wandb.init(project=project, id=run_name, resume='must')
             wandb.config.update(config, allow_val_change=True)
     else:
         # wandb init
@@ -179,14 +184,20 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                 print(f"{i_step:7>} / {config['iterations']:>7} iter - "
                       f"Loss: {loss:.4}, Train Acc.: {train_acc:.4}, Val. Acc.: {val_acc:.4}")
 
+            # save the model
+            if config['save_model']:
+                checkpoint = {'model_state': model.state_dict(), 'config': config,
+                              'optimizer_state': optimizer.state_dict(), 'scheduler_state': scheduler.state_dict()}
+                torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
+
             # save the best model so far
             if best_val_acc < val_acc:
                 best_val_acc = val_acc
                 best_model_state = deepcopy(model.state_dict())
-                if config['save_model']:
-                    checkpoint = {'model_state': best_model_state, 'config': config,
-                                  'optimizer_state': optimizer.state_dict(), 'scheduler_state': scheduler.state_dict()}
-                    torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
+                # if config['save_model']:
+                #    checkpoint = {'model_state': best_model_state, 'config': config,
+                #                  'optimizer_state': optimizer.state_dict(), 'scheduler_state': scheduler.state_dict()}
+                #    torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
 
     # calculate the test accuracy for best and last models
     if main_process:

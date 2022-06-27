@@ -1,6 +1,9 @@
-project: noname2
+project: caueeg-task2-bayes
 entity: ipis-mjkim
-method: grid
+method: bayes
+metric:
+  name: Validation Accuracy
+  goal: maximize
 program: run_train.py
 command:
   - ${env}
@@ -18,9 +21,9 @@ parameters:
     values:
       # - 1000  # 5 sec
       - 2000  # 10 sec
-      - 4000  # 20 sec
-      - 6000  # 30 sec
-      - 12000  # 60 sec
+      # - 4000  # 20 sec
+      # - 6000  # 30 sec
+      # - 12000  # 60 sec
 
   data.EKG:
     values:
@@ -33,21 +36,19 @@ parameters:
       - X
 
   data.mgn:
-    values:
-      - 0.0
-      - 0.005
-      - 0.05
+    distribution: uniform
+    max: 0.1
+    min: 0
 
   data.awgn:
-    - 0.0
-    - 0.05
-    - 0.1
+    distribution: uniform
+    max: 0.1
+    min: 0
 
   data.awgn_age:
-    values:
-      - 0.0
-      - 0.05
-      - 0.1
+    distribution: uniform
+    max: 0.1
+    min: 0
 
   #########
   # Train #
@@ -55,13 +56,13 @@ parameters:
 
   train.lr_scheduler_type:
     values:
-      # - constant_with_decay
-      # - constant_with_twice_decay
-      # - transformer_style
-      # - cosine_decay_with_warmup_half
-      # - cosine_decay_with_warmup_one_and_half
+       - constant_with_decay
+       - constant_with_twice_decay
+       - transformer_style
+       - cosine_decay_with_warmup_half
+       - cosine_decay_with_warmup_one_and_half
       # - cosine_decay_with_warmup_two_and_half
-      - linear_decay_with_warmup
+       - linear_decay_with_warmup
 
   #search_multiplier:
   #  values:
@@ -76,15 +77,16 @@ parameters:
 #    min: 1e-05
 
   train.weight_decay:
-    values:
-      - 0.01
+    distribution: uniform
+    max: 0.05
+    min: 1e-05
 
   train.mixup:
     values:
       - 0
       - 0.1
       - 0.2
-      # - 0.3
+      - 0.3
 
   train.criterion:
     values:
@@ -101,10 +103,10 @@ parameters:
       # - 1D-VGG-13
       # - 1D-VGG-16
       # - 1D-VGG-19
-      # - 1D-ResNet-18
+      - 1D-ResNet-18
       # - 1D-ResNet-50
 #      - 1D-ResNet-101
-      - 1D-ResNeXt-50
+#       - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
       # - 1D-Wide-ResNet-50
 #      - 1D-Wide-ResNet-101
@@ -116,7 +118,7 @@ parameters:
       # - 2D-ResNet-18
       # - 2D-ResNet-50
 #      - 2D-ResNet-101
-      - 2D-ResNeXt-50
+#       - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
       # - 2D-Wide-ResNet-50
 #      - 2D-Wide-ResNet-101
@@ -137,9 +139,9 @@ parameters:
 
   model.use_age:
     values:
-      - no
-      - fc
-      - conv
+      - 'fc'
+      - 'conv'
+      - 'no'
 
   model.dropout:
     values:
