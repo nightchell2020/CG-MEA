@@ -2,7 +2,7 @@ project: caueeg-task2-bayes
 entity: ipis-mjkim
 method: bayes
 metric:
-  name: Validation Accuracy
+  name: Test Accuracy
   goal: maximize
 program: run_train.py
 command:
@@ -10,6 +10,7 @@ command:
   - python
   - ${program}
   - "data=task2"
+  - "train=device"
   - ${args_no_hyphens}
 
 parameters:
@@ -21,7 +22,7 @@ parameters:
     values:
       # - 1000  # 5 sec
       - 2000  # 10 sec
-      # - 4000  # 20 sec
+      - 4000  # 20 sec
       # - 6000  # 30 sec
       # - 12000  # 60 sec
 
@@ -37,17 +38,17 @@ parameters:
 
   data.mgn:
     distribution: uniform
-    max: 0.1
+    max: 0.15
     min: 0
 
   data.awgn:
     distribution: uniform
-    max: 0.1
+    max: 0.15
     min: 0
 
   data.awgn_age:
     distribution: uniform
-    max: 0.1
+    max: 0.15
     min: 0
 
   #########
@@ -78,7 +79,7 @@ parameters:
 
   train.weight_decay:
     distribution: uniform
-    max: 0.05
+    max: 0.1
     min: 1e-05
 
   train.mixup:
