@@ -30,6 +30,7 @@ class TinyCNN1D(nn.Module):
         self.use_age = use_age
         if self.use_age == 'conv':
             in_channels += 1
+        self.fc_stages = fc_stages
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.F_act = get_activation_functional(activation, class_name=self.__class__.__name__)
@@ -89,7 +90,13 @@ class TinyCNN1D(nn.Module):
             if hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
 
-    def forward(self, x, age):
+    def get_output_length(self):
+        return self.output_length
+
+    def get_num_fc_stages(self):
+        return self.fc_stages
+
+    def compute_feature_embedding(self, x, age, target_from_last: int = 0):
         N, C, L = x.size()
 
         if self.use_age == 'conv':
@@ -110,8 +117,20 @@ class TinyCNN1D(nn.Module):
 
         if self.use_age == 'fc':
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)
-        x = self.fc_stage(x)
 
+        if target_from_last == 0:
+            x = self.fc_stage(x)
+        else:
+            if target_from_last > self.fc_stages:
+                raise ValueError(f"{self.__class__.__name__}.compute_feature_embedding(target_from_last) receives "
+                                 f"an integer equal to or smaller than fc_stages={self.fc_stages}.")
+
+            for l in range(self.fc_stages - target_from_last):
+                x = self.fc_stage[l](x)
+        return x
+
+    def forward(self, x, age):
+        x = self.compute_feature_embedding(x, age)
         # return F.log_softmax(x, dim=1)
         return x
 
@@ -220,7 +239,10 @@ class M5(nn.Module):
     def get_output_length(self):
         return self.output_length
 
-    def forward(self, x, age):
+    def get_num_fc_stages(self):
+        return self.fc_stages
+
+    def compute_feature_embedding(self, x, age, target_from_last: int = 0):
         N, C, L = x.size()
 
         if self.use_age == 'conv':
@@ -253,7 +275,19 @@ class M5(nn.Module):
 
         if self.use_age == 'fc':
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)
-        x = self.fc_stage(x)
 
+        if target_from_last == 0:
+            x = self.fc_stage(x)
+        else:
+            if target_from_last > self.fc_stages:
+                raise ValueError(f"{self.__class__.__name__}.compute_feature_embedding(target_from_last) receives "
+                                 f"an integer equal to or smaller than fc_stages={self.fc_stages}.")
+
+            for l in range(self.fc_stages - target_from_last):
+                x = self.fc_stage[l](x)
+        return x
+
+    def forward(self, x, age):
+        x = self.compute_feature_embedding(x, age)
         # return F.log_softmax(x, dim=1)
         return x

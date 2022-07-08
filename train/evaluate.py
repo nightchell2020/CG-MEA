@@ -6,6 +6,22 @@ import torch.nn.functional as F
 
 
 @torch.no_grad()
+def compute_embedding(model, sample_batched, preprocess, config):
+    # evaluation mode
+    model.eval()
+
+    # preprocessing (this includes to-device operation)
+    preprocess(sample_batched)
+
+    # apply model on whole batch directly on device
+    x = sample_batched['signal']
+    age = sample_batched['age']
+    output = model.compute_feature_embedding(x, age, target_from_last=1)
+
+    return output
+
+
+@torch.no_grad()
 def estimate_score(model, sample_batched, preprocess, config):
     # evaluation mode
     model.eval()
@@ -227,7 +243,7 @@ def check_accuracy_multicrop(model, loader, preprocess, config, repeat=1):
 
             # multi-crop averaging
             if s.size(0) % config['test_crop_multiple'] != 0:
-                raise ValueError(f"check_accuracy_multicrop(): Real minibatch size={y.size(0)} is not multiple of"
+                raise ValueError(f"check_accuracy_multicrop(): Real minibatch size={y.size(0)} is not multiple of "
                                  f"config['test_crop_multiple']={config['test_crop_multiple']}.")
 
             real_minibatch = s.size(0) // config['test_crop_multiple']

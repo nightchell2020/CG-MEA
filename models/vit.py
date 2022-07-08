@@ -235,6 +235,7 @@ class VisionTransformer(nn.Module):
         for i in range(self.fc_stages - 1):
             # TODO: Dropout or Normalization layers can be added here.
             heads_layers[f"linear{i + 1}"] = nn.Linear(prev_dim, prev_dim // 2)
+            heads_layers[f"dropout{i + 1}"] = nn.Dropout(dropout)
             heads_layers[f"act{i + 1}"] = self.nn_act()
             prev_dim = prev_dim // 2
         heads_layers["head"] = nn.Linear(prev_dim, out_dims)
@@ -300,9 +301,12 @@ class VisionTransformer(nn.Module):
                                f'failed to calculate the proper patch size')
 
     def get_output_length(self):
-        return self.seq_length
+        return self.output_length
 
-    def forward(self, x: torch.Tensor, age: torch.Tensor):
+    def get_num_fc_stages(self):
+        return self.fc_stages
+
+    def compute_feature_embedding(self, x, age, target_from_last: int = 0):
         # Reshape and permute the input tensor
         n, _, h, w = x.size()
         if self.use_age == 'conv':
@@ -333,8 +337,21 @@ class VisionTransformer(nn.Module):
 
         if self.use_age == 'fc':
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)
-        x = self.heads(x)
 
+        if target_from_last == 0:
+            x = self.heads(x)
+        else:
+            if target_from_last > self.fc_stages:
+                raise ValueError(f"{self.__class__.__name__}.compute_feature_embedding(target_from_last) receives "
+                                 f"an integer equal to or smaller than fc_stages={self.fc_stages}.")
+
+            for l in range(self.fc_stages - target_from_last):
+                x = self.heads[l](x)
+        return x
+
+    def forward(self, x: torch.Tensor, age: torch.Tensor):
+        x = self.compute_feature_embedding(x, age)
+        # return F.log_softmax(x, dim=1)
         return x
 
 

@@ -3,4 +3,4 @@ defaults:
   - _self_
 
 # GPU
-device: 2  # modify this
+device: 0  # modify this

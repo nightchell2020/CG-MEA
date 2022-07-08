@@ -63,6 +63,7 @@ class VGG1D(nn.Module):
         self.use_age = use_age
         if self.use_age == 'conv':
             in_channels += 1
+        self.fc_stages = fc_stages
 
         self.batch_norm = batch_norm
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
@@ -135,9 +136,6 @@ class VGG1D(nn.Module):
             elif hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
 
-    def get_output_length(self):
-        return self.output_length
-
     def _make_conv_stage(self, conv_filter, cfg, base_channels):
         conv_layers: List[nn.Module] = []
 
@@ -169,7 +167,13 @@ class VGG1D(nn.Module):
             self.current_channels = cfg['channel_mul'] * base_channels
         return nn.Sequential(*conv_layers)
 
-    def forward(self, x, age):
+    def get_output_length(self):
+        return self.output_length
+
+    def get_num_fc_stages(self):
+        return self.fc_stages
+
+    def compute_feature_embedding(self, x, age, target_from_last: int = 0):
         N, C, L = x.size()
 
         if self.use_age == 'conv':
@@ -188,7 +192,19 @@ class VGG1D(nn.Module):
 
         if self.use_age == 'fc':
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)
-        x = self.fc_stage(x)
 
+        if target_from_last == 0:
+            x = self.fc_stage(x)
+        else:
+            if target_from_last > self.fc_stages:
+                raise ValueError(f"{self.__class__.__name__}.compute_feature_embedding(target_from_last) receives "
+                                 f"an integer equal to or smaller than fc_stages={self.fc_stages}.")
+
+            for l in range(self.fc_stages - target_from_last):
+                x = self.fc_stage[l](x)
+        return x
+
+    def forward(self, x, age):
+        x = self.compute_feature_embedding(x, age)
         # return F.log_softmax(x, dim=1)
         return x

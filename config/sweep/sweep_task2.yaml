@@ -17,10 +17,10 @@ parameters:
   data.seq_length:
     values:
       # - 1000  # 5 sec
-      # - 2000  # 10 sec
-      # - 4000  # 20 sec
-      - 6000  # 30 sec
-      - 12000  # 60 sec
+      - 2000  # 10 sec
+      - 4000  # 20 sec
+      # - 6000  # 30 sec
+      # - 12000  # 60 sec
 
   data.EKG:
     values:
@@ -29,13 +29,13 @@ parameters:
 
   data.photic:
     values:
-      # - O
+      - O
       - X
 
   data.mgn:
     distribution: uniform
-    max: 0.1
-    min: 0
+    max: 0.12
+    min: 0.05
 
   data.awgn:
     distribution: uniform
@@ -44,8 +44,8 @@ parameters:
 
   data.awgn_age:
     distribution: uniform
-    max: 0.15
-    min: 0.05
+    max: 0.1
+    min: 0
 
   #########
   # Train #
@@ -75,8 +75,8 @@ parameters:
 
   train.weight_decay:
     distribution: uniform
-    max: 0.05
-    min: 1e-05
+    max: 0.08
+    min: 0.03
 
 
   train.mixup:
@@ -84,7 +84,7 @@ parameters:
       # - 0
       - 0.1
       - 0.2
-      - 0.3
+      # - 0.3
 
   train.criterion:
     values:
@@ -100,25 +100,25 @@ parameters:
       # - 1D-VGG-11
       # - 1D-VGG-13
       # - 1D-VGG-16
-      - 1D-VGG-19
-      - 1D-ResNet-18
-      - 1D-ResNet-50
+      # - 1D-VGG-19
+      # - 1D-ResNet-18
+      # - 1D-ResNet-50
 #      - 1D-ResNet-101
       - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
-      - 1D-Wide-ResNet-50
+      # - 1D-Wide-ResNet-50
 #      - 1D-Wide-ResNet-101
 #      - 1D-CNN-Transformer
       # - 2D-VGG-11
       # - 2D-VGG-13
       # - 2D-VGG-16
-      - 2D-VGG-19
-      - 2D-ResNet-18
-      - 2D-ResNet-50
+      # - 2D-VGG-19
+      # - 2D-ResNet-18
+      # - 2D-ResNet-50
 #      - 2D-ResNet-101
       - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
-      - 2D-Wide-ResNet-50
+      # - 2D-Wide-ResNet-50
 #      - 2D-Wide-ResNet-101
 #      - 2D-ViT-B-8
 #      - 2D-ViT-B-16
@@ -146,6 +146,6 @@ parameters:
 
   model.activation:
     values:
-      # - relu
+      - relu
       - gelu
       - mish

@@ -200,6 +200,7 @@ class ResNet2D(nn.Module):
         self.use_age = use_age
         if self.use_age == 'conv':
             in_channels += 1
+        self.fc_stages = fc_stages
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
 
@@ -308,9 +309,6 @@ class ResNet2D(nn.Module):
                 elif isinstance(m, BasicBlock2D):
                     nn.init.constant_(m.bn2.weight, 0)  # type: ignore[arg-type]
 
-    def get_output_length(self):
-        return self.output_length
-
     def _make_conv_stage(self, block: Type[Union[BasicBlock2D, Bottleneck2D]], planes: int, blocks: int,
                          stride: int = 1, pre_pool: int = 1, activation=nn.ReLU) -> nn.Sequential:
         norm_layer = self._norm_layer
@@ -342,8 +340,13 @@ class ResNet2D(nn.Module):
 
         return nn.Sequential(*conv_layers)
 
-    def _forward_impl(self, x: torch.Tensor, age: torch.Tensor) -> torch.Tensor:
-        # See note [TorchScript super()]
+    def get_output_length(self):
+        return self.output_length
+
+    def get_num_fc_stages(self):
+        return self.fc_stages
+
+    def compute_feature_embedding(self, x, age, target_from_last: int = 0):
         if self.use_age == 'conv':
             N, _, H, W = x.size()
             age = age.reshape((N, 1, 1, 1)).expand(N, 1, H, W)
@@ -361,12 +364,26 @@ class ResNet2D(nn.Module):
 
         if self.use_age == 'fc':
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)
-        x = self.fc_stage(x)
 
+        if target_from_last == 0:
+            x = self.fc_stage(x)
+        else:
+            if target_from_last > self.fc_stages:
+                raise ValueError(f"{self.__class__.__name__}.compute_feature_embedding(target_from_last) receives "
+                                 f"an integer equal to or smaller than fc_stages={self.fc_stages}.")
+
+            for l in range(self.fc_stages - target_from_last):
+                x = self.fc_stage[l](x)
+        return x
+
+    def _forward_impl(self, x: torch.Tensor, age: torch.Tensor) -> torch.Tensor:
+        # See note [TorchScript super()]
+        x = self.compute_feature_embedding(x, age)
         return x
 
     def forward(self, x: torch.Tensor, age: torch.Tensor) -> torch.Tensor:
-        return self._forward_impl(x, age)
+        x = self.compute_feature_embedding(x, age)
+        return x
 
 
 def _resnet_2d(
