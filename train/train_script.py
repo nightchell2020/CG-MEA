@@ -166,7 +166,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
             if config['save_model']:
                 checkpoint = {'model_state': model.state_dict(), 'config': config,
                               'optimizer_state': optimizer.state_dict(), 'scheduler_state': scheduler.state_dict()}
-                torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
+                torch.save(checkpoint, os.path.join(save_path, 'checkpoint_temp.pt'))
+                os.replace(os.path.join(save_path, 'checkpoint_temp.pt'), os.path.join(save_path, 'checkpoint.pt'))
 
             # save the best model so far
             if best_val_acc < val_acc:
@@ -203,7 +204,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         if config['save_model']:
             checkpoint = {'model_state': model_state, 'config': config,
                           'optimizer_state': optimizer.state_dict(), 'scheduler_state': scheduler.state_dict()}
-            torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
+            torch.save(checkpoint, os.path.join(save_path, 'checkpoint_temp.pt'))
+            os.replace(os.path.join(save_path, 'checkpoint_temp.pt'), os.path.join(save_path, 'checkpoint.pt'))
 
         # leave the message
         if config['use_wandb']:
