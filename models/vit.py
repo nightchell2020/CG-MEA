@@ -213,6 +213,7 @@ class VisionTransformer(nn.Module):
 
         # Add a class token
         self.seq_length = self.n_h * self.n_w + 1
+        self.output_length = self.n_h * self.n_w + 1
         self.class_token = nn.Parameter(torch.zeros(1, 1, hidden_dim))
 
         self.encoder = Encoder(
