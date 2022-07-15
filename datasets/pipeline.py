@@ -514,6 +514,44 @@ class EegAddGaussianNoiseAge(torch.nn.Module):
         return f"{self.__class__.__name__}(mean={self.mean},std={self.std})"
 
 
+class EegAgeBias(torch.nn.Module):
+    """Add a Gaussian noise to the age value
+
+    Args:
+        bias: Desired bias to add on age value.
+    """
+
+    def __init__(self, bias=0.0):
+        super().__init__()
+        self.bias = bias
+
+    def forward(self, sample):
+        sample['age'] += self.bias
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(bias={self.bias})"
+
+
+class EegAgeZero(torch.nn.Module):
+    """Add a Gaussian noise to the age value
+
+    Args:
+        bias: Desired bias to add on age value.
+    """
+
+    def __init__(self, bias=0.0):
+        self.bias = bias
+        super().__init__()
+
+    def forward(self, sample):
+        sample['age'] = torch.zeros_like(sample['age']) + self.bias
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(bias={self.bias})"
+
+
 class EegSpectrogram(torch.nn.Module):
     """Transform the multichannel 1D sequence as multichannel 2D image using short-time fourier transform
     (a.k.a. Spectrogram) """

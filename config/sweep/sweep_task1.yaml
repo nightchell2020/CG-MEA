@@ -17,10 +17,10 @@ parameters:
   data.seq_length:
     values:
       # - 1000  # 5 sec
-      # - 2000  # 10 sec
+      - 2000  # 10 sec
       - 4000  # 20 sec
-      - 6000  # 30 sec
-      - 12000  # 60 sec
+      # - 6000  # 30 sec
+      # - 12000  # 60 sec
 
   data.EKG:
     values:
