@@ -1,6 +1,6 @@
 project: caueeg-task1-segmented
 entity: ipis-mjkim
-method: random
+method: grid
 program: run_train.py
 command:
   - ${env}
