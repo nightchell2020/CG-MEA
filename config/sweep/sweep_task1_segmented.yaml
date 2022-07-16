@@ -1,4 +1,4 @@
-project: caueeg-task1
+project: caueeg-task1-segmented
 entity: ipis-mjkim
 method: random
 program: run_train.py
