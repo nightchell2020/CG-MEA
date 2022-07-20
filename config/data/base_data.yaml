@@ -6,11 +6,6 @@ test_crop_multiple: 8
 crop_timing_analysis: false
 load_event: false
 
-# task-dependent information
-# task: ???
-# class_label_to_name: ???
-# out_dims: ???
-
 # preprocessing
 seq_length: 2000  # 200Hz * 10s = 2000 for base
 latency: 2000
@@ -18,25 +13,6 @@ signal_length_limit: 10000000  # A sufficiently large number for no effect
 EKG: O
 photic: X
 input_norm: dataset
-# output_length: ???
-# in_channels: ???
-# signal_mean: ???
-# signal_std: ???
-# age_mean: ???
-# age_std: ???
-# transform: ???
-# transform_multicrop: ???
-# preprocess_train: ???
-# preprocess_test: ???
-
-# 2D case
-# stft_params: ???
-# hop_ratio: ???
-# n_fft: ???
-# hop_length: ???
-# seq_len_2d: ???
-# signal_2d_mean: ???
-# signal_2d_std: ???
 
 # augmentation
 awgn: 0.05

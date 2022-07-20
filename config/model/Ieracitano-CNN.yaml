@@ -1,0 +1,10 @@
+defaults:
+  - base_model
+  - _self_
+
+_target_: models.simple_cnn_2d.IeracitanoCNN
+model: Ieracitano-CNN
+use_age: 'no'
+fc_stages: 1
+activation: relu  # relu for the original
+minibatch: 512

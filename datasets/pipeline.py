@@ -34,7 +34,7 @@ class EegRandomCrop(object):
         return_timing (bool, optional): Decide whether return the sample timing or not.
     """
     def __init__(self, crop_length: int, length_limit: int = 10**7,
-                 multiple: int = 1, latency: int = 0, return_timing: bool = False):
+                 multiple: int = 1, latency: int = 0, segment_simulation=False, return_timing: bool = False):
         if isinstance(crop_length, int) is False:
             raise ValueError(f'{self.__class__.__name__}.__init__(crop_length) '
                              f'needs a integer to initialize')
@@ -49,6 +49,7 @@ class EegRandomCrop(object):
         self.length_limit = length_limit
         self.multiple = multiple
         self.latency = latency
+        self.segment_simulation = segment_simulation
         self.return_timing = return_timing
 
     def __call__(self, sample):
@@ -57,6 +58,8 @@ class EegRandomCrop(object):
 
         if self.multiple == 1:
             ct = np.random.randint(self.latency, signal_length - self.crop_length)
+            if self.segment_simulation:
+                ct = int((ct - self.latency) / self.crop_length) * self.crop_length + self.latency
             sample['signal'] = signal[:, ct:ct + self.crop_length]
             if self.return_timing:
                 sample['crop_timing'] = ct
@@ -66,6 +69,8 @@ class EegRandomCrop(object):
 
             for r in range(self.multiple):
                 ct = np.random.randint(self.latency, signal_length - self.crop_length)
+                if self.segment_simulation:
+                    ct = int((ct - self.latency) / self.crop_length) * self.crop_length + self.latency
                 signals.append(signal[:, ct:ct + self.crop_length])
                 crop_timings.append(ct)
 

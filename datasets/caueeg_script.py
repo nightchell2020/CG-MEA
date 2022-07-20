@@ -221,7 +221,7 @@ def calculate_signal_statistics(train_loader, preprocess_train=None, repeats=5, 
                 preprocess_train(sample)
 
             signal = sample['signal']
-            std, mean = torch.std_mean(signal, dim=-1, keepdims=True)  # [N, C, L] or [N, (2)C, F, T]
+            std, mean = torch.std_mean(signal, dim=-1, keepdim=True)  # [N, C, L] or [N, (2)C, F, T]
 
             if r == 0 and i == 0:
                 signal_means = torch.zeros_like(mean)
@@ -231,8 +231,8 @@ def calculate_signal_statistics(train_loader, preprocess_train=None, repeats=5, 
             signal_stds += std
             n_count += 1
 
-    signal_mean = torch.mean(signal_means / n_count, dim=0, keepdims=True)  # [N, C, L] or [N, (2)C, F, T]
-    signal_std = torch.mean(signal_stds / n_count, dim=0, keepdims=True)
+    signal_mean = torch.mean(signal_means / n_count, dim=0, keepdim=True)  # [N, C, L] or [N, (2)C, F, T]
+    signal_std = torch.mean(signal_stds / n_count, dim=0, keepdim=True)
 
     if verbose:
         print('Mean and standard deviation for signal:')
@@ -251,7 +251,7 @@ def calculate_age_statistics(train_loader, verbose=False):
 
     for i, sample in enumerate(train_loader):
         age = sample['age']
-        std, mean = torch.std_mean(age, dim=-1, keepdims=True)
+        std, mean = torch.std_mean(age, dim=-1, keepdim=True)
 
         if i == 0:
             age_means = torch.zeros_like(mean)
@@ -261,8 +261,8 @@ def calculate_age_statistics(train_loader, verbose=False):
         age_stds += std
         n_count += 1
 
-    age_mean = torch.mean(age_means / n_count, dim=0, keepdims=True)
-    age_std = torch.mean(age_stds / n_count, dim=0, keepdims=True)
+    age_mean = torch.mean(age_means / n_count, dim=0, keepdim=True)
+    age_std = torch.mean(age_stds / n_count, dim=0, keepdim=True)
 
     if verbose:
         print('Age mean and standard deviation:')
@@ -297,11 +297,13 @@ def compose_transforms(config, verbose=False):
                                 length_limit=config.get('signal_length_limit', 10 ** 7),
                                 multiple=config.get('crop_multiple', 1),
                                 latency=config.get('latency', 0),
+                                segment_simulation=config.get('segment_simulation', False),
                                 return_timing=config.get('crop_timing_analysis', False))]
     transform_multicrop += [EegRandomCrop(crop_length=config['seq_length'],
                                           length_limit=config.get('signal_length_limit', 10 ** 7),
                                           multiple=config.get('test_crop_multiple', 8),
                                           latency=config.get('latency', 0),
+                                          segment_simulation=config.get('segment_simulation', False),
                                           return_timing=config.get('crop_timing_analysis', False))]
 
     ###################################

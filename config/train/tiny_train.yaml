@@ -3,12 +3,12 @@ defaults:
   - _self_
 
 # Training iteration
-search_lr: true
-total_samples: 2500
+search_lr: false
+total_samples: 5000
 
 # log
 num_history: 5
-save_model: true
+save_model: false
 
 # wandb
 use_wandb: true
