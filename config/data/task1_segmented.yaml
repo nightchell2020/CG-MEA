@@ -8,3 +8,4 @@ file_format: memmap
 crop_multiple: 4
 test_crop_multiple: 8
 latency: 0
+check_accuracy_repeat: 1

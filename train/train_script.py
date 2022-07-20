@@ -42,8 +42,10 @@ def learning_rate_search(config, model, train_loader, val_loader,
         tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
         tr_ms(model, train_loader, preprocess_train, optimizer, scheduler, config, steps)
 
-        train_accuracy = check_accuracy(model, train_loader, preprocess_test, config, 10)
-        val_accuracy = check_accuracy(model, val_loader, preprocess_test, config, 10)
+        train_accuracy = check_accuracy(model, train_loader, preprocess_test, config,
+                                        repeat=config.get('check_accuracy_repeat', 10))
+        val_accuracy = check_accuracy(model, val_loader, preprocess_test, config,
+                                      repeat=config.get('check_accuracy_repeat', 10))
 
         # Train accuracy for the final epoch is stored
         learning_rate_record.append((log_lr, train_accuracy, val_accuracy))
@@ -116,7 +118,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         checkpoint = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
         best_model_state = checkpoint['model_state']
         model.load_state_dict(best_model_state)
-        best_val_acc = check_accuracy(model, val_loader, preprocess_test, config, 30)
+        best_val_acc = check_accuracy(model, val_loader, preprocess_test, config,
+                                      repeat=config.get('check_accuracy_repeat', 10) * 3)
         optimizer.load_state_dict(checkpoint['optimizer_state'])
         scheduler.load_state_dict(checkpoint['scheduler_state'])
         config = checkpoint['config']
@@ -148,7 +151,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         loss, train_acc = tr_ms(model=model, loader=train_loader, preprocess=preprocess_train,
                                 optimizer=optimizer, scheduler=scheduler, config=config, steps=history_interval)
         # validation accuracy
-        val_acc = check_accuracy(model, val_loader, preprocess_test, config, 30)
+        val_acc = check_accuracy(model, val_loader, preprocess_test, config,
+                                 repeat=config.get('check_accuracy_repeat', 10) * 3)
 
         # log
         if main_process:
@@ -178,12 +182,12 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     if main_process:
         last_model_state = deepcopy(model.state_dict())
         last_test_result = check_accuracy_extended(model=model, loader=test_loader, preprocess=preprocess_test,
-                                                   config=config, repeat=30)
+                                                   config=config, repeat=config.get('check_accuracy_repeat', 10) * 3)
         last_test_acc = last_test_result[0]
 
         model.load_state_dict(best_model_state)
         best_test_result = check_accuracy_extended(model=model, loader=test_loader, preprocess=preprocess_test,
-                                                   config=config, repeat=30)
+                                                   config=config, repeat=config.get('check_accuracy_repeat', 10) * 3)
         best_test_acc = best_test_result[0]
 
         if last_test_acc < best_test_acc:
@@ -198,7 +202,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
 
         # calculate the test accuracy of the final model using multiple crop averaging
         multicrop_test_acc = check_accuracy_multicrop(model=model, loader=multicrop_test_loader,
-                                                      preprocess=preprocess_test, config=config, repeat=30)
+                                                      preprocess=preprocess_test, config=config,
+                                                      repeat=config.get('check_accuracy_repeat', 10) * 3)
 
         # save the model
         if config['save_model']:
