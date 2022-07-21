@@ -3,16 +3,16 @@ defaults:
   - _self_
 
 task: task2
-dataset_path: local/dataset/02_Curated_Data_220715_seg_30s/
+dataset_path: local/dataset/02_Curated_Data_220419/
 file_format: memmap
 crop_multiple: 4
 test_crop_multiple: 8
-check_accuracy_repeat: 1
+check_accuracy_repeat: 10
 
 # preprocessing
 seq_length: 1000  # 200Hz * 5s = 1000
 # segment_simulation: true
-latency: 0
+latency: 2000
 EKG: X
 photic: X
 input_norm: dataset
