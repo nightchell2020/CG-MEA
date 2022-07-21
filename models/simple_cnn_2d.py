@@ -32,9 +32,15 @@ class IeracitanoCNN(nn.Module):
         self.conv1 = nn.Conv2d(1, base_channels, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1), bias=True)
         self.pool1 = self.base_pool((2, 2))
 
+        fc_stage = []
+
         self.output_length = 160 // 2
         current_dim = 11520
-        self.fc_stage = nn.Linear(current_dim, out_dims)
+        fc_stage.append(nn.Linear(current_dim, 300))
+
+        current_dim = 300
+        fc_stage.append(nn.Linear(current_dim, out_dims))
+        self.fc_stage = nn.Sequential(*fc_stage)
 
         self.reset_weights()
 
