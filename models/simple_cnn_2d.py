@@ -30,6 +30,7 @@ class IeracitanoCNN(nn.Module):
             self.base_pool = nn.MaxPool2d
 
         self.conv1 = nn.Conv2d(1, base_channels, kernel_size=(3, 3), padding=(1, 1), stride=(1, 1), bias=True)
+        self.bn1 = nn.BatchNorm2d(base_channels)
         self.pool1 = self.base_pool((2, 2))
 
         fc_stage = []
@@ -37,6 +38,8 @@ class IeracitanoCNN(nn.Module):
         self.output_length = 160 // 2
         current_dim = 11520
         fc_stage.append(nn.Linear(current_dim, 300))
+        fc_stage.append(nn.BatchNorm1d(300))
+        fc_stage.append(self.nn_act())
 
         current_dim = 300
         fc_stage.append(nn.Linear(current_dim, out_dims))
@@ -64,6 +67,7 @@ class IeracitanoCNN(nn.Module):
 
         # conv-bn-act-pool
         x = self.conv1(x)
+        x = self.bn1(x)
         x = self.F_act(x)
         x = self.pool1(x)
         x = x.reshape(N, -1)
