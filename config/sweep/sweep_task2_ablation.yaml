@@ -1,0 +1,84 @@
+project: caueeg-task2-ablation
+entity: ipis-mjkim
+method: grid
+program: run_train.py
+command:
+  - ${env}
+  - python
+  - ${program}
+  - "data=task2"
+  - "train=device"
+  - ${args_no_hyphens}
+
+parameters:
+
+  ########
+  # Data #
+  ########
+  data.seq_length:
+    values:
+      - 2000  # 10 sec
+
+  data.EKG:
+    values:
+      - O
+
+  data.photic:
+    values:
+      - O
+
+  data.mgn:
+    values:
+      - 0.09575622309480344
+
+  data.awgn:
+    values:
+      - 0.004872735559634612
+
+  data.awgn_age:
+    values:
+      - 0.03583361229344302
+
+  #########
+  # Train #
+  #########
+
+  train.lr_scheduler_type:
+    values:
+      - cosine_decay_with_warmup_half
+
+  train.weight_decay:
+    values:
+      - 0.04394746639552375
+
+  train.mixup:
+    values:
+      - 0.2
+
+  train.criterion:
+    values:
+      - multi-bce
+
+  #########
+  # Model #
+  #########
+
+  model:
+    values:
+      - 1D-ResNet-18
+
+  model.fc_stages:
+    values:
+      - 3
+
+  model.use_age:
+    values:
+      - 'conv'
+
+  model.dropout:
+    values:
+      - 0.3
+
+  model.activation:
+    values:
+      - gelu

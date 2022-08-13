@@ -63,7 +63,7 @@ def prepare_and_run_train(rank, world_size, config):
         os.environ['MASTER_PORT'] = '12355'
         torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
         config = deepcopy(config)
-        config['device'] = rank
+        config['device'] = torch.device(f'cuda:{rank}')
 
     # compose dataset
     train_loader, val_loader, test_loader, multicrop_test_loader = build_dataset_for_train(config)

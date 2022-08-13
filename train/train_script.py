@@ -68,7 +68,7 @@ def learning_rate_search(config, model, train_loader, val_loader,
 def train_script(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
                  preprocess_train, preprocess_test):
     # only the main process of DDP logs, evaluates, and saves
-    main_process = config['ddp'] is False or config['device'] == 0
+    main_process = config['ddp'] is False or config['device'].index == 0
 
     # load if using an existing model
     if config.get('init_from', None):
@@ -123,7 +123,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         optimizer.load_state_dict(checkpoint['optimizer_state'])
         scheduler.load_state_dict(checkpoint['scheduler_state'])
         config = checkpoint['config']
-        wandb.config.update(config, allow_val_change=True)
+        if main_process:
+            wandb.config.update(config, allow_val_change=True)
         i_step = checkpoint['optimizer_state']['state'][0]['step']
         pprint.pprint(f'Training resumes from {resume}', width=120)
         pprint.pprint(config, width=120)
