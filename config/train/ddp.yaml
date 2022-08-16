@@ -16,4 +16,3 @@ watch_model: false
 # device: ???  # decided during runtime
 ddp: true
 # ddp_size: ???  # decided during runtime
-# ddp_size: 3
