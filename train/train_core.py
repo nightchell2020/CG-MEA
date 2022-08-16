@@ -43,6 +43,8 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, config, ste
 
             # backward and update
             loss.backward()
+            if 'clip_grad_norm' in config:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), config['clip_grad_norm'])
             optimizer.step()
             scheduler.step()
 
