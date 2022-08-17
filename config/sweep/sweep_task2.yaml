@@ -17,9 +17,9 @@ parameters:
   data.seq_length:
     values:
       # - 1000  # 5 sec
-      - 2000  # 10 sec
-      - 4000  # 20 sec
-      # - 6000  # 30 sec
+      # - 2000  # 10 sec
+      # - 4000  # 20 sec
+      - 6000  # 30 sec
       # - 12000  # 60 sec
 
   data.EKG:
@@ -30,22 +30,22 @@ parameters:
   data.photic:
     values:
       - O
-      - X
+      # - X
 
   data.mgn:
     distribution: uniform
-    max: 0.12
-    min: 0.05
+    max: 0.1
+    min: 0
 
   data.awgn:
     distribution: uniform
-    max: 0.12
+    max: 0.1
     min: 0
 
   data.awgn_age:
     distribution: uniform
     max: 0.1
-    min: 0
+    min: 0.02
 
   #########
   # Train #
@@ -53,11 +53,11 @@ parameters:
 
   train.lr_scheduler_type:
     values:
-      - constant_with_decay
+      # - constant_with_decay
       - constant_with_twice_decay
-      - transformer_style
+      # - transformer_style
       - cosine_decay_with_warmup_half
-      - cosine_decay_with_warmup_one_and_half
+      # - cosine_decay_with_warmup_one_and_half
       # - cosine_decay_with_warmup_two_and_half
       - linear_decay_with_warmup
 
@@ -102,7 +102,7 @@ parameters:
       # - 1D-VGG-16
       # - 1D-VGG-19
       # - 1D-ResNet-18
-      # - 1D-ResNet-50
+      - 1D-ResNet-50
 #      - 1D-ResNet-101
       - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
@@ -114,7 +114,7 @@ parameters:
       # - 2D-VGG-16
       # - 2D-VGG-19
       # - 2D-ResNet-18
-      # - 2D-ResNet-50
+      - 2D-ResNet-50
 #      - 2D-ResNet-101
       - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
@@ -141,7 +141,7 @@ parameters:
 
   model.dropout:
     distribution: uniform
-    max: 0.5
+    max: 0.3
     min: 0.1
 
   model.activation:

@@ -17,9 +17,9 @@ parameters:
   data.seq_length:
     values:
       # - 1000  # 5 sec
-      - 2000  # 10 sec
-      - 4000  # 20 sec
-      # - 6000  # 30 sec
+      # - 2000  # 10 sec
+      # - 4000  # 20 sec
+      - 6000  # 30 sec
       # - 12000  # 60 sec
 
   data.EKG:
@@ -29,8 +29,8 @@ parameters:
 
   data.photic:
     values:
-      # - O
-      - X
+      - O
+      # - X
 
   data.mgn:
     distribution: uniform
@@ -39,13 +39,13 @@ parameters:
 
   data.awgn:
     distribution: uniform
-    max: 0.12
+    max: 0.1
     min: 0
 
   data.awgn_age:
     distribution: uniform
-    max: 0.15
-    min: 0.05
+    max: 0.1
+    min: 0.02
 
   #########
   # Train #
@@ -53,11 +53,11 @@ parameters:
 
   train.lr_scheduler_type:
     values:
-      - constant_with_decay
+      # - constant_with_decay
       - constant_with_twice_decay
-      - transformer_style
+      # - transformer_style
       - cosine_decay_with_warmup_half
-      - cosine_decay_with_warmup_one_and_half
+      # - cosine_decay_with_warmup_one_and_half
       # - cosine_decay_with_warmup_two_and_half
       - linear_decay_with_warmup
 
@@ -68,13 +68,8 @@ parameters:
   #    - 1.5
   #    - 2.0
 
-#  train.weight_decay:
-#    distribution: log_uniform_values
-#    max: 0.05
-#    min: 1e-05
-
   train.weight_decay:
-    distribution: uniform
+    distribution: uniform  # log_uniform_values
     max: 0.05
     min: 1e-05
 
@@ -99,25 +94,25 @@ parameters:
       # - 1D-VGG-11
       # - 1D-VGG-13
       # - 1D-VGG-16
-      - 1D-VGG-19
-      - 1D-ResNet-18
+      # - 1D-VGG-19
+      # - 1D-ResNet-18
       - 1D-ResNet-50
 #      - 1D-ResNet-101
       - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
-      - 1D-Wide-ResNet-50
+      # - 1D-Wide-ResNet-50
 #      - 1D-Wide-ResNet-101
 #      - 1D-CNN-Transformer
       # - 2D-VGG-11
       # - 2D-VGG-13
       # - 2D-VGG-16
-      - 2D-VGG-19
-      - 2D-ResNet-18
+      # - 2D-VGG-19
+      # - 2D-ResNet-18
       - 2D-ResNet-50
 #      - 2D-ResNet-101
       - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
-      - 2D-Wide-ResNet-50
+      # - 2D-Wide-ResNet-50
 #      - 2D-Wide-ResNet-101
 #      - 2D-ViT-B-8
 #      - 2D-ViT-B-16
@@ -140,7 +135,7 @@ parameters:
 
   model.dropout:
     distribution: uniform
-    max: 0.4
+    max: 0.2
     min: 0.1
 
   model.activation:
