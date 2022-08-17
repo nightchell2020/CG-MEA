@@ -1,5 +1,4 @@
 defaults:
-  - base_train
   - tiny_train
   - _self_
 
@@ -10,4 +9,5 @@ defaults:
 # GPU
 # device: ???  decided during runtime
 ddp: true
+ddp_size: 4
 # ddp_size: ???  decided during runtime

@@ -1,0 +1,7 @@
+defaults:
+  - tiny_ddp
+  - _self_
+
+# precision
+mixed_precision: true
+

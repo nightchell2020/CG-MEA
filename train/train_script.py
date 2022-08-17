@@ -38,9 +38,10 @@ def learning_rate_search(config, model, train_loader, val_loader,
         optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
         scheduler = get_lr_scheduler(optimizer, scheduler_type='constant_with_decay',  # constant for search
                                      iterations=config['total_samples'], warmup_steps=config['total_samples'])
+        amp_scaler = torch.cuda.amp.GradScaler() if config.get('mixed_precision', False) else None
 
         tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
-        tr_ms(model, train_loader, preprocess_train, optimizer, scheduler, config, steps)
+        tr_ms(model, train_loader, preprocess_train, optimizer, scheduler, amp_scaler, config, steps)
 
         train_accuracy = check_accuracy(model, train_loader, preprocess_test, config,
                                         repeat=config.get('check_accuracy_repeat', 10))
@@ -105,6 +106,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     optimizer = optim.AdamW(model.parameters(), lr=config['base_lr'], weight_decay=config['weight_decay'])
     scheduler = get_lr_scheduler(optimizer, config['lr_scheduler_type'],
                                  iterations=config['iterations'], warmup_steps=config['warmup_steps'])
+    amp_scaler = torch.cuda.amp.GradScaler() if config.get('mixed_precision', False) else None
 
     # local variable for training loop
     best_val_acc = 0
@@ -150,7 +152,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         # train during 'history_interval' steps
         tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
         loss, train_acc = tr_ms(model=model, loader=train_loader, preprocess=preprocess_train,
-                                optimizer=optimizer, scheduler=scheduler, config=config, steps=history_interval)
+                                optimizer=optimizer, scheduler=scheduler, amp_scaler=amp_scaler, config=config, steps=history_interval)
         # validation accuracy
         val_acc = check_accuracy(model, val_loader, preprocess_test, config,
                                  repeat=config.get('check_accuracy_repeat', 10) * 3)

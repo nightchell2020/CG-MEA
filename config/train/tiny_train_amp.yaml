@@ -1,0 +1,6 @@
+defaults:
+  - tiny_train
+  - _self_
+
+# precision
+mixed_precision: true
