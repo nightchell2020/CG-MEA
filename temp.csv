@@ -1,0 +1,2 @@
+,name,path,Train Accuracy,Validation Accuracy,Test Accuracy,Throughput,Multi-Crop Test Accuracy,awgn,awgn_age,mgn,mixup,fc_stages,use_age,photic,EKG,seed,model
+0,34oksw2q,E:\CAUEEG\checkpoint\34oksw2q\checkpoint.pt,99.71800986842105,87.31880733944953,87.55291612057667,5.5176137532272255e-05,95.60681520314547,0,0,0,0.0,1,no,X,X,0,Ieracitano-CNN

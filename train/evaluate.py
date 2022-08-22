@@ -106,6 +106,43 @@ def check_accuracy(model, loader, preprocess, config, repeat=1):
 
 
 @torch.no_grad()
+def check_accuracy_and_throughput(model, loader, preprocess, config, repeat=1, dummy=1):
+    # for accuracy
+    correct, total = (0, 0)
+
+    # for latency
+    total_time = 0.0
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+
+    # warm-up dummy round
+    for k in range(dummy):
+        for sample_batched in loader:
+            _ = estimate_score(model, sample_batched, preprocess, config)
+
+    # check accuracy and latency
+    for k in range(repeat):
+        for sample_batched in loader:
+            # estimate
+            start_event.record()
+            s = estimate_score(model, sample_batched, preprocess, config)
+            end_event.record()
+            torch.cuda.synchronize()
+
+            total_time += start_event.elapsed_time(end_event) / 1000
+
+            # calculate accuracy
+            y = sample_batched['class_label']
+            pred = s.argmax(dim=-1)
+            correct += pred.squeeze().eq(y).sum().item()
+            total += pred.shape[0]
+
+    accuracy = 100.0 * correct / total
+    throughput = total / total_time
+    return accuracy, throughput
+
+
+@torch.no_grad()
 def check_accuracy_extended(model, loader, preprocess, config, repeat=1):
     # for confusion matrix
     C = config['out_dims']
