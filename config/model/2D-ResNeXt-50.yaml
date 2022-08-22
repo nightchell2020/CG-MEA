@@ -8,4 +8,4 @@ conv_layers: [3, 4, 6, 3]
 block: bottleneck
 groups: 32
 width_per_group: 4
-minibatch: 128  # 64 for 4000, 16 for 6000
+minibatch: 96
