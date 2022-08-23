@@ -129,7 +129,7 @@ def check_accuracy_and_throughput(model, loader, preprocess, config, repeat=1, d
             end_event.record()
             torch.cuda.synchronize()
 
-            total_time += start_event.elapsed_time(end_event) / 1000
+            total_time += start_event.elapsed_time(end_event) * 1000
 
             # calculate accuracy
             y = sample_batched['class_label']
