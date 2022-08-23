@@ -85,7 +85,7 @@ class LinearClassifier2D(nn.Module):
         return self.output_length
 
     def forward(self, x, age):
-        N, C, L = x.size()
+        N, C, H, W = x.size()
 
         x = x.reshape((N, -1))
 
