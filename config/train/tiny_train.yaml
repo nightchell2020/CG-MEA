@@ -11,6 +11,6 @@ num_history: 5
 save_model: false
 
 # wandb
-use_wandb: true
+use_wandb: false
 draw_result: true
 watch_model: false

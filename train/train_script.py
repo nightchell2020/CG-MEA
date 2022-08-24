@@ -13,7 +13,7 @@ from .evaluate import check_accuracy
 from .evaluate import check_accuracy_extended
 from .evaluate import check_accuracy_multicrop
 from .visualize import draw_lr_search_record
-from .visualize import draw_roc_curve, draw_confusion, draw_error_table
+from .visualize import draw_roc_curve, draw_confusion
 
 # __all__ = []
 
@@ -201,7 +201,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
             test_result = last_test_result
 
         model.load_state_dict(model_state)
-        test_acc, score, target, test_confusion, error_table = test_result
+        test_acc, score, target, test_confusion, throughput = test_result
 
         # calculate the test accuracy of the final model using multiple crop averaging
         multicrop_test_acc = check_accuracy_multicrop(model=model, loader=multicrop_test_loader,
@@ -221,10 +221,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                        '(Best, Last) Test Accuracy': ('Best' if last_test_acc < best_test_acc else 'Last',
                                                       round(best_test_acc, 2), round(last_test_acc, 2)),
                        'Confusion Matrix (Array)': test_confusion,
-                       'Multi-Crop Test Accuracy': multicrop_test_acc,
-                       'Test Debug Table/Serial': error_table['Serial'],
-                       'Test Debug Table/Pred': error_table['Pred'],
-                       'Test Debug Table/GT': error_table['GT']})
+                       'Multi-Crop Test Accuracy': multicrop_test_acc,})
         else:
             print(f"\n{'*'*30} {run_name:^30} {'*'*30}\n")
             pprint.pprint({'Test Accuracy': test_acc,
@@ -237,7 +234,6 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         if config['draw_result']:
             draw_roc_curve(score, target, config['class_label_to_name'], use_wandb=config['use_wandb'])
             draw_confusion(test_confusion, config['class_label_to_name'], use_wandb=config['use_wandb'])
-            draw_error_table(error_table, use_wandb=config['use_wandb'])
 
         if config['use_wandb']:
             wandb.run.finish()

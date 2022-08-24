@@ -243,7 +243,7 @@ def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=Fa
     else:
         plt.show()
 
-    fig.clear()
+    # fig.clear()
     plt.close(fig)
 
 
@@ -270,7 +270,7 @@ def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False):
     else:
         plt.show()
 
-    fig.clear()
+    # fig.clear()
     plt.close(fig)
 
 
@@ -360,7 +360,7 @@ def draw_roc_curve(score, target, class_label_to_name, use_wandb=False):
     else:
         plt.show()
 
-    fig.clear()
+    # fig.clear()
     plt.close(fig)
 
 
@@ -397,5 +397,5 @@ def draw_error_table(error_table, use_wandb=False, fig_size=(40.0, 4.0)):
     else:
         plt.show()
 
-    fig.clear()
+    # fig.clear()
     plt.close(fig)

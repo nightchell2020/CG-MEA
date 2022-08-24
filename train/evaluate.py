@@ -106,21 +106,26 @@ def check_accuracy(model, loader, preprocess, config, repeat=1):
 
 
 @torch.no_grad()
-def check_accuracy_and_throughput(model, loader, preprocess, config, repeat=1, dummy=1):
-    # for accuracy
-    correct, total = (0, 0)
+def check_accuracy_extended(model, loader, preprocess, config, repeat=1, dummy=1):
+    # for confusion matrix
+    C = config['out_dims']
+    confusion_matrix = np.zeros((C, C), dtype=np.int32)
 
-    # for latency
+    # for ROC curve
+    score = None
+    target = None
+
+    # for throughput calculation
+    total = 0
     total_time = 0.0
     start_event = torch.cuda.Event(enable_timing=True)
     end_event = torch.cuda.Event(enable_timing=True)
 
-    # warm-up dummy round
+    # warm-up using dummy round
     for k in range(dummy):
         for sample_batched in loader:
             _ = estimate_score(model, sample_batched, preprocess, config)
 
-    # check accuracy and latency
     for k in range(repeat):
         for sample_batched in loader:
             # estimate
@@ -128,38 +133,8 @@ def check_accuracy_and_throughput(model, loader, preprocess, config, repeat=1, d
             s = estimate_score(model, sample_batched, preprocess, config)
             end_event.record()
             torch.cuda.synchronize()
-
             total_time += start_event.elapsed_time(end_event) / 1000
 
-            # calculate accuracy
-            y = sample_batched['class_label']
-            pred = s.argmax(dim=-1)
-            correct += pred.squeeze().eq(y).sum().item()
-            total += pred.shape[0]
-
-    accuracy = 100.0 * correct / total
-    throughput = total / total_time
-    return accuracy, throughput
-
-
-@torch.no_grad()
-def check_accuracy_extended(model, loader, preprocess, config, repeat=1):
-    # for confusion matrix
-    C = config['out_dims']
-    confusion_matrix = np.zeros((C, C), dtype=np.int32)
-
-    # for error table
-    error_table = {data['serial']: {'GT': data['class_label'].item(),
-                                    'Pred': [0] * C} for data in loader.dataset}
-
-    # for ROC curve
-    score = None
-    target = None
-
-    for k in range(repeat):
-        for sample_batched in loader:
-            # estimate
-            s = estimate_score(model, sample_batched, preprocess, config)
             y = sample_batched['class_label']
 
             # classification score for drawing ROC curve
@@ -174,27 +149,13 @@ def check_accuracy_extended(model, loader, preprocess, config, repeat=1):
             pred = s.argmax(dim=-1)
             confusion_matrix += calculate_confusion_matrix(pred, y, num_classes=config['out_dims'])
 
-            # error table
-            for n in range(pred.shape[0]):
-                serial = sample_batched['serial'][n]
-                error_table[serial]['Pred'][pred[n].item()] += 1
-
-    # error table update
-    error_table_serial = []
-    error_table_pred = []
-    error_table_gt = []
-
-    for serial in sorted(error_table.keys()):
-        error_table_serial.append(serial)
-        error_table_pred.append(error_table[serial]['Pred'])
-        error_table_gt.append(error_table[serial]['GT'])
-
-    error_table = {'Serial': error_table_serial,
-                   'Pred': error_table_pred,
-                   'GT': error_table_gt}
+            # total samples
+            total += pred.shape[0]
 
     accuracy = confusion_matrix.trace() / confusion_matrix.sum() * 100.0
-    return accuracy, score, target, confusion_matrix, error_table
+    throughput = total / total_time
+
+    return accuracy, score, target, confusion_matrix, throughput
 
 
 @torch.no_grad()
@@ -305,22 +266,34 @@ def check_accuracy_multicrop(model, loader, preprocess, config, repeat=1):
 
 
 @torch.no_grad()
-def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=1):
+def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=1, dummy=1):
     # for confusion matrix
     C = config['out_dims']
     confusion_matrix = np.zeros((C, C), dtype=np.int32)
-
-    # for error table
-    error_table = {data['serial']: {'GT': data['class_label'].item(),
-                                    'Pred': [0] * C} for data in loader.dataset}
 
     # for ROC curve
     score = None
     target = None
 
+    # for throughput calculation
+    total = 0
+    total_time = 0.0
+    start_event = torch.cuda.Event(enable_timing=True)
+    end_event = torch.cuda.Event(enable_timing=True)
+
+    # warm-up using dummy round
+    for k in range(dummy):
+        for sample_batched in loader:
+            _ = estimate_score(model, sample_batched, preprocess, config)
+
     for k in range(repeat):
         for sample_batched in loader:
+            real_minibatch = sample_batched['signal'].size(0) // config['test_crop_multiple']
+            s_merge = torch.zeros((real_minibatch, config['out_dims']))
+            y_merge = torch.zeros((real_minibatch,), dtype=torch.int32)
+
             # estimate
+            start_event.record()
             s = estimate_score(model, sample_batched, preprocess, config)
             y = sample_batched['class_label']
 
@@ -329,18 +302,16 @@ def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=
                 raise ValueError(f"check_accuracy_multicrop(): Real minibatch size={y.size(0)} is not multiple of "
                                  f"config['test_crop_multiple']={config['test_crop_multiple']}.")
 
-            real_minibatch = s.size(0) // config['test_crop_multiple']
-            s_ = torch.zeros((real_minibatch, s.size(1)))
-            y_ = torch.zeros((real_minibatch,), dtype=torch.int32)
-            serial_ = []
-
             for m in range(real_minibatch):
-                s_[m] = s[config['test_crop_multiple']*m:config['test_crop_multiple']*(m + 1)].mean(dim=0, keepdims=True)
-                y_[m] = y[config['test_crop_multiple']*m]
-                serial_.append(sample_batched['serial'][config['test_crop_multiple']*m])
+                s_merge[m] = s[config['test_crop_multiple']*m:config['test_crop_multiple']*(m + 1)].mean(dim=0, keepdims=True)
+                y_merge[m] = y[config['test_crop_multiple']*m]
 
-            s = s_
-            y = y_
+            end_event.record()
+            torch.cuda.synchronize()
+            total_time += start_event.elapsed_time(end_event) / 1000
+
+            s = s_merge
+            y = y_merge
 
             # classification score for drawing ROC curve
             if score is None:
@@ -354,24 +325,10 @@ def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=
             pred = s.argmax(dim=-1)
             confusion_matrix += calculate_confusion_matrix(pred, y, num_classes=config['out_dims'])
 
-            # error table
-            for n in range(pred.shape[0]):
-                serial = serial_[n]
-                error_table[serial]['Pred'][pred[n].item()] += 1
-
-    # error table update
-    error_table_serial = []
-    error_table_pred = []
-    error_table_gt = []
-
-    for serial in sorted(error_table.keys()):
-        error_table_serial.append(serial)
-        error_table_pred.append(error_table[serial]['Pred'])
-        error_table_gt.append(error_table[serial]['GT'])
-
-    error_table = {'Serial': error_table_serial,
-                   'Pred': error_table_pred,
-                   'GT': error_table_gt}
+            # total samples
+            total += pred.shape[0]
 
     accuracy = confusion_matrix.trace() / confusion_matrix.sum() * 100.0
-    return accuracy, score, target, confusion_matrix, error_table
+    throughput = total / total_time
+
+    return accuracy, score, target, confusion_matrix, throughput
