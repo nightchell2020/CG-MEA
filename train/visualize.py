@@ -201,7 +201,8 @@ def annotate_heatmap(im, data=None, anno_format="{x:.2f}",
     # Set default alignment to center, but allow it to be
     # overwritten by text_kw.
     kw = dict(horizontalalignment="center",
-              verticalalignment="center")
+              verticalalignment="center",
+              size="large")
     kw.update(text_kw)
 
     # Get the formatter in case a string is supplied
@@ -216,9 +217,11 @@ def annotate_heatmap(im, data=None, anno_format="{x:.2f}",
             im.axes.text(j, i, anno_format(data[i, j], None), **kw)
 
 
-def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=False):
+def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=False, save_path=None):
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
-    fig = plt.figure(num=1, clear=True, figsize=(4.0, 4.0), constrained_layout=True)
+    H = len(class_label_to_name) + 0.5
+    W = len(class_label_to_name) + 0.5
+    fig = plt.figure(num=1, clear=True, figsize=(W, H), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
 
     data = confusion
@@ -229,7 +232,7 @@ def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=Fa
 
     im = draw_heatmap(data, class_label_to_name, class_label_to_name,
                       ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
-                      draw_cbar=True, cbar_label="", cbar_kw={})
+                      draw_cbar=False, cbar_label="", cbar_kw={})
 
     annotate_heatmap(im, anno_format=anno_format, text_colors=("black", "white"), threshold=0.7)
 
@@ -237,22 +240,32 @@ def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=Fa
     ax.set_xlabel('Prediction')
     ax.set_ylabel('Ground Truth')
 
+    # save
+    if save_path:
+        plt.rcParams.update({'font.size': 22})
+        plt.rcParams.update({'font.family': 'Arial'})
+        plt.rcParams["savefig.dpi"] = 1200
+        fig.savefig(save_path, transparent=True)
+
     # draw
     if use_wandb:
         wandb.log({'Confusion Matrix (Image)': wandb.Image(plt)})
-    else:
+
+    if save_path is None and use_wandb is False:
         plt.show()
 
     # fig.clear()
     plt.close(fig)
 
 
-def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False):
-    plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
-    fig = plt.figure(num=1, clear=True, figsize=(8.0, 4.0), constrained_layout=True)
-    ax = fig.add_subplot(1, 1, 1)
-
+def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False, save_path=None):
     class_wise_metrics = calculate_class_wise_metrics(confusion)
+
+    plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
+    H = len(class_label_to_name) + 0.5
+    W = len(class_wise_metrics) + 0.5
+    fig = plt.figure(num=1, clear=True, figsize=(W, H), constrained_layout=True)
+    ax = fig.add_subplot(1, 1, 1)
 
     im = draw_heatmap(data=np.array([*class_wise_metrics.values()]).T,  # np.ones((C, len(class_wise_metrics))),
                       row_labels=class_label_to_name, col_labels=[*class_wise_metrics.keys()],
@@ -264,19 +277,27 @@ def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False):
 
     ax.set_title('Class-wise metrics')
 
+    # save
+    if save_path:
+        plt.rcParams.update({'font.size': 22})
+        plt.rcParams.update({'font.family': 'Arial'})
+        plt.rcParams["savefig.dpi"] = 1200
+        fig.savefig(save_path, transparent=True)
+
     # draw
     if use_wandb:
         wandb.log({'Class-wise Metrics (Image)': wandb.Image(plt)})
-    else:
+
+    if save_path is None and use_wandb is False:
         plt.show()
 
     # fig.clear()
     plt.close(fig)
 
 
-def draw_roc_curve(score, target, class_label_to_name, use_wandb=False):
+def draw_roc_curve(score, target, class_label_to_name, use_wandb=False, save_path=None):
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
-    lw = 1.5
+    lw = 1.1
 
     # Binarize the output
     n_classes = len(class_label_to_name)
@@ -354,10 +375,18 @@ def draw_roc_curve(score, target, class_label_to_name, use_wandb=False):
     ax.set_title('Class-Agnostic ROC Curves')
     ax.legend(loc="lower right")
 
+    # save
+    if save_path:
+        plt.rcParams.update({'font.size': 22})
+        plt.rcParams.update({'font.family': 'Arial'})
+        plt.rcParams["savefig.dpi"] = 1200
+        fig.savefig(save_path, transparent=True)
+
     # draw
     if use_wandb:
         wandb.log({'ROC Curve (Image)': wandb.Image(plt)})
-    else:
+
+    if save_path is None and use_wandb is False:
         plt.show()
 
     # fig.clear()

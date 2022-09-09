@@ -76,12 +76,12 @@ def calculate_class_wise_metrics(confusion_matrix):
         sensitivity[c] = tp / (tp + fn)
         specificity[c] = tn / (fp + tn)
         precision[c] = tp / (tp + fp)
-        recall[c] = tp / (tp + fn)
+        recall[c] = sensitivity[c]
     f1_score = 2 * precision * recall / (precision + recall)
 
     class_wise_metrics = {'Accuracy': accuracy,
                           'Sensitivity': sensitivity, 'Specificity': specificity,
-                          'Precision': precision, 'Recall': recall, 'F1-score': f1_score}
+                          'Precision': precision, 'F1-score': f1_score}  # 'Recall': recall is same with sensitivity
     return class_wise_metrics
 
 
