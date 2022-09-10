@@ -1,0 +1,7 @@
+defaults:
+  - ddp
+  - _self_
+
+# precision
+mixed_precision: true
+

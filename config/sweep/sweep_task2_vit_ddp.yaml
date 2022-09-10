@@ -8,7 +8,7 @@ command:
   - python
   - ${program}
   - "data=task2"
-  - "train=ddp"  # tiny_ddp
+  - "train=ddp_amp_grad_clip"  # tiny_ddp
   - ${args_no_hyphens}
 
 parameters:
@@ -19,10 +19,11 @@ parameters:
   data.seq_length:
     values:
       # - 1000  # 5 sec
-      - 2000  # 10 sec
-      - 4000  # 20 sec
-      - 6000  # 30 sec
-      - 12000  # 60 sec
+      # - 2000  # 10 sec
+      - 3000
+      # - 4000  # 20 sec
+      # - 6000  # 30 sec
+      # - 12000  # 60 sec
 
   data.EKG:
     values:
@@ -34,20 +35,20 @@ parameters:
       - O
       - X
 
+  data.mgn:
+    distribution: uniform
+    max: 1e-2
+    min: 1e-5
+
   data.awgn:
     distribution: uniform
-    max: 0.12
-    min: 0
+    max: 1e-2
+    min: 1e-5
 
   data.awgn_age:
     distribution: uniform
-    max: 0.3
-    min: 0
-
-  data.mgn:
-    distribution: uniform
-    max: 0.1
-    min: 0
+    max: 1e-2
+    min: 1e-5
 
   #########
   # Train #
@@ -55,13 +56,13 @@ parameters:
 
   train.lr_scheduler_type:
     values:
-#      - constant_with_decay
-#      - constant_with_twice_decay
+      # - constant_with_decay
+      # - constant_with_twice_decay
       # - transformer_style
-      # - cosine_decay_with_warmup_half
+      - cosine_decay_with_warmup_half
       - cosine_decay_with_warmup_one_and_half
       # - cosine_decay_with_warmup_two_and_half
-      # - linear_decay_with_warmup
+      - linear_decay_with_warmup
 
   #search_multiplier:
   #  values:
@@ -77,15 +78,16 @@ parameters:
 
   train.weight_decay:
     distribution: uniform
-    max: 0.05
-    min: 1e-05
+    max: 0.08
+    min: 0.03
+
 
   train.mixup:
     values:
       # - 0
       - 0.1
       - 0.2
-      - 0.3
+      # - 0.3
 
   train.criterion:
     values:
@@ -104,47 +106,49 @@ parameters:
       # - 1D-VGG-19
       # - 1D-ResNet-18
       # - 1D-ResNet-50
-      # - 1D-ResNet-101
+#      - 1D-ResNet-101
       # - 1D-ResNeXt-50
-      # - 1D-ResNeXt-101
+#      - 1D-ResNeXt-101
       # - 1D-Wide-ResNet-50
-      # - 1D-Wide-ResNet-101
-      # - 1D-CNN-Transformer
+#      - 1D-Wide-ResNet-101
+#      - 1D-CNN-Transformer
       # - 2D-VGG-11
       # - 2D-VGG-13
       # - 2D-VGG-16
       # - 2D-VGG-19
       # - 2D-ResNet-18
       # - 2D-ResNet-50
-      # - 2D-ResNet-101
+#      - 2D-ResNet-101
       # - 2D-ResNeXt-50
-      # - 2D-ResNeXt-101
+#      - 2D-ResNeXt-101
       # - 2D-Wide-ResNet-50
-      # - 2D-Wide-ResNet-101
-      - 2D-ViT-B-8
+#      - 2D-Wide-ResNet-101
+#      - 2D-ViT-B-8
       - 2D-ViT-B-16
       # - 2D-ViT-B-32
-      - 2D-ViT-L-8
+      # - 2D-ViT-L-8
       # - 2D-ViT-L-16
       # - 2D-ViT-L-32
 
   model.fc_stages:
-    distribution: int_uniform
-    max: 5
-    min: 3
+    values:
+      # - 1
+      - 2
+      - 3
+      - 4
 
   model.use_age:
     values:
       - fc
-      # - conv
+      - conv
 
   model.dropout:
     distribution: uniform
-    max: 0.5
-    min: 0.3
+    max: 0.4
+    min: 0.2
 
   model.activation:
     values:
-      # - relu
-      # - gelu
+      - relu
+      - gelu
       - mish
