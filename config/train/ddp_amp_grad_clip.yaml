@@ -1,0 +1,7 @@
+defaults:
+  - ddp_amp
+  - _self_
+
+# gradient clip
+clip_grad_norm: true
+
