@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import torch
 
@@ -622,3 +623,17 @@ class EegSpectrogram(torch.nn.Module):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(n_fft={self.n_fft}, complex_mode={self.complex_mode}, " \
                f"stft_kwargs={self.stft_kwargs})"
+
+
+class TransformTimeChecker(object):
+    def __init__(self, instance, header='', str_format=''):
+        self.instance = instance
+        self.header = header
+        self.str_format = str_format
+
+    def __call__(self, sample):
+        start = time.time()
+        sample = self.instance(sample)
+        end = time.time()
+        print(f'{self.header + type(self.instance).__name__:{self.str_format}}> {end - start :.5f}')
+        return sample

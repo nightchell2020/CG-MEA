@@ -1,6 +1,12 @@
 /local/
 
+/.ipynb_checkpoints/
+
 /notebook/.ipynb_checkpoints/
+
+/__pycache__/
+
+/*/__pycache__/
 
 /.vscode/
 
