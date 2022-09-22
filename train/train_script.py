@@ -71,6 +71,11 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     # only the main process of DDP logs, evaluates, and saves
     main_process = config['ddp'] is False or config['device'].index == 0
 
+    if main_process:
+        print(f"\n{'*'*30} {'Configurations for Train':^30} {'*'*30}\n")
+        pprint.pprint(config, width=120)
+        print(f"\n{'*'*92}\n")
+
     # load if using an existing model
     if config.get('init_from', None):
         init_path = os.path.join(config.get('cwd', ''), f'local/checkpoint_temp/{config["init_from"]}/')
@@ -125,11 +130,12 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         optimizer.load_state_dict(checkpoint['optimizer_state'])
         scheduler.load_state_dict(checkpoint['scheduler_state'])
         config = checkpoint['config']
-        if main_process:
+        if main_process and config['use_wandb']:
             wandb.config.update(config, allow_val_change=True)
         i_step = checkpoint['optimizer_state']['state'][0]['step']
-        pprint.pprint(f'Training resumes from {resume}', width=120)
+        print(f"\n{'*'*30} {f'Training resumes from {resume}':^30} {'*'*30}\n")
         pprint.pprint(config, width=120)
+        print(f"\n{'*'*92}\n")
 
     if main_process:
         # update configurations
@@ -141,7 +147,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                 wandb.watch(model, log='all', log_freq=history_interval, log_graph=True)
 
         # directory to save
-        run_name = wandb.run.name if config['use_wandb'] else datetime.now().strftime("%Y_%m%d_%H%M")
+        run_name = wandb.run.name if config['use_wandb'] else datetime.now().strftime("%Y-%m%d-%H%M")
         if config['save_model']:
             save_path = os.path.join(config.get('cwd', ''), f'local/checkpoint_temp/{run_name}/')
             os.makedirs(save_path, exist_ok=True)
