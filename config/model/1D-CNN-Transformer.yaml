@@ -9,4 +9,4 @@ use_age: conv
 dropout: 0.1
 fc_stages: 4
 activation: mish
-minibatch: 128
+minibatch_3090: 128

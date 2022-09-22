@@ -79,22 +79,17 @@ def load_caueeg_task_datasets(dataset_path: str, task: str,
 
     Args:
         dataset_path (str): The file path where the dataset files are located.
-        task (str): The target task to load among 'task1' or 'task2'.
+        task (str): The target task to load among 'dementia' or 'abnormal'.
         load_event (bool): Whether to load the event information occurred during recording EEG signals.
         file_format (str): Determines which file format will be used (default: 'edf').
         transform (callable): Preprocessing process to apply during loading signals.
         verbose (bool): Whether to print the progress during loading the datasets.
 
     Returns:
-        The PyTorch dataset instances for the train, validation, and test sets for task1 and their configurations.
+        The PyTorch dataset instances for the train, validation, and test sets for the task and their configurations.
     """
     task = task.lower()
-    if task == 'abnormal':
-        task = 'task1'
-    elif task == 'dementia':
-        task = 'task2'
-
-    if task not in ['task1', 'task2']:
+    if task not in ['abnormal', 'dementia']:
         raise ValueError(f"load_caueeg_task_datasets(task) receives the invalid task name: {task}. "
                          f"Make sure the task name is correct.")
 
@@ -152,7 +147,7 @@ def load_caueeg_task_split(dataset_path: str, task: str, split: str,
 
     Args:
         dataset_path (str): The file path where the dataset files are located.
-        task (str): The target task to load.
+        task (str): The target task to load among 'dementia' or 'abnormal'.
         split (str): The desired dataset split to get among "train", "validation", and "test".
         load_event (bool): Whether to load the event information occurred during recording EEG signals.
         file_format (str): Determines which file format is used among of EDF, PyArrow Feather, and NumPy memmap.
@@ -160,15 +155,10 @@ def load_caueeg_task_split(dataset_path: str, task: str, split: str,
         verbose (bool): Whether to print the progress during loading the dataset.
 
     Returns:
-        A PyTorch dataset instance for the specified split for task1 and their configurations.
+        A PyTorch dataset instance for the specified split for the task and their configurations.
     """
     task = task.lower()
-    if task == 'abnormal':
-        task = 'task1'
-    elif task == 'dementia':
-        task = 'task2'
-
-    if task not in ['task1', 'task2']:
+    if task not in ['dementia', 'abnormal']:
         raise ValueError(f"load_caueeg_task_split(task) receives the invalid task name: {task}. "
                          f"Make sure the task name is correct.")
 
@@ -190,7 +180,7 @@ def load_caueeg_task_split(dataset_path: str, task: str, split: str,
         dataset = CauEegDataset(dataset_path, task_dict['test_split'],
                                 load_event=load_event, file_format=file_format, transform=transform)
     else:
-        raise ValueError(f"ERROR: load_caueeg_task1_split(split) needs string among of "
+        raise ValueError(f"ERROR: load_caueeg_task_split(split) needs string among of "
                          f"'train', 'validation', and 'test'")
 
     config = {k: v for k, v in task_dict.items()

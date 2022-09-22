@@ -1,4 +1,4 @@
-project: caueeg-task2-segmented
+project: caueeg-abnormal-segmented
 entity: ipis-mjkim
 method: grid
 program: run_train.py
@@ -6,7 +6,7 @@ command:
   - ${env}
   - python
   - ${program}
-  - "data=task2_segmented"
+  - "data=caueeg-abnormal-segmented"
   - ${args_no_hyphens}
 
 parameters:
@@ -33,16 +33,19 @@ parameters:
       # - X
 
   data.mgn:
-    values:
-      - 0.05
+    distribution: uniform
+    max: 0.1
+    min: 0
 
   data.awgn:
-    values:
-      - 0.05
+    distribution: uniform
+    max: 0.12
+    min: 0
 
   data.awgn_age:
-    values:
-      - 0.05
+    distribution: uniform
+    max: 0.15
+    min: 0.05
 
   #########
   # Train #
@@ -50,11 +53,11 @@ parameters:
 
   train.lr_scheduler_type:
     values:
-      # - constant_with_decay
-      # - constant_with_twice_decay
-      # - transformer_style
-      # - cosine_decay_with_warmup_half
-      # - cosine_decay_with_warmup_one_and_half
+      - constant_with_decay
+      - constant_with_twice_decay
+      - transformer_style
+      - cosine_decay_with_warmup_half
+      - cosine_decay_with_warmup_one_and_half
       # - cosine_decay_with_warmup_two_and_half
       - linear_decay_with_warmup
 
@@ -71,19 +74,20 @@ parameters:
 #    min: 1e-05
 
   train.weight_decay:
-    values:
-      - 0.05
-
-
+    distribution: uniform
+    max: 0.05
+    min: 1e-05
 
   train.mixup:
     values:
+      # - 0
       - 0.1
-
+      - 0.2
+      - 0.3
 
   train.criterion:
     values:
-      # - cross-entropy
+      - cross-entropy
       - multi-bce
 
   #########
@@ -98,10 +102,10 @@ parameters:
       - 1D-VGG-19
       - 1D-ResNet-18
       - 1D-ResNet-50
-      - 1D-ResNet-101
+#      - 1D-ResNet-101
       - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
-      # - 1D-Wide-ResNet-50
+      - 1D-Wide-ResNet-50
 #      - 1D-Wide-ResNet-101
 #      - 1D-CNN-Transformer
       # - 2D-VGG-11
@@ -113,10 +117,10 @@ parameters:
 #      - 2D-ResNet-101
       - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
-      # - 2D-Wide-ResNet-50
+      - 2D-Wide-ResNet-50
 #      - 2D-Wide-ResNet-101
 #      - 2D-ViT-B-8
-      - 2D-ViT-B-16
+#      - 2D-ViT-B-16
       # - 2D-ViT-B-32
       # - 2D-ViT-L-8
       # - 2D-ViT-L-16
@@ -125,21 +129,22 @@ parameters:
   model.fc_stages:
     values:
       # - 1
-      # - 2
+      - 2
       - 3
-      # - 4
+      - 4
 
   model.use_age:
     values:
-      # - fc
+      - fc
       - conv
 
   model.dropout:
-    values:
-      - 0.3
+    distribution: uniform
+    max: 0.4
+    min: 0.1
 
   model.activation:
     values:
       # - relu
       - gelu
-      # - mish
+      - mish

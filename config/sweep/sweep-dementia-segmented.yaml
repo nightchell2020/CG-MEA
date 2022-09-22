@@ -1,14 +1,12 @@
-project: sweep-test
+project: caueeg-dementia-segmented
 entity: ipis-mjkim
-method: random
-name: sweep-task2-ddp
+method: grid
 program: run_train.py
 command:
   - ${env}
   - python
   - ${program}
-  - "data=task2"
-  - "train=ddp_amp_grad_clip"  # tiny_ddp
+  - "caueeg-dementia-segmented"
   - ${args_no_hyphens}
 
 parameters:
@@ -19,8 +17,7 @@ parameters:
   data.seq_length:
     values:
       # - 1000  # 5 sec
-      # - 2000  # 10 sec
-      - 3000
+      - 2000  # 10 sec
       # - 4000  # 20 sec
       # - 6000  # 30 sec
       # - 12000  # 60 sec
@@ -33,22 +30,19 @@ parameters:
   data.photic:
     values:
       - O
-      - X
+      # - X
 
   data.mgn:
-    distribution: uniform
-    max: 1e-2
-    min: 1e-5
+    values:
+      - 0.05
 
   data.awgn:
-    distribution: uniform
-    max: 1e-2
-    min: 1e-5
+    values:
+      - 0.05
 
   data.awgn_age:
-    distribution: uniform
-    max: 1e-2
-    min: 1e-5
+    values:
+      - 0.05
 
   #########
   # Train #
@@ -59,8 +53,8 @@ parameters:
       # - constant_with_decay
       # - constant_with_twice_decay
       # - transformer_style
-      - cosine_decay_with_warmup_half
-      - cosine_decay_with_warmup_one_and_half
+      # - cosine_decay_with_warmup_half
+      # - cosine_decay_with_warmup_one_and_half
       # - cosine_decay_with_warmup_two_and_half
       - linear_decay_with_warmup
 
@@ -77,21 +71,19 @@ parameters:
 #    min: 1e-05
 
   train.weight_decay:
-    distribution: uniform
-    max: 0.08
-    min: 0.03
+    values:
+      - 0.05
+
 
 
   train.mixup:
     values:
-      # - 0
       - 0.1
-      - 0.2
-      # - 0.3
+
 
   train.criterion:
     values:
-      - cross-entropy
+      # - cross-entropy
       - multi-bce
 
   #########
@@ -103,11 +95,11 @@ parameters:
       # - 1D-VGG-11
       # - 1D-VGG-13
       # - 1D-VGG-16
-      # - 1D-VGG-19
-      # - 1D-ResNet-18
-      # - 1D-ResNet-50
-#      - 1D-ResNet-101
-      # - 1D-ResNeXt-50
+      - 1D-VGG-19
+      - 1D-ResNet-18
+      - 1D-ResNet-50
+      - 1D-ResNet-101
+      - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
       # - 1D-Wide-ResNet-50
 #      - 1D-Wide-ResNet-101
@@ -115,11 +107,11 @@ parameters:
       # - 2D-VGG-11
       # - 2D-VGG-13
       # - 2D-VGG-16
-      # - 2D-VGG-19
-      # - 2D-ResNet-18
-      # - 2D-ResNet-50
+      - 2D-VGG-19
+      - 2D-ResNet-18
+      - 2D-ResNet-50
 #      - 2D-ResNet-101
-      # - 2D-ResNeXt-50
+      - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
       # - 2D-Wide-ResNet-50
 #      - 2D-Wide-ResNet-101
@@ -133,22 +125,21 @@ parameters:
   model.fc_stages:
     values:
       # - 1
-      - 2
+      # - 2
       - 3
-      - 4
+      # - 4
 
   model.use_age:
     values:
-      - fc
+      # - fc
       - conv
 
   model.dropout:
-    distribution: uniform
-    max: 0.4
-    min: 0.2
+    values:
+      - 0.3
 
   model.activation:
     values:
-      - relu
+      # - relu
       - gelu
-      - mish
+      # - mish

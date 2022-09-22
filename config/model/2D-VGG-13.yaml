@@ -4,4 +4,4 @@ defaults:
   - _self_
 
 model: 2D-VGG-13
-minibatch: 512
+minibatch_3090: 512

@@ -1,5 +1,5 @@
 defaults:
-  - tiny_train
+  - tiny-train
   - _self_
 
 # precision

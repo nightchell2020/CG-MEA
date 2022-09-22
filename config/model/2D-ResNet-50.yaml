@@ -6,4 +6,4 @@ defaults:
 model: 2D-ResNet-50
 conv_layers: [3, 4, 6, 3]
 block: bottleneck
-minibatch: 96
+minibatch_3090: 48

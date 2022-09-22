@@ -1,11 +1,7 @@
 defaults:
-  - base_data
+  - caueeg-dementia
   - _self_
 
-task: task2
 dataset_path: local/dataset/02_Curated_Data_220715_seg_30s/
-file_format: memmap
-crop_multiple: 4
-test_crop_multiple: 8
 latency: 0
 check_accuracy_repeat: 1

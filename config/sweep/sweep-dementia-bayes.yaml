@@ -1,12 +1,16 @@
-project: caueeg-task1-segmented
+project: caueeg-dementia
 entity: ipis-mjkim
-method: grid
+method: bayes
+metric:
+  name: Test Accuracy
+  goal: maximize
 program: run_train.py
 command:
   - ${env}
   - python
   - ${program}
-  - "data=task1_segmented"
+  - "data=caueeg-dementia"
+  - "train=device"
   - ${args_no_hyphens}
 
 parameters:
@@ -18,7 +22,7 @@ parameters:
     values:
       # - 1000  # 5 sec
       - 2000  # 10 sec
-      # - 4000  # 20 sec
+      - 4000  # 20 sec
       # - 6000  # 30 sec
       # - 12000  # 60 sec
 
@@ -30,22 +34,22 @@ parameters:
   data.photic:
     values:
       - O
-      # - X
+      - X
 
   data.mgn:
     distribution: uniform
-    max: 0.1
+    max: 0.15
     min: 0
 
   data.awgn:
     distribution: uniform
-    max: 0.12
+    max: 0.15
     min: 0
 
   data.awgn_age:
     distribution: uniform
     max: 0.15
-    min: 0.05
+    min: 0
 
   #########
   # Train #
@@ -53,13 +57,13 @@ parameters:
 
   train.lr_scheduler_type:
     values:
-      - constant_with_decay
-      - constant_with_twice_decay
-      - transformer_style
-      - cosine_decay_with_warmup_half
-      - cosine_decay_with_warmup_one_and_half
+       - constant_with_decay
+       - constant_with_twice_decay
+       - transformer_style
+       - cosine_decay_with_warmup_half
+       - cosine_decay_with_warmup_one_and_half
       # - cosine_decay_with_warmup_two_and_half
-      - linear_decay_with_warmup
+       - linear_decay_with_warmup
 
   #search_multiplier:
   #  values:
@@ -75,15 +79,15 @@ parameters:
 
   train.weight_decay:
     distribution: uniform
-    max: 0.05
+    max: 0.1
     min: 1e-05
 
   train.mixup:
     values:
-      # - 0
+      - 0
       - 0.1
       - 0.2
-      - 0.3
+      # - 0.3
 
   train.criterion:
     values:
@@ -102,10 +106,10 @@ parameters:
       - 1D-VGG-19
       - 1D-ResNet-18
       - 1D-ResNet-50
-#      - 1D-ResNet-101
+      - 1D-ResNet-101
       - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
-      - 1D-Wide-ResNet-50
+      # - 1D-Wide-ResNet-50
 #      - 1D-Wide-ResNet-101
 #      - 1D-CNN-Transformer
       # - 2D-VGG-11
@@ -117,10 +121,10 @@ parameters:
 #      - 2D-ResNet-101
       - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
-      - 2D-Wide-ResNet-50
+      # - 2D-Wide-ResNet-50
 #      - 2D-Wide-ResNet-101
 #      - 2D-ViT-B-8
-#      - 2D-ViT-B-16
+      - 2D-ViT-B-16
       # - 2D-ViT-B-32
       # - 2D-ViT-L-8
       # - 2D-ViT-L-16
@@ -133,18 +137,19 @@ parameters:
       - 3
       - 4
 
+
   model.use_age:
     values:
-      - fc
-      - conv
+      - 'fc'
+      - 'conv'
+      # - 'no'
 
   model.dropout:
-    distribution: uniform
-    max: 0.4
-    min: 0.1
+    values:
+      - 0.3
 
   model.activation:
     values:
-      # - relu
+      - relu
       - gelu
       - mish

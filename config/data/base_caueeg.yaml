@@ -1,7 +1,7 @@
 # dataset
-dataset_path: ???
-file_format: edf
-crop_multiple: 1
+dataset_path: local/dataset/02_Curated_Data_220419/
+file_format: memmap
+crop_multiple: 4
 test_crop_multiple: 8
 crop_timing_analysis: false
 load_event: false
@@ -15,6 +15,6 @@ photic: X
 input_norm: dataset
 
 # augmentation
-awgn: 0.05
-awgn_age: 0.05
-mgn: 0.0001
+awgn: 0.001
+awgn_age: 0.001
+mgn: 0.001

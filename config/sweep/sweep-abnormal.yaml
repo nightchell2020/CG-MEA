@@ -1,4 +1,4 @@
-project: caueeg-task2
+project: caueeg-abnormal
 entity: ipis-mjkim
 method: random
 program: run_train.py
@@ -6,7 +6,7 @@ command:
   - ${env}
   - python
   - ${program}
-  - "data=task2"
+  - "data=caueeg-abnormal"
   - ${args_no_hyphens}
 
 parameters:
@@ -68,23 +68,17 @@ parameters:
   #    - 1.5
   #    - 2.0
 
-#  train.weight_decay:
-#    distribution: log_uniform_values
-#    max: 0.05
-#    min: 1e-05
-
   train.weight_decay:
-    distribution: uniform
-    max: 0.08
-    min: 0.03
-
+    distribution: uniform  # log_uniform_values
+    max: 0.05
+    min: 1e-05
 
   train.mixup:
     values:
       # - 0
       - 0.1
       - 0.2
-      # - 0.3
+      - 0.3
 
   train.criterion:
     values:
@@ -141,11 +135,11 @@ parameters:
 
   model.dropout:
     distribution: uniform
-    max: 0.3
+    max: 0.2
     min: 0.1
 
   model.activation:
     values:
-      - relu
+      # - relu
       - gelu
       - mish

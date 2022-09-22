@@ -1,5 +1,5 @@
 defaults:
-  - data: base_data
+  - data: base_caueeg
   - train: base_train
   - model: base_model
   - optional sweep: optional

@@ -1,0 +1,7 @@
+defaults:
+  - tiny-train
+  - _self_
+
+# GPU
+ddp: true
+ddp_size: 4

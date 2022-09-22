@@ -23,14 +23,18 @@ def check_device_env(config):
     # assign GPU
     config['device'] = torch.device(config.get('device', 'cuda') if torch.cuda.is_available() else 'cpu')
 
-    # set the minibatch size according to the GPU memory
     device_name = torch.cuda.get_device_name(0)
-    if '3090' in device_name:
-        pass
-    elif '2080' in device_name:
-        config['minibatch'] = config['minibatch'] // 2
-    elif '1070' in device_name:
-        config['minibatch'] = config['minibatch'] // 4
+    # minibatch size
+    if 'minibatch' not in config:
+        # set the minibatch size according to the GPU memory
+        if '3090' in device_name:
+            config['minibatch'] = config['minibatch_3090']
+        elif '2080' in device_name:
+            config['minibatch'] = config['minibatch_3090'] // 2
+        elif '1080' in device_name:
+            config['minibatch'] = config['minibatch_3090'] // 4
+        elif '1070' in device_name:
+            config['minibatch'] = config['minibatch_3090'] // 4
 
     # distributed training
     if config.get('ddp', False):

@@ -1,13 +1,13 @@
-project: sweep-test
+project: sweep-abnormal-ddp
 entity: ipis-mjkim
 method: random
-name: sweep-task2-ddp
+name: sweep-abnormal-ddp
 program: run_train.py
 command:
   - ${env}
   - python
   - ${program}
-  - "data=task2"
+  - "data=caueeg-abnormal"
   - "train=ddp"  # tiny_ddp
   - ${args_no_hyphens}
 
@@ -27,7 +27,7 @@ parameters:
   data.EKG:
     values:
       - O
-      - X
+      # - X
 
   data.photic:
     values:
@@ -82,7 +82,7 @@ parameters:
 
   train.mixup:
     values:
-      - 0
+      # - 0
       - 0.1
       - 0.2
       - 0.3
@@ -104,10 +104,10 @@ parameters:
       # - 1D-VGG-19
       # - 1D-ResNet-18
       # - 1D-ResNet-50
-      - 1D-ResNet-101
+      # - 1D-ResNet-101
       # - 1D-ResNeXt-50
-      - 1D-ResNeXt-101
-      - 1D-Wide-ResNet-50
+      # - 1D-ResNeXt-101
+      # - 1D-Wide-ResNet-50
       # - 1D-Wide-ResNet-101
       # - 1D-CNN-Transformer
       # - 2D-VGG-11
@@ -116,13 +116,13 @@ parameters:
       # - 2D-VGG-19
       # - 2D-ResNet-18
       # - 2D-ResNet-50
-      - 2D-ResNet-101
+      # - 2D-ResNet-101
       # - 2D-ResNeXt-50
-      - 2D-ResNeXt-101
-      - 2D-Wide-ResNet-50
-      - 2D-Wide-ResNet-101
+      # - 2D-ResNeXt-101
+      # - 2D-Wide-ResNet-50
+      # - 2D-Wide-ResNet-101
       # - 2D-ViT-B-8
-      # - 2D-ViT-B-16
+      - 2D-ViT-B-16
       # - 2D-ViT-B-32
       # - 2D-ViT-L-8
       # - 2D-ViT-L-16
@@ -141,10 +141,10 @@ parameters:
   model.dropout:
     distribution: uniform
     max: 0.5
-    min: 0
+    min: 0.2
 
   model.activation:
     values:
-      - relu
+      # - relu
       - gelu
       - mish

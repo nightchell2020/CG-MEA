@@ -1,5 +1,5 @@
 defaults:
-  - ddp_amp
+  - ddp-amp
   - _self_
 
 # gradient clip
