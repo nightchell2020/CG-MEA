@@ -78,7 +78,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
 
     # load if using an existing model
     if config.get('init_from', None):
-        init_path = os.path.join(config.get('cwd', ''), f'local/checkpoint_temp/{config["init_from"]}/')
+        init_path = os.path.join(config.get('cwd', ''), f'local/checkpoint/{config["init_from"]}/')
         checkpoint = torch.load(os.path.join(init_path, 'checkpoint.pt'), map_location=config['device'])
         model.load_state_dict(checkpoint['model_state'])
         pprint.pprint(f'Load an existing model from {config["init_from"]}\n', width=120)
@@ -121,7 +121,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     # load if resuming
     if config.get('resume', None):
         resume = config['resume']
-        save_path = os.path.join(config.get('cwd', ''), f'local/checkpoint_temp/{config["resume"]}/')
+        save_path = os.path.join(config.get('cwd', ''), f'local/checkpoint/{config["resume"]}/')
         checkpoint = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
         best_model_state = checkpoint['model_state']
         model.load_state_dict(best_model_state)
@@ -149,7 +149,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         # directory to save
         run_name = wandb.run.name if config['use_wandb'] else datetime.now().strftime("%Y-%m%d-%H%M")
         if config['save_model']:
-            save_path = os.path.join(config.get('cwd', ''), f'local/checkpoint_temp/{run_name}/')
+            save_path = os.path.join(config.get('cwd', ''), f'local/checkpoint/{run_name}/')
             os.makedirs(save_path, exist_ok=True)
 
     # train and validation routine
@@ -179,8 +179,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
             if config['save_model']:
                 checkpoint = {'model_state': model.state_dict(), 'config': config,
                               'optimizer_state': optimizer.state_dict(), 'scheduler_state': scheduler.state_dict()}
-                torch.save(checkpoint, os.path.join(save_path, 'checkpoint_temp.pt'))
-                os.replace(os.path.join(save_path, 'checkpoint_temp.pt'), os.path.join(save_path, 'checkpoint.pt'))
+                torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
+                os.replace(os.path.join(save_path, 'checkpoint.pt'), os.path.join(save_path, 'checkpoint.pt'))
 
             # save the best model so far
             if best_val_acc < val_acc:
@@ -218,8 +218,8 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         if config['save_model']:
             checkpoint = {'model_state': model_state, 'config': config,
                           'optimizer_state': optimizer.state_dict(), 'scheduler_state': scheduler.state_dict()}
-            torch.save(checkpoint, os.path.join(save_path, 'checkpoint_temp.pt'))
-            os.replace(os.path.join(save_path, 'checkpoint_temp.pt'), os.path.join(save_path, 'checkpoint.pt'))
+            torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
+            os.replace(os.path.join(save_path, 'checkpoint.pt'), os.path.join(save_path, 'checkpoint.pt'))
 
         # leave the message
         if config['use_wandb']:

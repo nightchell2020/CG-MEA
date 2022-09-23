@@ -63,7 +63,7 @@ class CauEegDataset(Dataset):
             return self._read_memmap(anno)
 
     def _read_edf(self, anno):
-        edf_file = os.path.join(self.root_dir, f"signal/{anno['serial']}.edf")
+        edf_file = os.path.join(self.root_dir, f"signal/edf/{anno['serial']}.edf")
         signal, signal_headers, _ = pyedflib.highlevel.read_edf(edf_file)
         return signal
 
