@@ -32,6 +32,10 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
                 # forward pass
                 output = model(x, age)
 
+                if config['use_age'] == 'estimate':
+                    output_age = output[:, -1]
+                    output = output[:, :-1]
+
                 # loss function
                 if config['criterion'] == 'cross-entropy':
                     s = F.log_softmax(output, dim=1)
@@ -45,6 +49,10 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
                     loss = F.multi_margin_loss(output, y)
                 else:
                     raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce', 'svm']")
+
+                if config['use_age'] == 'estimate':
+                    age_loss_scale = config.get('age_loss_scale', 1)
+                    loss += age_loss_scale * F.mse_loss(age, output_age)
 
             # backward and update
             if config.get('mixed_precision', False):
@@ -114,6 +122,10 @@ def train_mixup_multistep(model, loader, preprocess, optimizer, scheduler, amp_s
                 # forward pass
                 output = model(x, age)
 
+                if config['use_age'] == 'estimate':
+                    output_age = output[:, -1]
+                    output = output[:, :-1]
+
                 # loss function
                 if config['criterion'] == 'cross-entropy':
                     s = F.log_softmax(output, dim=1)
@@ -133,6 +145,12 @@ def train_mixup_multistep(model, loader, preprocess, optimizer, scheduler, amp_s
                     loss = lam * loss1 + (1 - lam) * loss2
                 else:
                     raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce', 'svm']")
+
+                if config['use_age'] == 'estimate':
+                    age_loss_scale = config.get('age_loss_scale', 1)
+                    loss_age1 = F.mse_loss(age1, output_age)
+                    loss_age2 = F.mse_loss(age2, output_age)
+                    loss += age_loss_scale * (lam * loss_age1 + (1 - lam) * loss_age2)
 
             # backward and update
             if config.get('mixed_precision', False):

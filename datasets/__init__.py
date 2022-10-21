@@ -1,3 +1,3 @@
-# from cau_eeg_dataset import *
+# from caueeg_dataset import *
 
-# __all__ = ['cau_eeg_dataset', 'pipeline', 'cau_eeg_script', 'utils']
+# __all__ = ['caueeg_data_curation', 'caueeg_dataset', 'cau_eeg_script', 'pipeline']

@@ -168,9 +168,9 @@ class ResNet1D(nn.Module):
                              f"receives one of ['basic', 'bottleneck'].")
 
 
-        if use_age not in ['fc', 'conv', 'no']:
+        if use_age not in ['fc', 'conv', 'no', 'estimate']:
             raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
-                             f"receives one of ['fc', 'conv', 'no'].")
+                             f"receives one of ['fc', 'conv', 'no', 'estimate'].")
 
         if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
             raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
@@ -183,6 +183,8 @@ class ResNet1D(nn.Module):
         self.use_age = use_age
         if self.use_age == 'conv':
             in_channels += 1
+        elif self.use_age == 'estimate':
+            out_dims += 1
         self.fc_stages = fc_stages
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)

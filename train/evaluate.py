@@ -34,6 +34,10 @@ def estimate_score(model, sample_batched, preprocess, config):
     age = sample_batched['age']
     output = model(x, age)
 
+    if config['use_age'] == 'estimate':
+        output_age = output[:, -1]
+        output = output[:, :-1]
+
     if config['criterion'] == 'cross-entropy':
         score = F.softmax(output, dim=1)
     elif config['criterion'] == 'multi-bce':
