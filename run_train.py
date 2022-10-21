@@ -107,6 +107,29 @@ def prepare_and_run_train(rank, world_size, config):
         else:
             model.module.load_state_dict(ckpt['model_state'])
 
+    # load teacher network if needed
+    if 'teacher' in config.keys():
+        save_path = f'local/checkpoint/{config["pretrain"]}/'
+        if 'cwd' in config:
+            save_path = os.path.join(config['cwd'], save_path)
+
+        teacher = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
+        model_teacher = hydra.utils.instantiate(ckpt[config])
+
+        if ckpt['config']['ddp'] == config['ddp']:
+            model_teacher.load_state_dict(ckpt['model_state'])
+        elif ckpt['config']['ddp']:
+            model_state_ddp = deepcopy(ckpt['model_state'])
+            model_state = OrderedDict()
+            for k, v in model_state_ddp.items():
+                name = k[7:]  # remove 'module.' of DataParallel/DistributedDataParallel
+                model_state[name] = v
+            model_teacher.load_state_dict(model_state)
+        else:
+            model_teacher.module.load_state_dict(ckpt['model_state'])
+        teacher['model'] = model_teacher
+        config['teacher'] = teacher
+
     # train
     train_script(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
                  config['preprocess_train'], config['preprocess_test'])

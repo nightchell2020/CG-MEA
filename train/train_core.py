@@ -80,6 +80,78 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
     return avg_loss, train_acc
 
 
+def train_distil_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps):
+    model.train()
+
+    i = 0
+    cumu_loss = 0
+    correct, total = (0, 0)
+
+    while True:
+        for sample_batched in loader:
+            optimizer.zero_grad()
+
+            # preprocessing (this includes to-device operation)
+            preprocess(sample_batched)
+
+            # pull the data
+            x = sample_batched['signal']
+            age = sample_batched['age']
+            y = sample_batched['class_label']
+
+            # mixed precision training if needed
+            with autocast(enabled=config.get('mixed_precision', False)):
+                # forward pass
+                output = model(x, age)
+
+                # loss function
+                if config['criterion'] == 'cross-entropy':
+                    s = F.log_softmax(output, dim=1)
+                    loss = F.nll_loss(s, y)
+                elif config['criterion'] == 'multi-bce':
+                    y_oh = F.one_hot(y, num_classes=output.size(dim=1))
+                    s = torch.sigmoid(output)
+                    loss = F.binary_cross_entropy_with_logits(output, y_oh.float())
+                elif config['criterion'] == 'svm':
+                    s = output
+                    loss = F.multi_margin_loss(output, y)
+                else:
+                    raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce', 'svm']")
+
+            # backward and update
+            if config.get('mixed_precision', False):
+                amp_scaler.scale(loss).backward()
+                if 'clip_grad_norm' in config:
+                    amp_scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config['clip_grad_norm'])
+                amp_scaler.step(optimizer)
+                amp_scaler.update()
+                scheduler.step()
+            else:
+                loss.backward()
+                if 'clip_grad_norm' in config:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config['clip_grad_norm'])
+                optimizer.step()
+                scheduler.step()
+
+            # train accuracy
+            pred = s.argmax(dim=-1)
+            correct += pred.squeeze().eq(y).sum().item()
+            total += pred.shape[0]
+            cumu_loss += loss.item()
+
+            i += 1
+            if steps <= i:
+                break
+        if steps <= i:
+            break
+
+    train_acc = 100.0 * correct / total
+    avg_loss = cumu_loss / steps
+
+    return avg_loss, train_acc
+
+
 def train_mixup_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps):
     model.train()
 
