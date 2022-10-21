@@ -7,7 +7,7 @@ import wandb
 import pprint
 from datetime import datetime
 
-from .train_core import train_multistep, train_mixup_multistep
+from .train_core import train_multistep, train_mixup_multistep, train_distill_multistep
 from optim import get_lr_scheduler
 from .evaluate import check_accuracy
 from .evaluate import check_accuracy_extended
@@ -156,7 +156,12 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     while i_step < config["iterations"]:
         i_step += history_interval
         # train during 'history_interval' steps
-        tr_ms = train_multistep if config.get('mixup', 0) < 1e-12 else train_mixup_multistep
+        if config.get('teacher', None):
+            tr_ms = train_distill_multistep
+        elif config.get('mixup', 0) > 1e-12:
+            tr_ms = train_mixup_multistep
+        else:
+            tr_ms = train_multistep
         loss, train_acc = tr_ms(model=model, loader=train_loader, preprocess=preprocess_train,
                                 optimizer=optimizer, scheduler=scheduler, amp_scaler=amp_scaler, config=config, steps=history_interval)
         # validation accuracy

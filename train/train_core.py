@@ -1,3 +1,4 @@
+from copy import deepcopy
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -80,7 +81,7 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
     return avg_loss, train_acc
 
 
-def train_distil_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps):
+def train_distill_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps):
     model.train()
 
     i = 0
@@ -90,6 +91,18 @@ def train_distil_multistep(model, loader, preprocess, optimizer, scheduler, amp_
     while True:
         for sample_batched in loader:
             optimizer.zero_grad()
+
+            # teacher network
+            sb = deepcopy(sample_batched)
+            config['teacher']['preprocess'](sb)
+            teacher_output = config['teacher']['model'](sb['signal'], sb['age'])
+            if config['teacher']['criterion'] == 'cross-entropy':
+                teacher_s = F.softmax(teacher_output, dim=1)
+            elif config['teacher']['criterion'] == 'multi-bce':
+                teacher_s = torch.sigmoid(teacher_output)
+            elif config['teacher']['criterion'] == 'svm':
+                teacher_s = teacher_output
+            distill_ratio = config.get('distillation_ratio', 0.5)
 
             # preprocessing (this includes to-device operation)
             preprocess(sample_batched)
@@ -108,15 +121,20 @@ def train_distil_multistep(model, loader, preprocess, optimizer, scheduler, amp_
                 if config['criterion'] == 'cross-entropy':
                     s = F.log_softmax(output, dim=1)
                     loss = F.nll_loss(s, y)
+                    distill_loss = F.nll_loss(s, teacher_s.argmax(dim=1))  # TODO: only hard distillation is implemented by now.
+
                 elif config['criterion'] == 'multi-bce':
                     y_oh = F.one_hot(y, num_classes=output.size(dim=1))
-                    s = torch.sigmoid(output)
                     loss = F.binary_cross_entropy_with_logits(output, y_oh.float())
+                    distill_loss = F.binary_cross_entropy_with_logits(s, teacher_s.argmax(dim=1))
+
                 elif config['criterion'] == 'svm':
-                    s = output
                     loss = F.multi_margin_loss(output, y)
+                    distill_loss = F.multi_margin_loss(output, teacher_s.argmax(dim=1))
                 else:
                     raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce', 'svm']")
+
+                loss = (1 - distill_ratio) * loss + distill_ratio * distill_loss
 
             # backward and update
             if config.get('mixed_precision', False):
