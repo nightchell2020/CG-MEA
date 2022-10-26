@@ -110,10 +110,10 @@ parameters:
       # - 1D-VGG-13
       # - 1D-VGG-16
       # - 1D-VGG-19
-      - 1D-ResNet-18
+      # - 1D-ResNet-18
       # - 1D-ResNet-50
 #      - 1D-ResNet-101
-      # - 1D-ResNeXt-50
+      - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
       # - 1D-Wide-ResNet-50
 #      - 1D-Wide-ResNet-101
@@ -125,7 +125,7 @@ parameters:
       # - 2D-ResNet-18
       # - 2D-ResNet-50
 #      - 2D-ResNet-101
-      # - 2D-ResNeXt-50
+      - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
       # - 2D-Wide-ResNet-50
 #      - 2D-Wide-ResNet-101

@@ -126,7 +126,7 @@ def train_distill_multistep(model, loader, preprocess, optimizer, scheduler, amp
                 elif config['criterion'] == 'multi-bce':
                     y_oh = F.one_hot(y, num_classes=output.size(dim=1))
                     loss = F.binary_cross_entropy_with_logits(output, y_oh.float())
-                    distill_loss = F.binary_cross_entropy_with_logits(s, teacher_s.argmax(dim=1))
+                    distill_loss = F.binary_cross_entropy_with_logits(output, teacher_s.argmax(dim=1))
 
                 elif config['criterion'] == 'svm':
                     loss = F.multi_margin_loss(output, y)
