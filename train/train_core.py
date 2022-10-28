@@ -124,6 +124,7 @@ def train_distill_multistep(model, loader, preprocess, optimizer, scheduler, amp
                     distill_loss = F.nll_loss(s, teacher_s.argmax(dim=1))  # TODO: only hard distillation is implemented by now.
 
                 elif config['criterion'] == 'multi-bce':
+                    s = torch.sigmoid(output)
                     y_oh = F.one_hot(y, num_classes=output.size(dim=1))
                     loss = F.binary_cross_entropy_with_logits(output, y_oh.float())
 
@@ -131,6 +132,7 @@ def train_distill_multistep(model, loader, preprocess, optimizer, scheduler, amp
                     distill_loss = F.binary_cross_entropy_with_logits(output, teacher_y_oh.float())
 
                 elif config['criterion'] == 'svm':
+                    s = output
                     loss = F.multi_margin_loss(output, y)
                     distill_loss = F.multi_margin_loss(output, teacher_s.argmax(dim=1))
                 else:
