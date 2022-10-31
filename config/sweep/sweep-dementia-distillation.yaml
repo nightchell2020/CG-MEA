@@ -85,8 +85,7 @@ parameters:
 
   train.distillation_ratio:
     values:
-      - 0.5
-      - 0.9
+      - 1.0
 
   train.mixup:
     values:

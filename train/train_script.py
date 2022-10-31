@@ -155,13 +155,15 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
     # train and validation routine
     while i_step < config["iterations"]:
         i_step += history_interval
-        # train during 'history_interval' steps
-        if config.get('teacher', None):
+
+        if config.get('distil_teacher', None):
             tr_ms = train_distill_multistep
         elif config.get('mixup', 0) > 1e-12:
             tr_ms = train_mixup_multistep
         else:
             tr_ms = train_multistep
+
+        # train during 'history_interval' steps
         loss, train_acc = tr_ms(model=model, loader=train_loader, preprocess=preprocess_train,
                                 optimizer=optimizer, scheduler=scheduler, amp_scaler=amp_scaler, config=config, steps=history_interval)
         # validation accuracy

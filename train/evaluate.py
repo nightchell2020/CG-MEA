@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 @torch.no_grad()
-def compute_embedding(model, sample_batched, preprocess, config):
+def compute_embedding(model, sample_batched, preprocess):
     # evaluation mode
     model.eval()
 
