@@ -8,6 +8,8 @@ command:
   - ${program}
   - "data=caueeg-dementia"
   - "train=distillation"
+  - "++train.mixed_precision=True"
+  - "++train.clip_grad_norm=True"
   - ${args_no_hyphens}
 
 parameters:
@@ -83,20 +85,26 @@ parameters:
     values:
       - lo88puq7
 
-  train.distillation_ratio:
+  train.distil_type:
     values:
-      - 1.0
+      - hard
+      - soft
+
+  train.distil_alpha:
+    values:
+      - 0.5
+
+  train.distil_tau:
+    values:
+      - 3.0
 
   train.mixup:
     values:
       - 0
-      # - 0.1
-      # - 0.2
-      # - 0.3
+      - 0.5
 
   train.criterion:
     values:
-      - cross-entropy
       - multi-bce
 
   #########
@@ -112,7 +120,7 @@ parameters:
       # - 1D-ResNet-18
       # - 1D-ResNet-50
 #      - 1D-ResNet-101
-      - 1D-ResNeXt-50
+      # - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
       # - 1D-Wide-ResNet-50
 #      - 1D-Wide-ResNet-101
@@ -124,12 +132,12 @@ parameters:
       # - 2D-ResNet-18
       # - 2D-ResNet-50
 #      - 2D-ResNet-101
-      - 2D-ResNeXt-50
+      # - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
       # - 2D-Wide-ResNet-50
 #      - 2D-Wide-ResNet-101
 #      - 2D-ViT-B-8
-#      - 2D-ViT-B-16
+      - 2D-ViT-B-16
       # - 2D-ViT-B-32
       # - 2D-ViT-L-8
       # - 2D-ViT-L-16
