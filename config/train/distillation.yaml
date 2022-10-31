@@ -7,4 +7,4 @@ distil_type: soft
 distil_tau: 1.0
 # distil_teacher: ???  # decided during runtime
 
-distil_teacher: lo88puq7  # va9swnif
+distil_teacher: va9swnif  # va9swnif, lo88puq7
