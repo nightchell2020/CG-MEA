@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 @torch.no_grad()
-def compute_embedding(model, sample_batched, preprocess):
+def compute_feature_embedding(model, sample_batched, preprocess, target_from_last=1):
     # evaluation mode
     model.eval()
 
@@ -16,24 +16,17 @@ def compute_embedding(model, sample_batched, preprocess):
     # apply model on whole batch directly on device
     x = sample_batched['signal']
     age = sample_batched['age']
-    output = model.compute_feature_embedding(x, age, target_from_last=1)
+    output = model.compute_feature_embedding(x, age, target_from_last=target_from_last)
 
     return output
 
 
 @torch.no_grad()
 def estimate_score(model, sample_batched, preprocess, config):
-    # evaluation mode
-    model.eval()
+    # compute output embedding
+    output = compute_feature_embedding(model, sample_batched, preprocess, target_from_last=0)
 
-    # preprocessing (this includes to-device operation)
-    preprocess(sample_batched)
-
-    # apply model on whole batch directly on device
-    x = sample_batched['signal']
-    age = sample_batched['age']
-    output = model(x, age)
-
+    # map depending on the loss function
     if config['criterion'] == 'cross-entropy':
         score = F.softmax(output, dim=1)
     elif config['criterion'] == 'multi-bce':

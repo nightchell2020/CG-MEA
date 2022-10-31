@@ -89,7 +89,7 @@ def prepare_and_run_train(rank, world_size, config):
 
     # load pretrained model if needed
     if 'pretrain' in config.keys():
-        save_path = os.path.join(config.get('cfg', ''), f'local/checkpoint/{config["pretrain"]}/')
+        save_path = os.path.join(config.get('cwd', ''), f'local/checkpoint/{config["pretrain"]}/')
         ckpt = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
 
         if ckpt['config']['ddp'] == config['ddp']:
@@ -107,7 +107,7 @@ def prepare_and_run_train(rank, world_size, config):
     # load teacher network if needed
     if 'distil_teacher' in config.keys():
         # load teacher model
-        save_path = os.path.join(config.get('cfg', ''), f'local/checkpoint/{config["distil_teacher"]}/')
+        save_path = os.path.join(config.get('cwd', ''), f'local/checkpoint/{config["distil_teacher"]}/')
         ckpt = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
         model_teacher = hydra.utils.instantiate(ckpt['config'])
 
@@ -136,16 +136,16 @@ def prepare_and_run_train(rank, world_size, config):
         config['distil_teacher_criterion'] = ckpt['config']['criterion']
 
         # sanity check
-        if config['distil_type'] == 'soft' and config['distil_teacher_criterion'] != config['criterion']:
+        if config['distil_type'] not in ['hard', 'soft']:
+            raise ValueError(f"ERROR: Choose the correct option for knowledge distillation: 'soft' or 'hard.'")
+        elif config['distil_type'] == 'soft' and config['distil_teacher_criterion'] != config['criterion']:
             raise ValueError(f"ERROR: In the case of 'soft' knowledge distillation, "
                              f"the objective functions must be equal between teacher and student models.\n"
                              f"Current state: teacher - {config['distil_teacher_criterion']}"
                              f" / student - {config['criterion']}")
-        elif config['distil_type'] == 'soft' and config['distil_teacher_criterion'] != 'svm':
+        elif config['distil_type'] == 'soft' and config['distil_teacher_criterion'] == 'svm':
             raise ValueError(f"ERROR: In our implementation, "
                              f"the SVM classifier does not support for 'soft' knowledge distillation.")
-        elif config['distil_type'] not in ['hard', 'soft']:
-            raise ValueError(f"ERROR: Choose the correct option for knowledge distillation: 'soft' or 'hard.'")
         elif config['EKG'] != ckpt['config']['EKG'] or config['photic'] != ckpt['config']['photic']:
             raise ValueError(f"ERROR: The teacher and student networks must have the same EEG channel configuration:\n"
                              f"Current state: teacher - EKG {ckpt['config']['EKG']}, Photic {ckpt['config']['photic']}"

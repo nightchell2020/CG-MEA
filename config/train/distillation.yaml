@@ -1,6 +1,10 @@
 defaults:
-  - base_train
+  - tiny-train # base_train
   - _self_
 
-distillation_ratio: 0.5
-teacher: ???  # decided during runtime
+distil_alpha: 0.5
+distil_type: soft
+distil_tau: 1.0
+# distil_teacher: ???  # decided during runtime
+
+distil_teacher: lo88puq7  # va9swnif

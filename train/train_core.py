@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch.cuda.amp import autocast
 
-from .evaluate import compute_embedding
+from .evaluate import compute_feature_embedding
 
 # __all__ = []
 
@@ -94,9 +94,10 @@ def train_distill_multistep(model, loader, preprocess, optimizer, scheduler, amp
 
             # distillation
             if config.get('distil_teacher', None):
-                teacher_output = compute_embedding(config['teacher']['model'],
-                                                   deepcopy(sample_batched),
-                                                   config['teacher']['preprocess'])
+                teacher_output = compute_feature_embedding(config['distil_teacher_model'], 
+                                                           deepcopy(sample_batched),
+                                                           config['distil_teacher_preprocess'],
+                                                           target_from_last=0)
 
             # preprocessing (this includes to-device operation)
             preprocess(sample_batched)
@@ -129,29 +130,29 @@ def train_distill_multistep(model, loader, preprocess, optimizer, scheduler, amp
 
                     if config['criterion'] == 'cross-entropy':
                         if config.get('distil_type') == 'hard':
-                            distill_loss = F.cross_entropy(output_kd, teacher_output.argmax(dim=1))
+                            distil_loss = F.cross_entropy(output_kd, teacher_output.argmax(dim=1))
                         elif config.get('distil_type') == 'soft':
-                            distill_loss = F.kl_div(F.log_softmax(output_kd / distil_tau, dim=1),
-                                                    F.log_softmax(teacher_output / distil_tau, dim=1),
-                                                    reduction='sum', log_target=True)
-                            distill_loss = distill_loss * (distil_tau * distil_tau) / output_kd.numel()
+                            distil_loss = F.kl_div(F.log_softmax(output_kd / distil_tau, dim=1),
+                                                   F.log_softmax(teacher_output / distil_tau, dim=1),
+                                                   reduction='sum', log_target=True)
+                            distil_loss = distil_loss * (distil_tau * distil_tau) / output_kd.numel()
 
                     elif config['criterion'] == 'multi-bce':
                         if config.get('distil_type') == 'hard':
                             teacher_y_oh = F.one_hot(teacher_output.argmax(dim=1), num_classes=output_kd.size(dim=1))
-                            distill_loss = F.binary_cross_entropy_with_logits(output_kd, teacher_y_oh.float())
+                            distil_loss = F.binary_cross_entropy_with_logits(output_kd, teacher_y_oh.float())
                         elif config.get('distil_type') == 'soft':
-                            distill_loss = F.binary_cross_entropy_with_logits(output_kd / distil_tau,
-                                                                              teacher_output / distil_tau,
-                                                                              reduction='sum')
-                            distill_loss = distill_loss * (distil_tau * distil_tau) / output_kd.numel()
+                            distil_loss = F.binary_cross_entropy_with_logits(output_kd / distil_tau, 
+                                                                             (teacher_output / distil_tau).sigmoid(),
+                                                                             reduction='sum')
+                            distil_loss = distil_loss * (distil_tau * distil_tau) / output_kd.numel()
 
                     elif config['criterion'] == 'svm':
                         if config.get('distil_type') == 'hard':
-                            distill_loss = F.multi_margin_loss(output_kd, teacher_output.argmax(dim=1))
+                            distil_loss = F.multi_margin_loss(output_kd, teacher_output.argmax(dim=1))
 
                     distil_alpha = config['distil_alpha']
-                    loss = (1 - distil_alpha) * loss + distil_alpha * distill_loss
+                    loss = (1 - distil_alpha) * loss + distil_alpha * distil_loss
 
             # backward and update
             if config.get('mixed_precision', False):
