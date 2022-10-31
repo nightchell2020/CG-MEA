@@ -81,9 +81,9 @@ parameters:
     max: 0.08
     min: 0.03
 
-  train.teacher:
+  train.distil_teacher:
     values:
-      - lo88puq7
+      - va9swnif
 
   train.distil_type:
     values:
@@ -113,35 +113,35 @@ parameters:
 
   model:
     values:
-      # - 1D-VGG-11
-      # - 1D-VGG-13
-      # - 1D-VGG-16
-      # - 1D-VGG-19
-      # - 1D-ResNet-18
-      # - 1D-ResNet-50
+#      - 1D-VGG-11
+#      - 1D-VGG-13
+#      - 1D-VGG-16
+#      - 1D-VGG-19
+#      - 1D-ResNet-18
+#      - 1D-ResNet-50
 #      - 1D-ResNet-101
-      # - 1D-ResNeXt-50
+      - 1D-ResNeXt-50
 #      - 1D-ResNeXt-101
-      # - 1D-Wide-ResNet-50
+#      - 1D-Wide-ResNet-50
 #      - 1D-Wide-ResNet-101
 #      - 1D-CNN-Transformer
-      # - 2D-VGG-11
-      # - 2D-VGG-13
-      # - 2D-VGG-16
-      # - 2D-VGG-19
-      # - 2D-ResNet-18
-      # - 2D-ResNet-50
+#      - 2D-VGG-11
+#      - 2D-VGG-13
+#      - 2D-VGG-16
+#      - 2D-VGG-19
+#      - 2D-ResNet-18
+#      - 2D-ResNet-50
 #      - 2D-ResNet-101
-      # - 2D-ResNeXt-50
+      - 2D-ResNeXt-50
 #      - 2D-ResNeXt-101
-      # - 2D-Wide-ResNet-50
+#      - 2D-Wide-ResNet-50
 #      - 2D-Wide-ResNet-101
 #      - 2D-ViT-B-8
-      - 2D-ViT-B-16
-      # - 2D-ViT-B-32
-      # - 2D-ViT-L-8
-      # - 2D-ViT-L-16
-      # - 2D-ViT-L-32
+#      - 2D-ViT-B-16
+#      - 2D-ViT-B-32
+#      - 2D-ViT-L-8
+#      - 2D-ViT-L-16
+#      - 2D-ViT-L-32
 
   model.fc_stages:
     values:
