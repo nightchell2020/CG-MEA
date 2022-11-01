@@ -1,6 +1,8 @@
+from typing import Optional
 import time
 import numpy as np
 import torch
+import torchaudio
 
 
 class EegLimitMaxLength(object):
@@ -539,11 +541,11 @@ class EegAgeBias(torch.nn.Module):
         return f"{self.__class__.__name__}(bias={self.bias})"
 
 
-class EegAgeZero(torch.nn.Module):
-    """Add a Gaussian noise to the age value
+class EegAgeSetConstant(torch.nn.Module):
+    """Set the age value as the specified constant.
 
     Args:
-        bias: Desired bias to add on age value.
+        bias: Desired constant to set age value.
     """
 
     def __init__(self, bias=0.0):
@@ -623,6 +625,51 @@ class EegSpectrogram(torch.nn.Module):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(n_fft={self.n_fft}, complex_mode={self.complex_mode}, " \
                f"stft_kwargs={self.stft_kwargs})"
+
+
+class EegResample(torch.nn.Module):
+    """Resample the EEG data as the specified sampling frequency.
+
+    Args:
+        orig_freq (int):
+        new_freq (int):
+        resampling_method (str, optional):
+        lowpass_filter_width (int, optional):
+        rolloff (float, optional):
+        beta (float, optional):
+    """
+
+    def __init__(self, orig_freq: int, new_freq: int, resampling_method: str = 'sinc_interpolation'):
+        super().__init__()
+        if resampling_method not in ('sinc_interpolation', 'kaiser_best', 'kaiser_fast'):
+            raise ValueError('complex_mode must be set to one of ("as_real", "power", "remove")')
+
+        self.orig_freq = orig_freq
+        self.new_freq = new_freq
+        self.resampling_method = resampling_method
+
+        if resampling_method == 'sinc_interpolation':
+            self.resampler = torchaudio.transforms.Resample(orig_freq=orig_freq, new_freq=new_freq,
+                                                            lowpass_filter_width=16,
+                                                            resampling_method=resampling_method)
+        elif resampling_method == 'kaiser_best':
+            self.resampler = torchaudio.transforms.Resample(orig_freq=orig_freq, new_freq=new_freq,
+                                                            resampling_method='kaiser_window',
+                                                            lowpass_filter_width=64,
+                                                            rolloff=0.9475937167399596, beta=14.769656459379492)
+        elif resampling_method == 'kaiser_fast':
+            self.resampler = torchaudio.transforms.Resample(orig_freq=orig_freq, new_freq=new_freq,
+                                                            resampling_method='kaiser_window',
+                                                            lowpass_filter_width=16,
+                                                            rolloff=0.85, beta=8.555504641634386)
+
+
+    def forward(self, sample):
+        sample['signal'] = self.resampler(sample['signal'])
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(resampling_method='{self.resampling_method}', resampler={self.resampler})"
 
 
 class TransformTimeChecker(object):
