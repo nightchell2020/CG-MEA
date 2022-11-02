@@ -185,9 +185,9 @@ class ResNet2D(nn.Module):
             raise ValueError(f"{self.__class__.__name__}.__init__(block) "
                              f"receives one of ['basic', 'bottleneck'].")
 
-        if use_age not in ['fc', 'conv', 'no']:
+        if use_age not in ['fc', 'conv', 'embedding', 'no']:
             raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
-                             f"receives one of ['fc', 'conv', 'no'].")
+                             f"receives one of ['fc', 'conv', 'embedding', 'no'].")
 
         if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
             raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
@@ -200,6 +200,10 @@ class ResNet2D(nn.Module):
         self.use_age = use_age
         if self.use_age == 'conv':
             in_channels += 1
+        elif self.use_age == 'embedding':
+            self.age_embedding = torch.nn.Parameter((torch.zeros(1, in_channels, 1, 1)))
+            torch.nn.init.trunc_normal_(self.age_embedding, std=.02)
+
         self.fc_stages = fc_stages
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
@@ -347,10 +351,13 @@ class ResNet2D(nn.Module):
         return self.fc_stages
 
     def compute_feature_embedding(self, x, age, target_from_last: int = 0):
+        N, _, H, W = x.size()
+
         if self.use_age == 'conv':
-            N, _, H, W = x.size()
             age = age.reshape((N, 1, 1, 1)).expand(N, 1, H, W)
             x = torch.cat((x, age), dim=1)
+        elif self.use_age == 'embedding':
+            x = x + self.age_embedding * age.reshape(N, 1, 1, 1)
 
         x = self.input_stage(x)
 

@@ -20,13 +20,13 @@ from .activation import get_activation_class
 
 
 __all__ = [
-    "VisionTransformer",
-    "vit_b_8",
-    "vit_b_16",
-    "vit_b_32",
-    "vit_l_8",
-    "vit_l_16",
-    "vit_l_32",
+    "VisionTransformer1D",
+    "vit_b_8_1d",
+    "vit_b_16_1d",
+    "vit_b_32_1d",
+    "vit_l_8_1d",
+    "vit_l_16_1d",
+    "vit_l_32_1d",
 ]
 
 
@@ -34,7 +34,7 @@ class ConvStemConfig(NamedTuple):
     out_channels: int
     kernel_size: int
     stride: int
-    norm_layer: Callable[..., nn.Module] = nn.BatchNorm2d
+    norm_layer: Callable[..., nn.Module] = nn.BatchNorm1d
     activation_layer: Callable[..., nn.Module] = nn.ReLU
 
 
@@ -132,12 +132,12 @@ class Encoder(nn.Module):
         return self.ln(self.layers(self.dropout(input)))
 
 
-class VisionTransformer(nn.Module):
+class VisionTransformer1D(nn.Module):
     """Vision Transformer as per https://arxiv.org/abs/2010.11929."""
 
     def __init__(
             self,
-            seq_len_2d: Tuple[int, int],
+            seq_length: int,
             size_min: int,
             size_max: int,
             in_channels: int,
@@ -176,7 +176,7 @@ class VisionTransformer(nn.Module):
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.activation = activation
 
-        self.image_h, self.image_w = seq_len_2d
+        self.seq_length = seq_length
         self.hidden_dim = hidden_dim
         self.mlp_dim = mlp_dim
         self.attention_dropout = attention_dropout
@@ -204,24 +204,21 @@ class VisionTransformer(nn.Module):
             #     )
             #     prev_channels = conv_stem_layer_config.out_channels
             # seq_proj.add_module(
-            #     "conv_last", nn.Conv2d(in_channels=prev_channels, out_channels=hidden_dim, kernel_size=1)
+            #     "conv_last", nn.Conv1d(in_channels=prev_channels, out_channels=hidden_dim, kernel_size=1)
             # )
             # self.conv_proj: nn.Module = seq_proj
         else:
-            self.n_h, h_conv_filter = self._decide_patch_size(in_size=self.image_h,
-                                                              target_num_min=size_min, target_num_max=size_max)
-            self.n_w, w_conv_filter = self._decide_patch_size(in_size=self.image_w,
-                                                              target_num_min=size_min, target_num_max=size_max)
-            conv_filter = {k: (h_conv_filter[k], w_conv_filter[k]) for k in h_conv_filter.keys() if k != 'pool'}
-            self.conv_proj = nn.Conv2d(in_channels=in_channels, out_channels=hidden_dim, **conv_filter)
+            self.n_patches, conv_filter = self._decide_patch_size(in_size=self.seq_length,
+                                                                  target_num_min=size_min, target_num_max=size_max)
+            conv_filter = {k: (conv_filter[k]) for k in conv_filter.keys() if k != 'pool'}
+            self.conv_proj = nn.Conv1d(in_channels=in_channels, out_channels=hidden_dim, **conv_filter)
 
         # Add a class token
-        self.seq_length = self.n_h * self.n_w + 1
-        self.output_length = self.n_h * self.n_w + 1
+        self.output_length = self.n_patches + 1
         self.class_token = nn.Parameter(torch.zeros(1, 1, hidden_dim))
 
         self.encoder = Encoder(
-            self.seq_length,
+            self.output_length,
             num_layers,
             num_heads,
             hidden_dim,
@@ -253,13 +250,13 @@ class VisionTransformer(nn.Module):
             if hasattr(m, 'reset_parameters'):
                 m.reset_parameters()
 
-        if isinstance(self.conv_proj, nn.Conv2d):
+        if isinstance(self.conv_proj, nn.Conv1d):
             # Init the patchify stem
-            fan_in = self.conv_proj.in_channels * self.conv_proj.kernel_size[0] * self.conv_proj.kernel_size[1]
+            fan_in = self.conv_proj.in_channels * self.conv_proj.kernel_size[0]
             nn.init.trunc_normal_(self.conv_proj.weight, std=math.sqrt(1 / fan_in))
             if self.conv_proj.bias is not None:
                 nn.init.zeros_(self.conv_proj.bias)
-        elif self.conv_proj.conv_last is not None and isinstance(self.conv_proj.conv_last, nn.Conv2d):
+        elif self.conv_proj.conv_last is not None and isinstance(self.conv_proj.conv_last, nn.Conv1d):
             # Init the last 1x1 conv of the conv stem
             nn.init.normal_(
                 self.conv_proj.conv_last.weight, mean=0.0, std=math.sqrt(2.0 / self.conv_proj.conv_last.out_channels)
@@ -313,29 +310,25 @@ class VisionTransformer(nn.Module):
 
     def compute_feature_embedding(self, x, age, target_from_last: int = 0):
         # Reshape and permute the input tensor
-        n, _, h, w = x.size()
+        N, C, L = x.size()
         if self.use_age == 'conv':
-            age = age.reshape((n, 1, 1, 1)).expand(n, 1, h, w)
+            age = age.reshape((N, 1, 1)).expand(N, 1, L)
             x = torch.cat((x, age), dim=1)
 
-        # (n, c, h, w) -> (n, hidden_dim, n_h, n_w)
+        # (N, C, L) -> (N, hidden_dim, output_length)
         x = self.conv_proj(x)
 
-        # (n, hidden_dim, n_h, n_w) -> (n, hidden_dim, (n_h * n_w))
-        x = x.reshape(n, self.hidden_dim, self.n_h * self.n_w)
-
         if self.use_age == 'embedding':
-            x = x + self.age_embedding * age.reshape(n, 1, 1)
+            x = x + self.age_embedding * age.reshape(N, 1, 1)
 
-        # (n, hidden_dim, (n_h * n_w)) -> (n, (n_h * n_w), hidden_dim)
+        # (N, hidden_dim, output_length) -> (N, output_length, hidden_dim)
         # The self attention layer expects inputs in the format (N, S, E)
         # where S is the source sequence length, N is the batch size, E is the
         # embedding dimension
         x = x.permute(0, 2, 1)
-        n = x.shape[0]
 
         # Expand the class token to the full batch
-        batch_class_token = self.class_token.expand(n, -1, -1)
+        batch_class_token = self.class_token.expand(N, -1, -1)
         x = torch.cat([batch_class_token, x], dim=1)
 
         x = self.encoder(x)
@@ -363,8 +356,8 @@ class VisionTransformer(nn.Module):
         return x
 
 
-def _vision_transformer(
-        seq_len_2d: Tuple[int, int],
+def _vision_transformer_1d(
+        seq_length: int,
         size_min: int,
         size_max: int,
         in_channels: int,
@@ -376,9 +369,9 @@ def _vision_transformer(
         hidden_dim: int,
         mlp_dim: int,
         **kwargs: Any,
-) -> VisionTransformer:
-    model = VisionTransformer(
-        seq_len_2d=seq_len_2d,
+) -> VisionTransformer1D:
+    model = VisionTransformer1D(
+        seq_length=seq_length,
         size_min=size_min,
         size_max=size_max,
         in_channels=in_channels,
@@ -395,15 +388,15 @@ def _vision_transformer(
     return model
 
 
-def vit_b_8(**kwargs: Any) -> VisionTransformer:
+def vit_b_8_1d(**kwargs: Any) -> VisionTransformer1D:
     """
-    Constructs a vit_b_8 architecture from
+    Constructs a vit_b_8_1d architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
     """
-    return _vision_transformer(
-        arch="vit_b_8",
-        size_min=7,
-        size_max=9,
+    return _vision_transformer_1d(
+        arch="vit_b_8_1d",
+        size_min=6*6,
+        size_max=8*8,
         num_layers=12,
         num_heads=12,
         hidden_dim=768,
@@ -412,15 +405,15 @@ def vit_b_8(**kwargs: Any) -> VisionTransformer:
     )
 
 
-def vit_b_16(**kwargs: Any) -> VisionTransformer:
+def vit_b_16_1d(**kwargs: Any) -> VisionTransformer1D:
     """
-    Constructs a vit_b_16 architecture from
+    Constructs a vit_b_16_1d architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
     """
-    return _vision_transformer(
-        arch="vit_b_16",
-        size_min=14,
-        size_max=16,
+    return _vision_transformer_1d(
+        arch="vit_b_16_1d",
+        size_min=14*14,
+        size_max=16*16,
         num_layers=12,
         num_heads=12,
         hidden_dim=768,
@@ -429,15 +422,15 @@ def vit_b_16(**kwargs: Any) -> VisionTransformer:
     )
 
 
-def vit_b_32(**kwargs: Any) -> VisionTransformer:
+def vit_b_32_1d(**kwargs: Any) -> VisionTransformer1D:
     """
-    Constructs a vit_b_32 architecture from
+    Constructs a vit_b_32_1d architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
     """
-    return _vision_transformer(
-        arch="vit_b_32",
-        size_min=22,
-        size_max=32,
+    return _vision_transformer_1d(
+        arch="vit_b_32_1d",
+        size_min=30*30,
+        size_max=32*32,
         num_layers=12,
         num_heads=12,
         hidden_dim=768,
@@ -446,15 +439,15 @@ def vit_b_32(**kwargs: Any) -> VisionTransformer:
     )
 
 
-def vit_l_8(**kwargs: Any) -> VisionTransformer:
+def vit_l_8_1d(**kwargs: Any) -> VisionTransformer1D:
     """
-    Constructs a vit_l_8 architecture from
+    Constructs a vit_l_8_1d architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
     """
-    return _vision_transformer(
-        arch="vit_l_8",
-        size_min=7,
-        size_max=9,
+    return _vision_transformer_1d(
+        arch="vit_l_8_1d",
+        size_min=6*6,
+        size_max=8*8,
         num_layers=24,
         num_heads=16,
         hidden_dim=1024,
@@ -463,15 +456,15 @@ def vit_l_8(**kwargs: Any) -> VisionTransformer:
     )
 
 
-def vit_l_16(**kwargs: Any) -> VisionTransformer:
+def vit_l_16_1d(**kwargs: Any) -> VisionTransformer1D:
     """
-    Constructs a vit_l_16 architecture from
+    Constructs a vit_l_16_1d architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
     """
-    return _vision_transformer(
-        arch="vit_l_16",
-        size_min=14,
-        size_max=16,
+    return _vision_transformer_1d(
+        arch="vit_l_16_1d",
+        size_min=14*14,
+        size_max=16*16,
         num_layers=24,
         num_heads=16,
         hidden_dim=1024,
@@ -480,15 +473,15 @@ def vit_l_16(**kwargs: Any) -> VisionTransformer:
     )
 
 
-def vit_l_32(**kwargs: Any) -> VisionTransformer:
+def vit_l_32_1d(**kwargs: Any) -> VisionTransformer1D:
     """
-    Constructs a vit_l_32 architecture from
+    Constructs a vit_l_32_1d architecture from
     `"An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale" <https://arxiv.org/abs/2010.11929>`_.
     """
-    return _vision_transformer(
-        arch="vit_l_32",
-        size_min=22,
-        size_max=32,
+    return _vision_transformer_1d(
+        arch="vit_l_32_1d",
+        size_min=30*30,
+        size_max=32*32,
         num_layers=24,
         num_heads=16,
         hidden_dim=1024,
@@ -523,7 +516,7 @@ def interpolate_embeddings(
     if n != 1:
         raise ValueError(f"Unexpected position embedding shape: {pos_embedding.shape}")
 
-    new_seq_length = (image_size // patch_size) ** 2 + 1
+    new_seq_length = (image_size // patch_size) + 1
 
     # Need to interpolate the weights for the position embedding.
     # We do this by reshaping the positions embeddings to a 2d grid, performing
@@ -537,24 +530,15 @@ def interpolate_embeddings(
 
         # (1, seq_length, hidden_dim) -> (1, hidden_dim, seq_length)
         pos_embedding_img = pos_embedding_img.permute(0, 2, 1)
-        seq_length_1d = int(math.sqrt(seq_length))
-        torch._assert(seq_length_1d * seq_length_1d == seq_length, "seq_length is not a perfect square!")
-
-        # (1, hidden_dim, seq_length) -> (1, hidden_dim, seq_l_1d, seq_l_1d)
-        pos_embedding_img = pos_embedding_img.reshape(1, hidden_dim, seq_length_1d, seq_length_1d)
-        new_seq_length_1d = image_size // patch_size
 
         # Perform interpolation.
-        # (1, hidden_dim, seq_l_1d, seq_l_1d) -> (1, hidden_dim, new_seq_l_1d, new_seq_l_1d)
+        # (1, hidden_dim, seq_length) -> (1, hidden_dim, new_seq_length)
         new_pos_embedding_img = nn.functional.interpolate(
             pos_embedding_img,
-            size=new_seq_length_1d,
+            size=new_seq_length,
             mode=interpolation_mode,
             align_corners=True,
         )
-
-        # (1, hidden_dim, new_seq_l_1d, new_seq_l_1d) -> (1, hidden_dim, new_seq_length)
-        new_pos_embedding_img = new_pos_embedding_img.reshape(1, hidden_dim, new_seq_length)
 
         # (1, hidden_dim, new_seq_length) -> (1, new_seq_length, hidden_dim)
         new_pos_embedding_img = new_pos_embedding_img.permute(0, 2, 1)

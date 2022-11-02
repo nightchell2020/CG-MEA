@@ -6,6 +6,7 @@ activation_list = [
     'relu',
     'gelu',
     'mish',
+    'tanh',
 ]
 
 

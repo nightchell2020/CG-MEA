@@ -1,0 +1,8 @@
+defaults:
+  - base_model
+  - 1D-ViT-Base
+  - _self_
+
+_target_: models.vit_1d.vit_b_8_1d
+model: 1D-ViT-B-8
+minibatch_3090: 192
