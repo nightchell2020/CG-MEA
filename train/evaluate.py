@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 @torch.no_grad()
-def compute_embedding(model, sample_batched, preprocess, config):
+def compute_feature_embedding(model, sample_batched, preprocess, target_from_last=1):
     # evaluation mode
     model.eval()
 
@@ -16,28 +16,17 @@ def compute_embedding(model, sample_batched, preprocess, config):
     # apply model on whole batch directly on device
     x = sample_batched['signal']
     age = sample_batched['age']
-    output = model.compute_feature_embedding(x, age, target_from_last=1)
+    output = model.compute_feature_embedding(x, age, target_from_last=target_from_last)
 
     return output
 
 
 @torch.no_grad()
 def estimate_score(model, sample_batched, preprocess, config):
-    # evaluation mode
-    model.eval()
+    # compute output embedding
+    output = compute_feature_embedding(model, sample_batched, preprocess, target_from_last=0)
 
-    # preprocessing (this includes to-device operation)
-    preprocess(sample_batched)
-
-    # apply model on whole batch directly on device
-    x = sample_batched['signal']
-    age = sample_batched['age']
-    output = model(x, age)
-
-    if config['use_age'] == 'estimate':
-        output_age = output[:, -1]
-        output = output[:, :-1]
-
+    # map depending on the loss function
     if config['criterion'] == 'cross-entropy':
         score = F.softmax(output, dim=1)
     elif config['criterion'] == 'multi-bce':
@@ -242,20 +231,21 @@ def check_accuracy_multicrop(model, loader, preprocess, config, repeat=1):
             # estimate
             s = estimate_score(model, sample_batched, preprocess, config)
             y = sample_batched['class_label']
+            tcm = config['test_crop_multiple']
 
             # multi-crop averaging
-            if s.size(0) % config['test_crop_multiple'] != 0:
+            if s.size(0) % tcm != 0:
                 raise ValueError(f"check_accuracy_multicrop(): Real minibatch size={y.size(0)} is not multiple of "
-                                 f"config['test_crop_multiple']={config['test_crop_multiple']}.")
+                                 f"config['test_crop_multiple']={tcm}.")
 
-            real_minibatch = s.size(0) // config['test_crop_multiple']
+            real_minibatch = s.size(0) // tcm
             s_ = torch.zeros((real_minibatch, s.size(1)))
             y_ = torch.zeros((real_minibatch,), dtype=torch.int32)
 
             for m in range(real_minibatch):
-                s_[m] = s[config['test_crop_multiple']*m:config['test_crop_multiple']*(m + 1)].mean(dim=0,
+                s_[m] = s[tcm*m: tcm*(m + 1)].mean(dim=0,
                                                                                                     keepdims=True)
-                y_[m] = y[config['test_crop_multiple']*m]
+                y_[m] = y[tcm*m]
 
             s = s_
             y = y_
@@ -300,15 +290,16 @@ def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=
             start_event.record()
             s = estimate_score(model, sample_batched, preprocess, config)
             y = sample_batched['class_label']
+            tcm = config['test_crop_multiple']
 
             # multi-crop averaging
-            if s.size(0) % config['test_crop_multiple'] != 0:
+            if s.size(0) % tcm != 0:
                 raise ValueError(f"check_accuracy_multicrop(): Real minibatch size={y.size(0)} is not multiple of "
-                                 f"config['test_crop_multiple']={config['test_crop_multiple']}.")
+                                 f"config['test_crop_multiple']={tcm}.")
 
             for m in range(real_minibatch):
-                s_merge[m] = s[config['test_crop_multiple']*m:config['test_crop_multiple']*(m + 1)].mean(dim=0, keepdims=True)
-                y_merge[m] = y[config['test_crop_multiple']*m]
+                s_merge[m] = s[tcm*m: tcm*(m + 1)].mean(dim=0, keepdims=True)
+                y_merge[m] = y[tcm*m]
 
             end_event.record()
             torch.cuda.synchronize()

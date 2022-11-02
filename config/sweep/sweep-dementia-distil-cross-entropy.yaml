@@ -1,0 +1,167 @@
+project: caueeg-dementia
+entity: ipis-mjkim
+method: random
+program: run_train.py
+command:
+  - ${env}
+  - python
+  - ${program}
+  - "data=caueeg-dementia"
+  - "train=distillation"
+  - "++train.mixed_precision=True"
+  - "++train.clip_grad_norm=True"
+  - ${args_no_hyphens}
+
+parameters:
+
+  ########
+  # Data #
+  ########
+  data.seq_length:
+    values:
+      # - 1000  # 5 sec
+      - 2000  # 10 sec
+      - 4000  # 20 sec
+      # - 6000  # 30 sec
+      # - 12000  # 60 sec
+
+  data.EKG:
+    values:
+      - O
+      # - X
+
+  data.photic:
+    values:
+      # - O
+      - X
+
+  data.mgn:
+    distribution: uniform
+    max: 0.1
+    min: 0
+
+  data.awgn:
+    distribution: uniform
+    max: 0.1
+    min: 0
+
+  data.awgn_age:
+    distribution: uniform
+    max: 0.1
+    min: 0.02
+
+  #########
+  # Train #
+  #########
+
+  train.lr_scheduler_type:
+    values:
+      # - constant_with_decay
+      - constant_with_twice_decay
+      # - transformer_style
+      - cosine_decay_with_warmup_half
+      # - cosine_decay_with_warmup_one_and_half
+      # - cosine_decay_with_warmup_two_and_half
+      - linear_decay_with_warmup
+
+  #search_multiplier:
+  #  values:
+  #    - 1.0
+  #    - 1.2
+  #    - 1.5
+  #    - 2.0
+
+#  train.weight_decay:
+#    distribution: log_uniform_values
+#    max: 0.05
+#    min: 1e-05
+
+  train.weight_decay:
+    distribution: uniform
+    max: 0.08
+    min: 0.03
+
+  train.distil_teacher:
+    values:
+      - va9swnif
+
+  train.distil_type:
+    values:
+      - hard
+      - soft
+
+  train.distil_alpha:
+    values:
+      - 0.5
+
+  train.distil_tau:
+    values:
+      - 3.0
+
+  train.mixup:
+    values:
+      - 0
+      - 0.5
+
+  train.criterion:
+    values:
+      - cross-entropy
+
+  #########
+  # Model #
+  #########
+
+  model:
+    values:
+#      - 1D-VGG-11
+#      - 1D-VGG-13
+#      - 1D-VGG-16
+#      - 1D-VGG-19
+#      - 1D-ResNet-18
+#      - 1D-ResNet-50
+#      - 1D-ResNet-101
+      - 1D-ResNeXt-50
+#      - 1D-ResNeXt-101
+#      - 1D-Wide-ResNet-50
+#      - 1D-Wide-ResNet-101
+#      - 1D-CNN-Transformer
+#      - 2D-VGG-11
+#      - 2D-VGG-13
+#      - 2D-VGG-16
+#      - 2D-VGG-19
+#      - 2D-ResNet-18
+#      - 2D-ResNet-50
+#      - 2D-ResNet-101
+      - 2D-ResNeXt-50
+#      - 2D-ResNeXt-101
+#      - 2D-Wide-ResNet-50
+#      - 2D-Wide-ResNet-101
+#      - 2D-ViT-B-8
+#      - 2D-ViT-B-16
+#      - 2D-ViT-B-32
+#      - 2D-ViT-L-8
+#      - 2D-ViT-L-16
+#      - 2D-ViT-L-32
+
+  model.fc_stages:
+    values:
+      # - 1
+      - 2
+      - 3
+      - 4
+
+  model.use_age:
+    values:
+      - fc
+      - conv
+
+  model.dropout:
+    distribution: uniform
+    max: 0.3
+    min: 0.1
+
+  model.activation:
+    values:
+      - relu
+      - gelu
+      - mish

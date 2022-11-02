@@ -16,3 +16,4 @@ sklearn
 plotly
 tqdm
 pyarrow
+PySoundFile

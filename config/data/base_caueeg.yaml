@@ -1,5 +1,5 @@
 # dataset
-dataset_path: local/dataset/02_Curated_Data_220419/
+dataset_path: local/dataset/caueeg-dataset/
 file_format: memmap
 crop_multiple: 4
 test_crop_multiple: 8

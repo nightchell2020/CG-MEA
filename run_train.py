@@ -89,10 +89,7 @@ def prepare_and_run_train(rank, world_size, config):
 
     # load pretrained model if needed
     if 'pretrain' in config.keys():
-        save_path = f'local/checkpoint/{config["pretrain"]}/'
-        if 'cwd' in config:
-            save_path = os.path.join(config['cwd'], save_path)
-
+        save_path = os.path.join(config.get('cwd', ''), f'local/checkpoint/{config["pretrain"]}/')
         ckpt = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
 
         if ckpt['config']['ddp'] == config['ddp']:
@@ -106,6 +103,53 @@ def prepare_and_run_train(rank, world_size, config):
             model.load_state_dict(model_state)
         else:
             model.module.load_state_dict(ckpt['model_state'])
+
+    # load teacher network if needed
+    if 'distil_teacher' in config.keys():
+        # load teacher model
+        save_path = os.path.join(config.get('cwd', ''), f'local/checkpoint/{config["distil_teacher"]}/')
+        ckpt = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
+        model_teacher = hydra.utils.instantiate(ckpt['config'])
+
+        if ckpt['config']['ddp'] == config['ddp']:
+            model_teacher.load_state_dict(ckpt['model_state'])
+        elif ckpt['config']['ddp']:
+            model_state_ddp = deepcopy(ckpt['model_state'])
+            model_state = OrderedDict()
+            for k, v in model_state_ddp.items():
+                name = k[7:]  # remove 'module.' of DataParallel/DistributedDataParallel
+                model_state[name] = v
+            model_teacher.load_state_dict(model_state)
+        else:
+            model_teacher.module.load_state_dict(ckpt['model_state'])
+        model_teacher = model_teacher.requires_grad_(False)
+        model_teacher = model_teacher.eval()
+        model_teacher.cuda(config['device'])
+
+        # distill configuration
+        config['distil_alpha'] = config.get('distil_alpha', 0.5)
+        config['distil_type'] = config.get('distil_type', 'hard')
+        if config['distil_type'] == 'soft':
+            config['distil_tau'] = config.get('distil_tau', 1.0)
+        config['distil_teacher_preprocess'] = ckpt['config']['preprocess_test']
+        config['distil_teacher_model'] = model_teacher
+        config['distil_teacher_criterion'] = ckpt['config']['criterion']
+
+        # sanity check
+        if config['distil_type'] not in ['hard', 'soft']:
+            raise ValueError(f"ERROR: Choose the correct option for knowledge distillation: 'soft' or 'hard.'")
+        elif config['distil_type'] == 'soft' and config['distil_teacher_criterion'] != config['criterion']:
+            raise ValueError(f"ERROR: In the case of 'soft' knowledge distillation, "
+                             f"the objective functions must be equal between teacher and student models.\n"
+                             f"Current state: teacher - {config['distil_teacher_criterion']}"
+                             f" / student - {config['criterion']}")
+        elif config['distil_type'] == 'soft' and config['distil_teacher_criterion'] == 'svm':
+            raise ValueError(f"ERROR: In our implementation, "
+                             f"the SVM classifier does not support for 'soft' knowledge distillation.")
+        elif config['EKG'] != ckpt['config']['EKG'] or config['photic'] != ckpt['config']['photic']:
+            raise ValueError(f"ERROR: The teacher and student networks must have the same EEG channel configuration:\n"
+                             f"Current state: teacher - EKG {ckpt['config']['EKG']}, Photic {ckpt['config']['photic']}"
+                             f" / student - EKG {config['EKG']}, Photic {config['photic']}.")
 
     # train
     train_script(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
