@@ -15,9 +15,9 @@ class TinyCNN1D(nn.Module):
                  base_pool: str = 'max', final_pool: str = 'average', activation: str = 'relu', **kwargs):
         super().__init__()
 
-        if use_age not in ['fc', 'conv', 'no']:
+        if use_age not in ['fc', 'conv', 'embedding', 'no']:
             raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
-                             f"receives one of ['fc', 'conv', 'no'].")
+                             f"receives one of ['fc', 'conv', 'embedding', 'no'].")
 
         if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
             raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
@@ -30,6 +30,10 @@ class TinyCNN1D(nn.Module):
         self.use_age = use_age
         if self.use_age == 'conv':
             in_channels += 1
+        elif self.use_age == 'embedding':
+            self.age_embedding = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
+            torch.nn.init.trunc_normal_(self.age_embedding, std=.02)
+
         self.fc_stages = fc_stages
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
@@ -100,9 +104,10 @@ class TinyCNN1D(nn.Module):
         N, C, L = x.size()
 
         if self.use_age == 'conv':
-            age = age.reshape((N, 1, 1))
-            age = torch.cat([age for i in range(L)], dim=2)
+            age = age.reshape((N, 1, 1)).repeat((1, 1, L))
             x = torch.cat((x, age), dim=1)
+        elif self.use_age == 'embedding':
+            x = x + self.age_embedding * age.reshape(N, 1, 1)
 
         # conv-bn-act-pool
         x = self.pool1(x)
@@ -141,9 +146,9 @@ class M5(nn.Module):
                  base_pool: str = 'max', final_pool: str = 'average', activation: str = 'relu', **kwargs):
         super().__init__()
 
-        if use_age not in ['fc', 'conv', 'no']:
+        if use_age not in ['fc', 'conv', 'embedding', 'no']:
             raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
-                             f"receives one of ['fc', 'conv', 'no'].")
+                             f"receives one of ['fc', 'conv', 'embedding', 'no'].")
 
         if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
             raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
@@ -156,6 +161,9 @@ class M5(nn.Module):
         self.use_age = use_age
         if self.use_age == 'conv':
             in_channels += 1
+        elif self.use_age == 'embedding':
+            self.age_embedding = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
+            torch.nn.init.trunc_normal_(self.age_embedding, std=.02)
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.F_act = get_activation_functional(activation, class_name=self.__class__.__name__)
@@ -246,9 +254,10 @@ class M5(nn.Module):
         N, C, L = x.size()
 
         if self.use_age == 'conv':
-            age = age.reshape((N, 1, 1))
-            age = torch.cat([age for i in range(L)], dim=2)
+            age = age.reshape((N, 1, 1)).repeat((1, 1, L))
             x = torch.cat((x, age), dim=1)
+        elif self.use_age == 'embedding':
+            x = x + self.age_embedding * age.reshape(N, 1, 1)
 
         # conv-bn-act-pool
         x = self.pool1(x)
