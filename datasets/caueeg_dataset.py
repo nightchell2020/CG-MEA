@@ -17,11 +17,12 @@ class CauEegDataset(Dataset):
         data_list (list of dict): List of dictionary for the data.
         load_event (bool): Determines whether to load event information or not for saving loading time.
         file_format (str): Determines which file format is used among of EDF, PyArrow Feather, and NumPy memmap.
+        use_prefix_signal (bool): Whether to append the folder prefix for signal, such as 'signal/edf/*.edf.'
         transform (callable): Optional transform to be applied on each data.
     """
 
     def __init__(self, root_dir: str, data_list: list, load_event: bool,
-                 file_format: str = 'edf', transform=None):
+                 file_format: str = 'edf', use_prefix_signal: bool = True, transform=None):
         if file_format not in ['edf', 'feather', 'memmap', 'np']:
             raise ValueError(f"{self.__class__.__name__}.__init__(file_format) "
                              f"must be set to one of 'edf', 'feather', 'memmap' and 'np'")
@@ -30,6 +31,7 @@ class CauEegDataset(Dataset):
         self.data_list = data_list
         self.load_event = load_event
         self.file_format = file_format
+        self.use_prefix_signal = use_prefix_signal
         self.transform = transform
 
     def __len__(self):
@@ -63,22 +65,26 @@ class CauEegDataset(Dataset):
             return self._read_memmap(anno)
 
     def _read_edf(self, anno):
-        edf_file = os.path.join(self.root_dir, f"signal/edf/{anno['serial']}.edf")
+        prefix = 'signal/edf/' if self.use_prefix_signal else ''
+        edf_file = os.path.join(self.root_dir, prefix, f"{anno['serial']}.edf")
         signal, signal_headers, _ = pyedflib.highlevel.read_edf(edf_file)
         return signal
 
     def _read_feather(self, anno):
-        fname = os.path.join(self.root_dir, f"signal/feather/{anno['serial']}.feather")
+        prefix = 'signal/feather/' if self.use_prefix_signal else ''
+        fname = os.path.join(self.root_dir, prefix, f"{anno['serial']}.feather")
         df = feather.read_feather(fname)
         return df.values.T
 
     def _read_memmap(self, anno):
-        fname = os.path.join(self.root_dir, f"signal/memmap/{anno['serial']}.dat")
+        prefix = 'signal/memmap/' if self.use_prefix_signal else ''
+        fname = os.path.join(self.root_dir, prefix, f"{anno['serial']}.dat")
         signal = np.memmap(fname, dtype='int32', mode='r').reshape(21, -1)
         return signal
 
     def _read_np(self, anno):
-        fname = os.path.join(self.root_dir, f"signal/{anno['serial']}.npy")
+        prefix = 'signal/np/' if self.use_prefix_signal else ''
+        fname = os.path.join(self.root_dir, prefix, f"{anno['serial']}.npy")
         return np.load(fname)
 
     def _read_event(self, m):

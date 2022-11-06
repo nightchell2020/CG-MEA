@@ -1,5 +1,6 @@
 from typing import Optional
 import time
+
 import numpy as np
 import torch
 import torchaudio
@@ -254,6 +255,49 @@ class EegEyeClosedCrop(object):
         return f"{self.__class__.__name__}(transition={self.transition}, " \
                f"crop_length={self.crop_length}, jitter={self.jitter}, mode={self.mode}, " \
                f"length_limit={self.length_limit})"
+
+
+class EegChangeMontageOrder(object):
+    """Transpose the channel order of EEG signal.
+
+    Args:
+        ref_montage (list or ndarray): Channel montage of reference
+        new_montage (list or ndarray): Channel montage of target
+    """
+    def __init__(self, ref_montage, new_montage):
+        self._calculate_channel_change(ref_montage, new_montage)
+
+    def _calculate_channel_change(self, ref_montage, new_montage):
+        self.channel_change = -np.ones((len(new_montage),), dtype='int32')
+
+        for r, ref in enumerate([shl.split('-')[0].lower() for shl in ref_montage]):
+            for n, new in enumerate([shl.split('-')[0].lower() for shl in new_montage]):
+                other_conditions = (ref == 't3' and new == 't7') or \
+                                   (ref == 't4' and new == 't8') or \
+                                   (ref == 't5' and new == 'p7') or \
+                                   (ref == 't6' and new == 'p8') or \
+                                   (ref == 'ekg' and new == 'ekg1')
+                if ref == new or other_conditions:
+                    self.channel_change[n] = r
+
+    def _change_channels(self, signal):
+        return signal[self.channel_change]
+
+    def __call__(self, sample):
+        signal = sample['signal']
+
+        if isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(self._change_channels(s))
+            sample['signal'] = signals
+        else:
+            sample['signal'] = self._change_channels(signal)
+
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(channel_change={self.channel_change})"
 
 
 class EegDropChannels(object):
