@@ -713,7 +713,8 @@ class EegResample(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(resampling_method='{self.resampling_method}', resampler={self.resampler})"
+        return f"{self.__class__.__name__}(resampling_method='{self.resampling_method}', " \
+               f"orig_freq={self.orig_freq}, new_freq={self.new_freq})"
 
 
 class TransformTimeChecker(object):
