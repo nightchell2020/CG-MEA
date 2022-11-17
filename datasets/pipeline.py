@@ -641,11 +641,11 @@ class EegSpectrogram(torch.nn.Module):
                     x_out[i] = torch.real(xf)
 
         elif len(x.shape) == 2:
-            xf = torch.stft(x, n_fft=self.n_fft, return_complex=True)
+            xf = torch.stft(x, n_fft=self.n_fft, return_complex=True, **self.stft_kwargs)
 
             if self.complex_mode == 'as_real':
                 x_out = torch.cat((torch.view_as_real(xf)[..., 0],
-                                      torch.view_as_real(xf)[..., 1]), dim=0)
+                                   torch.view_as_real(xf)[..., 1]), dim=0)
             elif self.complex_mode == 'power':
                 x_out = xf.abs()
             elif self.complex_mode == 'remove':
@@ -678,9 +678,6 @@ class EegResample(torch.nn.Module):
         orig_freq (int):
         new_freq (int):
         resampling_method (str, optional):
-        lowpass_filter_width (int, optional):
-        rolloff (float, optional):
-        beta (float, optional):
     """
 
     def __init__(self, orig_freq: int, new_freq: int, resampling_method: str = 'sinc_interpolation'):
@@ -706,7 +703,6 @@ class EegResample(torch.nn.Module):
                                                             resampling_method='kaiser_window',
                                                             lowpass_filter_width=16,
                                                             rolloff=0.85, beta=8.555504641634386)
-
 
     def forward(self, sample):
         sample['signal'] = self.resampler(sample['signal'])
