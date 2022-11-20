@@ -170,7 +170,7 @@ def draw_heatmap(data, row_labels, col_labels, ax,
     return im
 
 
-def annotate_heatmap(im, data=None, anno_format="{x:.2f}",
+def annotate_heatmap(im, data=None, data_for_color=None, anno_format="{x:.2f}",
                      text_colors=("black", "white"),
                      threshold=None, text_kw=None):
     """ A function to annotate a heatmap.
@@ -194,9 +194,12 @@ def annotate_heatmap(im, data=None, anno_format="{x:.2f}",
     if data is None:
         data = im.get_array()
 
+    if data_for_color is None:
+        data_for_color = data
+
     # Normalize the threshold to the images color range.
     if threshold is None:
-        threshold = im.norm(data.max()) / 2.0
+        threshold = im.norm(data_for_color.max()) / 2.0
 
     # Set default alignment to center, but allow it to be
     # overwritten by text_kw.
@@ -213,7 +216,7 @@ def annotate_heatmap(im, data=None, anno_format="{x:.2f}",
     # Change the text's color depending on the data.
     for i in range(data.shape[0]):
         for j in range(data.shape[1]):
-            kw.update(color=text_colors[int(im.norm(data[i, j]) > threshold)])
+            kw.update(color=text_colors[int(im.norm(data_for_color[i, j]) > threshold)])
             im.axes.text(j, i, anno_format(data[i, j], None), **kw)
 
 
@@ -224,17 +227,22 @@ def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=Fa
     fig = plt.figure(num=1, clear=True, figsize=(W, H), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
 
-    data = confusion
-    anno_format = "{x:d}"
-    if normalize:
+    if not normalize:
+        data = confusion
+        im = draw_heatmap(data, class_label_to_name, class_label_to_name,
+                          ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
+                          draw_cbar=False, cbar_label="", cbar_kw={})
+        annotate_heatmap(im, anno_format="{x:d}", text_colors=("black", "white"), threshold=0.7)
+    else:
         data = confusion / confusion.sum(axis=1, keepdims=True)
-        anno_format = "{x:.2f}"
-
-    im = draw_heatmap(data, class_label_to_name, class_label_to_name,
-                      ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
-                      draw_cbar=False, cbar_label="", cbar_kw={})
-
-    annotate_heatmap(im, anno_format=anno_format, text_colors=("black", "white"), threshold=0.7)
+        im = draw_heatmap(data, class_label_to_name, class_label_to_name,
+                          ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
+                          draw_cbar=False, cbar_label="", cbar_kw={})
+        annotate_heatmap(im, anno_format="{x:.2f}\n", text_colors=("black", "white"),
+                         threshold=0.7, text_kw={"weight": "semibold"})
+        annotate_heatmap(im, data=confusion, data_for_color=data,
+                         anno_format="\n({x:d})", text_colors=("black", "white"),
+                         threshold=0.7, text_kw={"size": "small"})
 
     ax.set_title('Confusion Matrix')
     ax.set_xlabel('Prediction')
