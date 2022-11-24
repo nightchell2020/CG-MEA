@@ -281,7 +281,8 @@ def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False, sav
                       draw_cbar=False,  cbar_label="", cbar_kw={'alpha': 0.9})
 
     annotate_heatmap(im, data=np.array([*class_wise_metrics.values()]).T,
-                     anno_format="{x:.2f}", text_colors=("black", "white"), threshold=0.7)
+                     anno_format="{x:.2f}", text_colors=("black", "white"),
+                     threshold=0.7, text_kw={"weight": "semibold"})
 
     ax.set_title('Class-wise metrics')
 

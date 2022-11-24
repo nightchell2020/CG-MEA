@@ -111,6 +111,13 @@ def prepare_and_run_train(rank, world_size, config):
         ckpt = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
         model_teacher = hydra.utils.instantiate(ckpt['config'])
 
+        if use_ddp:
+            model_teacher.cuda(config['device'])
+            model_teacher = DDP(model_teacher, device_ids=[config['device']])
+            torch.distributed.barrier()
+        else:
+            model_teacher = model_teacher.to(config['device'])
+
         if ckpt['config']['ddp'] == config['ddp']:
             model_teacher.load_state_dict(ckpt['model_state'])
         elif ckpt['config']['ddp']:
@@ -122,9 +129,9 @@ def prepare_and_run_train(rank, world_size, config):
             model_teacher.load_state_dict(model_state)
         else:
             model_teacher.module.load_state_dict(ckpt['model_state'])
+
         model_teacher = model_teacher.requires_grad_(False)
         model_teacher = model_teacher.eval()
-        model_teacher.cuda(config['device'])
 
         # distill configuration
         config['distil_alpha'] = config.get('distil_alpha', 0.5)
