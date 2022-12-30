@@ -1,0 +1,8 @@
+defaults:
+  - base_model
+  - 1D-DeiT-Base
+  - _self_
+
+_target_: models.deit_1d.deit_b_16_1d
+model: 1D-DeiT-B-16
+minibatch_3090: 48

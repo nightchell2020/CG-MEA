@@ -39,7 +39,10 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
             with autocast(enabled=config.get('mixed_precision', False)):
                 # forward pass
                 output = model(x, age)
-                output_kd = output
+                if isinstance(output, tuple):
+                    output, output_kd = output
+                else:
+                    output_kd = output
 
                 if config['use_age'] == 'estimate':
                     output_age = output[:, -1]

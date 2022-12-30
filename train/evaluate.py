@@ -16,11 +16,13 @@ def compute_feature_embedding(model, sample_batched, preprocess, config, target_
     # apply model on whole batch directly on device
     x = sample_batched['signal']
     age = sample_batched['age']
-    
-    if config.get('ddp', False):
-        output = model.module.compute_feature_embedding(x, age, target_from_last=target_from_last)
-    else:
-        output = model.compute_feature_embedding(x, age, target_from_last=target_from_last)
+
+    module = model.module if config.get('ddp', False) else model
+    output = module.compute_feature_embedding(x, age, target_from_last=target_from_last)
+
+    # DeiT model
+    if isinstance(output, tuple):
+        output = (output[0] + output[1]) / 2.0
 
     return output
 
