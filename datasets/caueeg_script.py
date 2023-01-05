@@ -288,13 +288,15 @@ def compose_transforms(config, verbose=False):
                                 multiple=config.get('crop_multiple', 1),
                                 latency=config.get('latency', 0),
                                 segment_simulation=config.get('segment_simulation', False),
-                                return_timing=config.get('crop_timing_analysis', False))]
+                                return_timing=config.get('crop_timing_analysis', False),
+                                reject_events=config.get('reject_events', False))]
     transform_multicrop += [EegRandomCrop(crop_length=config['seq_length'],
                                           length_limit=config.get('signal_length_limit', 10 ** 7),
                                           multiple=config.get('test_crop_multiple', 8),
                                           latency=config.get('latency', 0),
                                           segment_simulation=config.get('segment_simulation', False),
-                                          return_timing=config.get('crop_timing_analysis', False))]
+                                          return_timing=config.get('crop_timing_analysis', False),
+                                          reject_events=config.get('reject_events', False))]
 
     ###################################
     # usage of EKG or photic channels #

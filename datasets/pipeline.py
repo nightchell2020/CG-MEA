@@ -35,10 +35,12 @@ class EegRandomCrop(object):
         length_limit (int, optional): Signal length limit to use.
         multiple (int, optional): Desired number of cropping.
         latency (int, optional): Latency signal length to exclude after record starting.
-        return_timing (bool, optional): Decide whether return the sample timing or not.
+        return_timing (bool, optional): Decide whether to return the sample timing.
+        reject_events (bool, optional): Decide whether to reject the segments with events.
     """
     def __init__(self, crop_length: int, length_limit: int = 10**7,
-                 multiple: int = 1, latency: int = 0, segment_simulation=False, return_timing: bool = False):
+                 multiple: int = 1, latency: int = 0, segment_simulation=False,
+                 return_timing: bool = False, reject_events: bool = False):
         if isinstance(crop_length, int) is False:
             raise ValueError(f'{self.__class__.__name__}.__init__(crop_length) '
                              f'needs a integer to initialize')
@@ -55,38 +57,76 @@ class EegRandomCrop(object):
         self.latency = latency
         self.segment_simulation = segment_simulation
         self.return_timing = return_timing
+        self.reject_events = reject_events
 
     def __call__(self, sample):
+        if self.reject_events and 'event' not in sample.keys():
+            raise ValueError(f'{self.__class__.__name__}, this dataset '
+                             f'does not have the event information at all.')
+
         signal = sample['signal']
         signal_length = min(signal.shape[-1], self.length_limit)
 
+        possible_timeline = np.ones((signal_length,), dtype=np.int32)
+        possible_timeline[:self.latency] = 0
+        if self.reject_events:
+            for e in sample['event']:
+                start = max(e[0] - self.crop_length + 1, 0)
+                possible_timeline[start:e[0] + 1] = 0
+
+        cts = np.random.choice(np.arange(signal_length)[possible_timeline == 1], self.multiple)
+
         if self.multiple == 1:
-            ct = np.random.randint(self.latency, signal_length - self.crop_length)
+            ct = cts[0]
             if self.segment_simulation:
                 ct = int((ct - self.latency) / self.crop_length) * self.crop_length + self.latency
+
             sample['signal'] = signal[:, ct:ct + self.crop_length]
+
             if self.return_timing:
                 sample['crop_timing'] = ct
+
+            if 'event' in sample.keys():
+                event = []
+                for e in sample['event']:
+                    if ct <= e[0] < ct + self.crop_length:
+                        event.append((e[0] - ct, e[1]))
+                sample['event'] = event
+
         else:
             signals = []
             crop_timings = []
+            events = []
 
             for r in range(self.multiple):
-                ct = np.random.randint(self.latency, signal_length - self.crop_length)
+                ct = cts[r]
                 if self.segment_simulation:
                     ct = int((ct - self.latency) / self.crop_length) * self.crop_length + self.latency
+
                 signals.append(signal[:, ct:ct + self.crop_length])
-                crop_timings.append(ct)
+
+                if self.return_timing:
+                    crop_timings.append(ct)
+
+                if 'event' in sample.keys():
+                    event = []
+                    for e in sample['event']:
+                        if ct <= e[0] < ct + self.crop_length:
+                            event.append((e[0] - ct, e[1]))
+                    events.append(event)
 
             sample['signal'] = signals
             if self.return_timing:
                 sample['crop_timing'] = crop_timings
+            if 'event' in sample.keys():
+                sample['event'] = events
 
         return sample
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(crop_length={self.crop_length}, length_limit={self.length_limit}, " \
-               f"multiple={self.multiple}, latency={self.latency}, return_timing={self.return_timing})"
+               f"multiple={self.multiple}, latency={self.latency}, return_timing={self.return_timing}, " \
+               f"reject_events={self.reject_events})"
 
 
 class EegEyeOpenCrop(object):
