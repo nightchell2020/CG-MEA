@@ -69,6 +69,7 @@ class EegRandomCrop(object):
 
         possible_timeline = np.ones((signal_length,), dtype=np.int32)
         possible_timeline[:self.latency] = 0
+        possible_timeline[-self.crop_length + 1:] = 0
         if self.reject_events:
             for e in sample['event']:
                 start = max(e[0] - self.crop_length + 1, 0)

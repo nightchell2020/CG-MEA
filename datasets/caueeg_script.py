@@ -587,7 +587,7 @@ def build_dataset_for_train(config, verbose=False):
 
     config_task, train_dataset, val_dataset, test_dataset = load_caueeg_task_datasets(dataset_path=dataset_path,
                                                                                       task=config['task'],
-                                                                                      load_event=config['load_event'],
+                                                                                      load_event=config['load_event'] or config['reject_events'],
                                                                                       file_format=config['file_format'],
                                                                                       transform=transform,
                                                                                       verbose=verbose)
