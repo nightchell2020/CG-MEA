@@ -18,15 +18,13 @@ class TuhAbnormalDataset(Dataset):
         transform (callable): Optional transform to be applied on each data.
     """
 
-    def __init__(self, root_dir: str, data_list: list, load_event: bool,
-                 file_format: str = 'edf', transform=None):
+    def __init__(self, root_dir: str, data_list: list, file_format: str = 'edf', transform=None):
         if file_format not in ['edf', 'feather', 'memmap', 'np']:
             raise ValueError(f"{self.__class__.__name__}.__init__(file_format) "
                              f"must be set to one of 'edf', 'feather', 'memmap' and 'np'")
 
         self.root_dir = root_dir
         self.data_list = data_list
-        self.load_event = load_event
         self.file_format = file_format
         self.transform = transform
 
@@ -43,10 +41,6 @@ class TuhAbnormalDataset(Dataset):
         # signal
         sample['signal'] = self._read_signal(sample)
 
-        # event
-        if self.load_event:
-            sample['event'] = self._read_event(sample)
-
         if self.transform:
             sample = self.transform(sample)
 
@@ -55,8 +49,6 @@ class TuhAbnormalDataset(Dataset):
     def _read_signal(self, anno):
         if self.file_format == 'edf':
             return self._read_edf(anno)
-        elif self.file_format == 'feather':
-            return self._read_feather(anno)
         else:
             return self._read_memmap(anno)
 
