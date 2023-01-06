@@ -14,6 +14,7 @@ import torch.multiprocessing as mp
 
 from train.train_script import train_script
 from datasets.caueeg_script import build_dataset_for_train
+from datasets.temple_eeg_script import build_dataset_for_tuab_train
 from models.utils import count_parameters
 
 
@@ -71,7 +72,10 @@ def prepare_and_run_train(rank, world_size, config):
         config['device'] = torch.device(f'cuda:{rank}')
 
     # compose dataset
-    train_loader, val_loader, test_loader, multicrop_test_loader = build_dataset_for_train(config)
+    if config.get('dataset_name', None) == 'tuab':
+        train_loader, val_loader, test_loader, multicrop_test_loader = build_dataset_for_tuab_train(config)
+    else:
+        train_loader, val_loader, test_loader, multicrop_test_loader = build_dataset_for_train(config)
 
     # generate the model and update some configurations
     model = hydra.utils.instantiate(config)

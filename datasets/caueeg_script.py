@@ -581,13 +581,20 @@ def build_dataset_for_train(config, verbose=False):
     config_dataset = load_caueeg_config(dataset_path)
     config.update(**config_dataset)
 
+    if 'run_mode' not in config.keys():
+        print('\n' + '=' * 80 + '\n')
+        print('WARNING: run_mode is not specified.\n \t==> run_mode is set to "train" automatically.')
+        print('\n' + '=' * 80 + '\n')
+        config['run_mode'] = 'train'
+
     transform, transform_multicrop = compose_transforms(config, verbose=verbose)
     config['transform'] = transform
     config['transform_multicrop'] = transform_multicrop
+    load_event = config['load_event'] or config.get('reject_events', False)
 
     config_task, train_dataset, val_dataset, test_dataset = load_caueeg_task_datasets(dataset_path=dataset_path,
                                                                                       task=config['task'],
-                                                                                      load_event=config['load_event'] or config['reject_events'],
+                                                                                      load_event=load_event,
                                                                                       file_format=config['file_format'],
                                                                                       transform=transform,
                                                                                       verbose=verbose)
@@ -596,7 +603,7 @@ def build_dataset_for_train(config, verbose=False):
     _, multicrop_test_dataset = load_caueeg_task_split(dataset_path=dataset_path,
                                                        task=config['task'],
                                                        split='test',
-                                                       load_event=config['load_event'] or config['reject_events'],
+                                                       load_event=load_event,
                                                        file_format=config['file_format'],
                                                        transform=transform_multicrop,
                                                        verbose=verbose)

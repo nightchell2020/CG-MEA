@@ -1,19 +1,18 @@
 # dataset
-dataset_name: caueeg-dataset
-dataset_path: local/dataset/caueeg-dataset/
+dataset_name: tuab
+dataset_path: local/dataset/Temple_EEG/
 file_format: memmap
 crop_multiple: 4
 test_crop_multiple: 8
 crop_timing_analysis: false
-load_event: false
 
 # preprocessing
-seq_length: 2000  # 200Hz * 10s = 2000 for base
-latency: 2000
+seq_length: 2500  # 250Hz * 10s = 2500 for base
+latency: 2500
 signal_length_limit: 10000000  # A sufficiently large number for no effect
 EKG: O
-photic: X
 input_norm: dataset
+use_age: no
 
 # augmentation
 awgn: 0.001

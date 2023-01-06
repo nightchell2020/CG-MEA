@@ -775,5 +775,6 @@ def trim_trailing_zeros(a):
         if np.any(a[..., -1 - i] != 0):
             trim = i
             break
-    a = a[..., :-trim]
+    if trim > 0:
+        a = a[..., :-trim]
     return a
