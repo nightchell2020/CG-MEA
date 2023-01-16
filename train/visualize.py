@@ -266,6 +266,49 @@ def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=Fa
     plt.close(fig)
 
 
+def draw_confusion2(mean_confusion, std_confusion, class_label_to_name, use_wandb=False, save_path=None):
+    plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
+    H = len(class_label_to_name) + 0.5
+    W = len(class_label_to_name) + 0.5
+    fig = plt.figure(num=1, clear=True, figsize=(W, H), constrained_layout=True)
+    ax = fig.add_subplot(1, 1, 1)
+
+    data = mean_confusion / mean_confusion.sum(axis=1, keepdims=True)
+    im = draw_heatmap(data, class_label_to_name, class_label_to_name,
+                      ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
+                      draw_cbar=False, cbar_label="", cbar_kw={})
+    annotate_heatmap(im, anno_format="{x:.2f}\n", text_colors=("black", "white"),
+                     threshold=0.7, text_kw={"weight": "semibold"})
+
+    annotate_heatmap(im, data=mean_confusion, data_for_color=data,
+                     anno_format="\n\n({x:3.1f}         ", text_colors=("black", "white"),
+                     threshold=0.7, text_kw={"size": "small"})
+
+    annotate_heatmap(im, data=std_confusion, data_for_color=data,
+                     anno_format="\n\n        ±{x:.1f})", text_colors=("black", "white"),
+                     threshold=0.7, text_kw={"size": "small"})
+
+    ax.set_title('Confusion Matrix')
+    ax.set_xlabel('Prediction')
+    ax.set_ylabel('Ground Truth')
+
+    # save
+    if save_path:
+        plt.rcParams.update({'font.size': 22})
+        plt.rcParams.update({'font.family': 'Arial'})
+        plt.rcParams["savefig.dpi"] = 1200
+        fig.savefig(save_path, transparent=True)
+
+    # draw
+    if use_wandb:
+        wandb.log({'Confusion Matrix (Image)': wandb.Image(plt)})
+
+    if save_path is None and use_wandb is False:
+        plt.show()
+
+    # fig.clear()
+    plt.close(fig)
+
 def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False, save_path=None):
     class_wise_metrics = calculate_class_wise_metrics(confusion)
 
