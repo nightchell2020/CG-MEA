@@ -539,3 +539,655 @@ AttributeError: 'DistributedDataParallel' object has no attribute 'compute_featu
 
 
 Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+Traceback (most recent call last):
+  File "/home/imkbsz/workspace/eeg_analysis/run_train.py", line 11, in <module>
+    import torch
+ModuleNotFoundError: No module named 'torch'
+Traceback (most recent call last):
+  File "/home/imkbsz/workspace/eeg_analysis/run_train.py", line 11, in <module>
+    import torch
+ModuleNotFoundError: No module named 'torch'
+Could not override 'data.photic'.
+To append to your config use +data.photic=X
+Key 'photic' is not in struct
+    full_key: data.photic
+    object_type=dict
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+wandb: Currently logged in as: ipis-mjkim. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.13.9 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.13.5
+wandb: Run data is saved locally in /home/imkbsz/workspace/eeg_analysis/local/hydra/2023-01-16/14-39-32/wandb/run-20230116_144002-3nv4hv3y
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run smart-terrain-30
+wandb: ⭐️ View project at https://wandb.ai/ipis-mjkim/noname
+wandb: 🚀 View run at https://wandb.ai/ipis-mjkim/noname/runs/3nv4hv3y
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/optim/lr_scheduler.py:131: UserWarning:
+
+Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/optim/lr_scheduler.py:131: UserWarning:
+
+Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/optim/lr_scheduler.py:131: UserWarning:
+
+Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/optim/lr_scheduler.py:131: UserWarning:
+
+Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+
+
+******************************    Configurations for Train    ******************************
+
+{'EKG': 'O',
+ '_target_': 'models.resnet_1d.ResNet1D',
+ 'activation': 'gelu',
+ 'age_mean': tensor([0.]),
+ 'age_std': tensor([0.]),
+ 'awgn': 0.03753631562388706,
+ 'awgn_age': 0.1153811170738336,
+ 'base_channels': 64,
+ 'base_lr': 0.0001,
+ 'block': 'bottleneck',
+ 'class_label_to_name': ['Normal', 'Abnormal'],
+ 'class_name_to_label': {'Abnormal': 1, 'Normal': 0},
+ 'clip_grad_norm': True,
+ 'conv_layers': [3, 4, 6, 3],
+ 'criterion': 'cross-entropy',
+ 'crop_multiple': 4,
+ 'crop_timing_analysis': False,
+ 'cwd': '/home/imkbsz/workspace/eeg_analysis',
+ 'dataset_name': 'tuab',
+ 'dataset_path': 'local/dataset/Temple_EEG/',
+ 'ddp': True,
+ 'ddp_size': 4,
+ 'device': device(type='cuda', index=0),
+ 'draw_result': True,
+ 'dropout': 0.2721821402524912,
+ 'fc_stages': 3,
+ 'file_format': 'memmap',
+ 'groups': 32,
+ 'in_channels': 24,
+ 'input_norm': 'dataset',
+ 'latency': 2500,
+ 'lr_scheduler_type': 'cosine_decay_with_warmup_half',
+ 'mgn': 0.04023761519347058,
+ 'minibatch': 512,
+ 'minibatch_3090': 512,
+ 'mixed_precision': True,
+ 'mixup': 0.1,
+ 'model': '1D-ResNeXt-50',
+ 'multi_batch_size': 64,
+ 'num_history': 500,
+ 'num_params': 25660034,
+ 'out_dims': 2,
+ 'output_length': 5,
+ 'preprocess_test': Sequential(
+  (0): EegToDevice(device=cuda:0)
+  (1): EegNormalizeAge(mean=tensor([0.]),std=tensor([0.]),eps=1e-08)
+  (2): EegNormalizeMeanStd(mean=tensor([-12393265.0000, -12972898.0000, -11781966.0000, -11820662.0000,
+          -17130282.0000, -13236709.0000, -13697522.0000, -18084652.0000,
+          -12669752.0000,  -8475924.0000,  -1593895.7500,   4283262.0000,
+          -10502373.0000,    630590.6250, -18239650.0000,  -4385635.0000,
+           10852608.0000,  31586198.0000,   -520987.3750, -15164404.0000,
+            6462482.0000,  20666106.0000,  25415178.0000, -91468744.0000]),std=tensor([1.0487e+09, 1.0482e+09, 1.0406e+09, 1.0465e+09, 1.0369e+09, 1.0389e+09,
+          1.0362e+09, 1.0357e+09, 1.0442e+09, 1.0480e+09, 1.0477e+09, 1.0535e+09,
+          1.0397e+09, 1.0477e+09, 1.0398e+09, 1.0488e+09, 1.0455e+09, 1.0496e+09,
+          1.0392e+09, 1.0355e+09, 1.0428e+09, 1.0489e+09, 1.0508e+09, 1.0319e+09]),eps=1e-08)
+),
+ 'preprocess_train': Sequential(
+  (0): EegToDevice(device=cuda:0)
+  (1): EegNormalizeAge(mean=tensor([0.], device='cuda:0'),std=tensor([0.]),eps=1e-08)
+  (2): EegAddGaussianNoiseAge(mean=0.0,std=0.1153811170738336)
+  (3): EegNormalizeMeanStd(mean=tensor([-12393265.0000, -12972898.0000, -11781966.0000, -11820662.0000,
+          -17130282.0000, -13236709.0000, -13697522.0000, -18084652.0000,
+          -12669752.0000,  -8475924.0000,  -1593895.7500,   4283262.0000,
+          -10502373.0000,    630590.6250, -18239650.0000,  -4385635.0000,
+           10852608.0000,  31586198.0000,   -520987.3750, -15164404.0000,
+            6462482.0000,  20666106.0000,  25415178.0000, -91468744.0000],
+         device='cuda:0'),std=tensor([1.0487e+09, 1.0482e+09, 1.0406e+09, 1.0465e+09, 1.0369e+09, 1.0389e+09,
+          1.0362e+09, 1.0357e+09, 1.0442e+09, 1.0480e+09, 1.0477e+09, 1.0535e+09,
+          1.0397e+09, 1.0477e+09, 1.0398e+09, 1.0488e+09, 1.0455e+09, 1.0496e+09,
+          1.0392e+09, 1.0355e+09, 1.0428e+09, 1.0489e+09, 1.0508e+09, 1.0319e+09]),eps=1e-08)
+  (4): EegMultiplicativeGaussianNoise(mean=0.0,std=0.04023761519347058)
+  (5): EegAdditiveGaussianNoise(mean=0.0,std=0.03753631562388706)
+),
+ 'run_mode': 'train',
+ 'save_model': True,
+ 'search_lr': True,
+ 'search_multiplier': 1.0,
+ 'seed': 0,
+ 'seq_length': 6000,
+ 'signal_header': ['EEG FP1-REF',
+                   'EEG FP2-REF',
+                   'EEG F3-REF',
+                   'EEG F4-REF',
+                   'EEG C3-REF',
+                   'EEG C4-REF',
+                   'EEG P3-REF',
+                   'EEG P4-REF',
+                   'EEG O1-REF',
+                   'EEG O2-REF',
+                   'EEG F7-REF',
+                   'EEG F8-REF',
+                   'EEG T3-REF',
+                   'EEG T4-REF',
+                   'EEG T5-REF',
+                   'EEG T6-REF',
+                   'EEG A1-REF',
+                   'EEG A2-REF',
+                   'EEG FZ-REF',
+                   'EEG CZ-REF',
+                   'EEG PZ-REF',
+                   'EEG T1-REF',
+                   'EEG T2-REF',
+                   'EEG EKG1-REF'],
+ 'signal_length_limit': 10000000,
+ 'signal_mean': tensor([[[-12393265.0000],
+         [-12972898.0000],
+         [-11781966.0000],
+         [-11820662.0000],
+         [-17130282.0000],
+         [-13236709.0000],
+         [-13697522.0000],
+         [-18084652.0000],
+         [-12669752.0000],
+         [ -8475924.0000],
+         [ -1593895.7500],
+         [  4283262.0000],
+         [-10502373.0000],
+         [   630590.6250],
+         [-18239650.0000],
+         [ -4385635.0000],
+         [ 10852608.0000],
+         [ 31586198.0000],
+         [  -520987.3750],
+         [-15164404.0000],
+         [  6462482.0000],
+         [ 20666106.0000],
+         [ 25415178.0000],
+         [-91468744.0000]]]),
+ 'signal_std': tensor([[[1.0487e+09],
+         [1.0482e+09],
+         [1.0406e+09],
+         [1.0465e+09],
+         [1.0369e+09],
+         [1.0389e+09],
+         [1.0362e+09],
+         [1.0357e+09],
+         [1.0442e+09],
+         [1.0480e+09],
+         [1.0477e+09],
+         [1.0535e+09],
+         [1.0397e+09],
+         [1.0477e+09],
+         [1.0398e+09],
+         [1.0488e+09],
+         [1.0455e+09],
+         [1.0496e+09],
+         [1.0392e+09],
+         [1.0355e+09],
+         [1.0428e+09],
+         [1.0489e+09],
+         [1.0508e+09],
+         [1.0319e+09]]]),
+ 'task_description': 'Pathological classification of [Normal] and [Abnormal] EEG',
+ 'task_name': 'Temple University Hospital Abnormal Corpus v2.0.0',
+ 'test_crop_multiple': 8,
+ 'total_samples': 300000000.0,
+ 'transform': Compose(
+    EegRandomCrop(crop_length=6000, length_limit=10000000, multiple=4, latency=2500, return_timing=False, reject_events=False)
+    EegToTensor()
+),
+ 'transform_multicrop': Compose(
+    EegRandomCrop(crop_length=6000, length_limit=10000000, multiple=8, latency=2500, return_timing=False, reject_events=False)
+    EegToTensor()
+),
+ 'use_age': 'fc',
+ 'use_wandb': True,
+ 'warmup_min': 3000,
+ 'warmup_ratio': 0.05,
+ 'watch_model': False,
+ 'weight_decay': 0.04817806327088455,
+ 'width_per_group': 4}
+
+********************************************************************************************
+
+wandb: Waiting for W&B process to finish... (success).
+wandb: - 0.016 MB of 0.024 MB uploaded (0.000 MB deduped)wandb: \ 0.024 MB of 0.024 MB uploaded (0.000 MB deduped)wandb: | 0.024 MB of 0.024 MB uploaded (0.000 MB deduped)wandb: Synced smart-terrain-30: https://wandb.ai/ipis-mjkim/noname/runs/3nv4hv3y
+wandb: Synced 7 W&B file(s), 0 media file(s), 0 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20230116_144002-3nv4hv3y/logs
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/multiprocessing/resource_tracker.py:216: UserWarning: resource_tracker: There appear to be 8 leaked semaphore objects to clean up at shutdown
+  warnings.warn('resource_tracker: There appear to be %d '
+wandb: Currently logged in as: ipis-mjkim. Use `wandb login --relogin` to force relogin
+wandb: - Waiting for wandb.init()...wandb: \ Waiting for wandb.init()...wandb: wandb version 0.13.9 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.13.5
+wandb: Run data is saved locally in /home/imkbsz/workspace/eeg_analysis/local/hydra/2023-01-16/14-41-20/wandb/run-20230116_144152-3u3bx062
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run effortless-wood-4
+wandb: ⭐️ View project at https://wandb.ai/ipis-mjkim/tuab
+wandb: 🚀 View run at https://wandb.ai/ipis-mjkim/tuab/runs/3u3bx062
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/optim/lr_scheduler.py:131: UserWarning:
+
+Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/optim/lr_scheduler.py:131: UserWarning:
+
+Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/optim/lr_scheduler.py:131: UserWarning:
+
+Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/optim/lr_scheduler.py:131: UserWarning:
+
+Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/optim/lr_scheduler.py:131: UserWarning:
+
+Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and later, you should call them in the opposite order: `optimizer.step()` before `lr_scheduler.step()`.  Failure to do this will result in PyTorch skipping the first value of the learning rate schedule. See more details at https://pytorch.org/docs/stable/optim.html#how-to-adjust-learning-rate
+
+wandb: Network error (ReadTimeout), entering retry loop.
+wandb: Waiting for W&B process to finish... (success).
+wandb: 
+wandb: Run history:
+wandb:            Learning Rate ▂▅███████▇▇▇▇▇▆▆▆▅▅▅▅▄▄▄▃▃▃▃▂▂▂▂▂▁▁▁▁▁▁▁
+wandb:                     Loss █▂▂▂▁▂▁▂▁▁▁▁▂▁▁▁▂▁▁▁▂▁▁▁▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: Multi-Crop Test Accuracy ▁
+wandb:            Test Accuracy ▁
+wandb:           Train Accuracy ▁█▇██▇█▇████▇███▇███▇█████████▇█████████
+wandb:      Validation Accuracy ▁▆▅▇▇▇█▆▇▇▅█▅▅▅▅▆▅▅▅▅▆▆▆▅▅▅▆▆▅▆▅▆▆▆▆▅▆▆▆
+wandb: 
+wandb: Run summary:
+wandb:            Learning Rate 0.0
+wandb:                     Loss 0.06845
+wandb: Multi-Crop Test Accuracy 82.06522
+wandb:            Test Accuracy 81.16244
+wandb:           Train Accuracy 97.46652
+wandb:      Validation Accuracy 72.35507
+wandb: 
+wandb: Synced effortless-wood-4: https://wandb.ai/ipis-mjkim/tuab/runs/3u3bx062
+wandb: Synced 7 W&B file(s), 3 media file(s), 0 artifact file(s) and 1 other file(s)
+wandb: Find logs at: ./wandb/run-20230116_144152-3u3bx062/logs
+
+******************************    Configurations for Train    ******************************
+
+{'EKG': 'O',
+ '_target_': 'models.resnet_1d.ResNet1D',
+ 'activation': 'gelu',
+ 'age_mean': tensor([0.]),
+ 'age_std': tensor([0.]),
+ 'awgn': 0.03753631562388706,
+ 'awgn_age': 0.1153811170738336,
+ 'base_channels': 64,
+ 'base_lr': 0.0001,
+ 'block': 'bottleneck',
+ 'class_label_to_name': ['Normal', 'Abnormal'],
+ 'class_name_to_label': {'Abnormal': 1, 'Normal': 0},
+ 'clip_grad_norm': True,
+ 'conv_layers': [3, 4, 6, 3],
+ 'criterion': 'cross-entropy',
+ 'crop_multiple': 4,
+ 'crop_timing_analysis': False,
+ 'cwd': '/home/imkbsz/workspace/eeg_analysis',
+ 'dataset_name': 'tuab',
+ 'dataset_path': 'local/dataset/Temple_EEG/',
+ 'ddp': True,
+ 'ddp_size': 4,
+ 'device': device(type='cuda', index=0),
+ 'draw_result': True,
+ 'dropout': 0.2721821402524912,
+ 'fc_stages': 3,
+ 'file_format': 'memmap',
+ 'groups': 32,
+ 'in_channels': 24,
+ 'input_norm': 'dataset',
+ 'latency': 2500,
+ 'lr_scheduler_type': 'cosine_decay_with_warmup_half',
+ 'mgn': 0.04023761519347058,
+ 'minibatch': 512,
+ 'minibatch_3090': 512,
+ 'mixed_precision': True,
+ 'mixup': 0.1,
+ 'model': '1D-ResNeXt-50',
+ 'multi_batch_size': 64,
+ 'num_history': 500,
+ 'num_params': 25660034,
+ 'out_dims': 2,
+ 'output_length': 5,
+ 'preprocess_test': Sequential(
+  (0): EegToDevice(device=cuda:0)
+  (1): EegNormalizeAge(mean=tensor([0.]),std=tensor([0.]),eps=1e-08)
+  (2): EegNormalizeMeanStd(mean=tensor([-12393265.0000, -12972898.0000, -11781966.0000, -11820662.0000,
+          -17130282.0000, -13236709.0000, -13697522.0000, -18084652.0000,
+          -12669752.0000,  -8475924.0000,  -1593895.7500,   4283262.0000,
+          -10502373.0000,    630590.6250, -18239650.0000,  -4385635.0000,
+           10852608.0000,  31586198.0000,   -520987.3750, -15164404.0000,
+            6462482.0000,  20666106.0000,  25415178.0000, -91468744.0000]),std=tensor([1.0487e+09, 1.0482e+09, 1.0406e+09, 1.0465e+09, 1.0369e+09, 1.0389e+09,
+          1.0362e+09, 1.0357e+09, 1.0442e+09, 1.0480e+09, 1.0477e+09, 1.0535e+09,
+          1.0397e+09, 1.0477e+09, 1.0398e+09, 1.0488e+09, 1.0455e+09, 1.0496e+09,
+          1.0392e+09, 1.0355e+09, 1.0428e+09, 1.0489e+09, 1.0508e+09, 1.0319e+09]),eps=1e-08)
+),
+ 'preprocess_train': Sequential(
+  (0): EegToDevice(device=cuda:0)
+  (1): EegNormalizeAge(mean=tensor([0.], device='cuda:0'),std=tensor([0.]),eps=1e-08)
+  (2): EegAddGaussianNoiseAge(mean=0.0,std=0.1153811170738336)
+  (3): EegNormalizeMeanStd(mean=tensor([-12393265.0000, -12972898.0000, -11781966.0000, -11820662.0000,
+          -17130282.0000, -13236709.0000, -13697522.0000, -18084652.0000,
+          -12669752.0000,  -8475924.0000,  -1593895.7500,   4283262.0000,
+          -10502373.0000,    630590.6250, -18239650.0000,  -4385635.0000,
+           10852608.0000,  31586198.0000,   -520987.3750, -15164404.0000,
+            6462482.0000,  20666106.0000,  25415178.0000, -91468744.0000],
+         device='cuda:0'),std=tensor([1.0487e+09, 1.0482e+09, 1.0406e+09, 1.0465e+09, 1.0369e+09, 1.0389e+09,
+          1.0362e+09, 1.0357e+09, 1.0442e+09, 1.0480e+09, 1.0477e+09, 1.0535e+09,
+          1.0397e+09, 1.0477e+09, 1.0398e+09, 1.0488e+09, 1.0455e+09, 1.0496e+09,
+          1.0392e+09, 1.0355e+09, 1.0428e+09, 1.0489e+09, 1.0508e+09, 1.0319e+09]),eps=1e-08)
+  (4): EegMultiplicativeGaussianNoise(mean=0.0,std=0.04023761519347058)
+  (5): EegAdditiveGaussianNoise(mean=0.0,std=0.03753631562388706)
+),
+ 'project': 'tuab',
+ 'run_mode': 'train',
+ 'save_model': True,
+ 'search_lr': True,
+ 'search_multiplier': 1.0,
+ 'seed': 0,
+ 'seq_length': 6000,
+ 'signal_header': ['EEG FP1-REF',
+                   'EEG FP2-REF',
+                   'EEG F3-REF',
+                   'EEG F4-REF',
+                   'EEG C3-REF',
+                   'EEG C4-REF',
+                   'EEG P3-REF',
+                   'EEG P4-REF',
+                   'EEG O1-REF',
+                   'EEG O2-REF',
+                   'EEG F7-REF',
+                   'EEG F8-REF',
+                   'EEG T3-REF',
+                   'EEG T4-REF',
+                   'EEG T5-REF',
+                   'EEG T6-REF',
+                   'EEG A1-REF',
+                   'EEG A2-REF',
+                   'EEG FZ-REF',
+                   'EEG CZ-REF',
+                   'EEG PZ-REF',
+                   'EEG T1-REF',
+                   'EEG T2-REF',
+                   'EEG EKG1-REF'],
+ 'signal_length_limit': 10000000,
+ 'signal_mean': tensor([[[-12393265.0000],
+         [-12972898.0000],
+         [-11781966.0000],
+         [-11820662.0000],
+         [-17130282.0000],
+         [-13236709.0000],
+         [-13697522.0000],
+         [-18084652.0000],
+         [-12669752.0000],
+         [ -8475924.0000],
+         [ -1593895.7500],
+         [  4283262.0000],
+         [-10502373.0000],
+         [   630590.6250],
+         [-18239650.0000],
+         [ -4385635.0000],
+         [ 10852608.0000],
+         [ 31586198.0000],
+         [  -520987.3750],
+         [-15164404.0000],
+         [  6462482.0000],
+         [ 20666106.0000],
+         [ 25415178.0000],
+         [-91468744.0000]]]),
+ 'signal_std': tensor([[[1.0487e+09],
+         [1.0482e+09],
+         [1.0406e+09],
+         [1.0465e+09],
+         [1.0369e+09],
+         [1.0389e+09],
+         [1.0362e+09],
+         [1.0357e+09],
+         [1.0442e+09],
+         [1.0480e+09],
+         [1.0477e+09],
+         [1.0535e+09],
+         [1.0397e+09],
+         [1.0477e+09],
+         [1.0398e+09],
+         [1.0488e+09],
+         [1.0455e+09],
+         [1.0496e+09],
+         [1.0392e+09],
+         [1.0355e+09],
+         [1.0428e+09],
+         [1.0489e+09],
+         [1.0508e+09],
+         [1.0319e+09]]]),
+ 'task_description': 'Pathological classification of [Normal] and [Abnormal] EEG',
+ 'task_name': 'Temple University Hospital Abnormal Corpus v2.0.0',
+ 'test_crop_multiple': 8,
+ 'total_samples': 300000000.0,
+ 'transform': Compose(
+    EegRandomCrop(crop_length=6000, length_limit=10000000, multiple=4, latency=2500, return_timing=False, reject_events=False)
+    EegToTensor()
+),
+ 'transform_multicrop': Compose(
+    EegRandomCrop(crop_length=6000, length_limit=10000000, multiple=8, latency=2500, return_timing=False, reject_events=False)
+    EegToTensor()
+),
+ 'use_age': 'fc',
+ 'use_wandb': True,
+ 'warmup_min': 3000,
+ 'warmup_ratio': 0.05,
+ 'watch_model': False,
+ 'weight_decay': 0.04817806327088455,
+ 'width_per_group': 4}
+
+********************************************************************************************
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/tempfile.py:821: ResourceWarning:
+
+Implicitly cleaning up <TemporaryDirectory '/tmp/tmpepg7bid1wandb'>
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/tempfile.py:821: ResourceWarning:
+
+Implicitly cleaning up <TemporaryDirectory '/tmp/tmpqsi0j5eywandb-artifacts'>
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/tempfile.py:821: ResourceWarning:
+
+Implicitly cleaning up <TemporaryDirectory '/tmp/tmplce0sou9wandb-media'>
+
+/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/tempfile.py:821: ResourceWarning:
+
+Implicitly cleaning up <TemporaryDirectory '/tmp/tmpl1zrms53wandb-media'>
+
+
+******************************    Configurations for Train    ******************************
+
+{'EKG': 'O',
+ '_target_': 'models.deit_1d.deit_b_16_1d',
+ 'activation': 'gelu',
+ 'age_mean': tensor([71.0482]),
+ 'age_std': tensor([9.1175]),
+ 'attention_dropout': 0.1,
+ 'awgn': 0.01,
+ 'awgn_age': 0.01,
+ 'base_lr': 0.0001,
+ 'class_label_to_name': ['Normal', 'MCI', 'Dementia'],
+ 'class_name_to_label': {'Dementia': 2, 'MCI': 1, 'Normal': 0},
+ 'clip_grad_norm': 1.0,
+ 'criterion': 'multi-bce',
+ 'crop_multiple': 4,
+ 'crop_timing_analysis': False,
+ 'cwd': '/home/imkbsz/workspace/eeg_analysis',
+ 'dataset_name': 'CAUEEG dataset',
+ 'dataset_path': 'local/dataset/caueeg-dataset/',
+ 'ddp': True,
+ 'ddp_size': 4,
+ 'device': device(type='cuda', index=0),
+ 'distil_alpha': 0.5,
+ 'distil_tau': 1.0,
+ 'distil_teacher': 'lo88puq7',
+ 'distil_teacher_criterion': 'multi-bce',
+ 'distil_teacher_model': DistributedDataParallel(
+  (module): VGG2D(
+    (conv_stage1): Sequential(
+      (0): Conv2d(41, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (2): GELU()
+      (3): Conv2d(64, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (4): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (5): GELU()
+    )
+    (conv_stage2): Sequential(
+      (0): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+      (1): Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (2): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (3): GELU()
+      (4): Conv2d(128, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (5): BatchNorm2d(128, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (6): GELU()
+    )
+    (conv_stage3): Sequential(
+      (0): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+      (1): Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (2): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (3): GELU()
+      (4): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (5): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (6): GELU()
+      (7): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (8): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (9): GELU()
+      (10): Conv2d(256, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (11): BatchNorm2d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (12): GELU()
+    )
+    (conv_stage4): Sequential(
+      (0): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+      (1): Conv2d(256, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (3): GELU()
+      (4): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (5): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (6): GELU()
+      (7): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (8): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (9): GELU()
+      (10): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (11): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (12): GELU()
+    )
+    (conv_stage5): Sequential(
+      (0): MaxPool2d(kernel_size=2, stride=2, padding=0, dilation=1, ceil_mode=False)
+      (1): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (2): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (3): GELU()
+      (4): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (5): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (6): GELU()
+      (7): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (8): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (9): GELU()
+      (10): Conv2d(512, 512, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
+      (11): BatchNorm2d(512, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+      (12): GELU()
+    )
+    (final_pool): AdaptiveAvgPool2d(output_size=(1, 1))
+    (fc_stage): Sequential(
+      (0): Sequential(
+        (0): Linear(in_features=512, out_features=256, bias=False)
+        (1): Dropout(p=0.20149124331753415, inplace=False)
+        (2): BatchNorm1d(256, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
+        (3): GELU()
+      )
+      (1): Linear(in_features=256, out_features=3, bias=True)
+    )
+  )
+),
+ 'distil_teacher_preprocess': Sequential(
+  (0): EegToDevice(device=cuda)
+  (1): EegNormalizeAge(mean=tensor([71.2425], device='cuda:0'),std=tensor([9.5208], device='cuda:0'),eps=1e-08)
+  (2): EegNormalizeMeanStd(mean=tensor([ 0.0794, -0.0131, -0.0121, -0.0244,  0.0004,  0.0295,  0.0506,  0.0152,
+          -0.0003,  0.0337, -0.0050, -0.0096, -0.0336,  0.0111,  0.0077,  0.0076,
+           0.0110,  0.0071, -0.0213,  0.0056], device='cuda:0'),std=tensor([49.7625, 21.7403, 12.5883, 12.5998, 17.0438, 53.6425, 21.1902, 11.1606,
+          12.5307, 16.9399, 21.8603, 15.2040, 14.7430, 23.0870, 18.4153, 15.7697,
+          20.6772, 12.2012, 12.5872, 94.9068], device='cuda:0'),eps=1e-08)
+  (3): EegSpectrogram(n_fft=179, complex_mode=as_real, stft_kwargs={'hop_length': 45})
+  (4): EegNormalizeMeanStd(mean=tensor([[ 8.8867e-02, -5.7190e-03, -1.6277e-03,  ...,  2.6429e-04,
+           -6.7322e-04, -3.5536e-04],
+          [ 1.6543e-01, -4.2610e-03, -1.3435e-03,  ...,  1.1995e-04,
+           -7.5047e-04, -5.0288e-04],
+          [ 3.1017e-01, -5.0789e-03,  5.7958e-04,  ..., -1.4441e-03,
+           -3.9227e-04, -6.9917e-04],
+          ...,
+          [ 0.0000e+00,  3.6909e-02,  1.9252e-02,  ...,  9.5797e-05,
+           -3.3087e-06, -6.3128e-05],
+          [ 0.0000e+00,  2.7598e-02,  1.4468e-02,  ..., -5.3788e-05,
+            1.3961e-04,  5.5767e-05],
+          [ 0.0000e+00, -2.4867e-03, -7.6243e-03,  ...,  6.0732e-04,
+           -2.7412e-04, -5.0179e-05]], device='cuda:0'),std=tensor([[145.3382,  26.7999,  13.3822,  ...,   0.7959,   0.7957,   0.7995],
+          [143.4889,  23.3764,  11.8724,  ...,   0.7910,   0.7902,   0.7958],
+          [139.0950,  20.1886,  10.9955,  ...,   0.8211,   0.8198,   0.8245],
+          ...,
+          [  0.0000,  34.1715,  18.9551,  ...,   0.5108,   0.5090,   0.5146],
+          [  0.0000,  35.6781,  19.4519,  ...,   0.5075,   0.5058,   0.5110],
+          [  0.0000,  22.4555,  21.9978,  ...,   0.4598,   0.4571,   0.4618]],
+         device='cuda:0'),eps=1e-08)
+),
+ 'distil_type': 'soft',
+ 'draw_result': True,
+ 'dropout': 0.3,
+ 'fc_stages': 2,
+ 'file_format': 'memmap',
+ 'in_channels': 20,
+ 'input_norm': 'dataset',
+ 'latency': 2000,
+ 'load_event': False,
+ 'lr_scheduler_type': 'constant_with_twice_decay',
+ 'mgn': 0.01,
+ 'minibatch': 48,
+ 'minibatch_3090': 48,
+ 'mixed_precision': True,
+ 'mixup': 0.2,
+ 'model': '1D-DeiT-B-16',
+ 'multi_batch_size': 6,
+ 'num_history': 500,
+ 'num_params': 86102790,
+ 'out_dims': 3,
+ 'output_length': 252,
+ 'photic': 'X',
+ 'preprocess_test': Error executing job with overrides: ['data=caueeg-dementia', 'data.EKG=O', 'data.photic=X', 'data.awgn=0.01', 'data.awgn_age=0.01', 'data.mgn=0.01', 'data.seq_length=4000', 'model=1D-DeiT-B-16', 'model.activation=gelu', 'model.dropout=0.3', 'model.fc_stages=2', 'model.use_age=conv', 'train=ddp-amp-gradclip-distillation', '++train.ddp_size=4', '++train.criterion=multi-bce', '++train.lr_scheduler_type=constant_with_twice_decay', '++train.mixup=0.2', '++train.weight_decay=0.005', '++train.project=caueeg-dementia', '++train.distil_teacher=lo88puq7', '++train.resume=1c6w8rvq']
+Traceback (most recent call last):
+  File "/home/imkbsz/workspace/eeg_analysis/run_train.py", line 187, in my_app
+    mp.spawn(prepare_and_run_train,
+  File "/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/multiprocessing/spawn.py", line 240, in spawn
+    return start_processes(fn, args, nprocs, join, daemon, start_method='spawn')
+  File "/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/multiprocessing/spawn.py", line 198, in start_processes
+    while not context.join():
+  File "/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/multiprocessing/spawn.py", line 160, in join
+    raise ProcessRaisedException(msg, error_index, failed_process.pid)
+torch.multiprocessing.spawn.ProcessRaisedException: 
+
+-- Process 3 terminated with the following error:
+Traceback (most recent call last):
+  File "/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/multiprocessing/spawn.py", line 69, in _wrap
+    fn(i, *args)
+  File "/home/imkbsz/workspace/eeg_analysis/run_train.py", line 167, in prepare_and_run_train
+    train_script(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
+  File "/home/imkbsz/workspace/eeg_analysis/train/train_script.py", line 124, in train_script
+    checkpoint = torch.load(os.path.join(save_path, 'checkpoint.pt'), map_location=config['device'])
+  File "/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/serialization.py", line 705, in load
+    with _open_zipfile_reader(opened_file) as opened_zipfile:
+  File "/home/imkbsz/anaconda3/envs/eeg/lib/python3.9/site-packages/torch/serialization.py", line 243, in __init__
+    super(_open_zipfile_reader, self).__init__(torch._C.PyTorchFileReader(name_or_buffer))
+RuntimeError: PytorchStreamReader failed reading zip archive: failed finding central directory
+
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
