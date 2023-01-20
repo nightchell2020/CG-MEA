@@ -131,7 +131,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
         config = checkpoint['config']
         if main_process and config['use_wandb']:
             wandb.config.update(config, allow_val_change=True)
-        i_step = checkpoint['optimizer_state']['state'][0]['step']
+        i_step = int(checkpoint['optimizer_state']['state'][0]['step'].detach().cpu().numpy())
         print(f"\n{'*'*30} {f'Training resumes from {resume}':^30} {'*'*30}\n")
         pprint.pprint(config, width=120)
         print(f"\n{'*'*92}\n")
