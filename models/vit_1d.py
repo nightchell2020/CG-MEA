@@ -330,6 +330,7 @@ class VisionTransformer1D(nn.Module):
         # Expand the class token to the full batch
         batch_class_token = self.class_token.expand(N, -1, -1)
         x = torch.cat([batch_class_token, x], dim=1)
+        x = x.contiguous()
 
         x = self.encoder(x)
 

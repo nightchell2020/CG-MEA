@@ -1,0 +1,9 @@
+defaults:
+  - base_model
+  - 2D-Conformer-Base
+  - _self_
+
+model: 2D-Conformer-9-512
+encoder_dim: 512
+num_layers: 9
+minibatch_3090: 384

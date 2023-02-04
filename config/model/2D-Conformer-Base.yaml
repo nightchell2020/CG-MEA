@@ -1,0 +1,11 @@
+defaults:
+  - base_model
+  - _self_
+
+_target_: models.conformer.ConformerClassifier
+model: ???
+seq_len_2d: ???
+use_age: fc
+fc_stages: 3
+dropout: 0.1
+encoder_dim: 512

@@ -334,6 +334,7 @@ class DeiT1D(nn.Module):
         batch_class_token = self.class_token.expand(N, -1, -1)
         batch_distil_token = self.distil_token.expand(N, -1, -1)
         x = torch.cat([batch_class_token, batch_distil_token, x], dim=1)
+        x = x.contiguous()
 
         x = self.encoder(x)
 

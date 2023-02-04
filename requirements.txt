@@ -17,3 +17,4 @@ plotly
 tqdm
 pyarrow
 PySoundFile
+einops
