@@ -2447,3 +2447,1183 @@ Implicitly cleaning up <TemporaryDirectory '/tmp/tmpowywckdiwandb-media'>
 
 Implicitly cleaning up <TemporaryDirectory '/tmp/tmpb0gg1trowandb-media'>
 
+Error executing job with overrides: ['data=caueeg-dementia', 'model=2D-Conformer-9-512', 'train=base_train', '++train.project=noname']
+Error locating target 'models.conformer.ConformerClassifier', see chained exception above.
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+Error executing job with overrides: ['data=caueeg-dementia', '++data.seq_length=8000', 'model=2D-Conformer-9-512', 'train=base_train', '++train.project=noname']
+Error locating target 'models.conformer.ConformerClassifier', see chained exception above.
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+
+******************************    Configurations for Train    ******************************
+
+{'EKG': 'O',
+ '_target_': 'models.conformer.ConformerClassifier',
+ 'age_mean': tensor([71.2164]),
+ 'age_std': tensor([9.6820]),
+ 'awgn': 0.001,
+ 'awgn_age': 0.001,
+ 'base_lr': 0.0001,
+ 'class_label_to_name': ['Normal', 'MCI', 'Dementia'],
+ 'class_name_to_label': {'Dementia': 2, 'MCI': 1, 'Normal': 0},
+ 'criterion': 'cross-entropy',
+ 'crop_multiple': 4,
+ 'crop_timing_analysis': False,
+ 'cwd': '/home/imkbsz/workspace/eeg_analysis',
+ 'dataset_name': 'CAUEEG dataset',
+ 'dataset_path': 'local/dataset/caueeg-dataset/',
+ 'ddp': False,
+ 'device': device(type='cuda'),
+ 'draw_result': True,
+ 'dropout': 0.1,
+ 'encoder_dim': 512,
+ 'fc_stages': 3,
+ 'file_format': 'memmap',
+ 'in_channels': 40,
+ 'input_norm': 'dataset',
+ 'latency': 2000,
+ 'load_event': False,
+ 'lr_scheduler_type': 'constant_with_decay',
+ 'mgn': 0.001,
+ 'minibatch': 384,
+ 'minibatch_3090': 384,
+ 'mixup': 0.0,
+ 'model': '2D-Conformer-9-512',
+ 'multi_batch_size': 48,
+ 'num_history': 500,
+ 'num_layers': 9,
+ 'num_params': 69007427,
+ 'out_dims': 3,
+ 'output_length': 15,
+ 'photic': 'X',
+ 'preprocess_test': Sequential(
+  (0): EegToDevice(device=cuda)
+  (1): EegNormalizeAge(mean=tensor([71.2164]),std=tensor([9.6820]),eps=1e-08)
+  (2): EegNormalizeMeanStd(mean=tensor([-0.0384,  0.0006,  0.0086,  0.0176, -0.0376, -0.1280, -0.0631,  0.0235,
+          -0.0338, -0.0228, -0.0329,  0.0270,  0.0060, -0.0223, -0.0261,  0.0122,
+           0.0641,  0.0284,  0.0234,  0.0032]),std=tensor([45.7019, 20.5953, 12.0251, 12.1081, 16.2011, 48.6628, 20.3841, 10.8768,
+          12.0344, 15.9926, 21.3253, 14.8005, 14.0145, 22.4584, 17.8524, 15.2060,
+          19.6586, 11.8014, 11.9744, 93.7715]),eps=1e-08)
+  (3): EegSpectrogram(n_fft=126, complex_mode=as_real, stft_kwargs={'hop_length': 32})
+  (4): EegNormalizeMeanStd(mean=tensor([[ 1.1007e-01, -3.1573e-03, -5.4595e-04,  ...,  3.1988e-04,
+            3.1681e-04,  1.4790e-04],
+          [-2.6105e-02, -6.5862e-04,  3.7351e-04,  ...,  4.7449e-04,
+            4.9830e-04,  1.8165e-04],
+          [-4.2660e-01, -9.9290e-04,  3.2437e-03,  ...,  3.1296e-05,
+            6.8729e-05, -2.2571e-05],
+          ...,
+          [ 0.0000e+00, -2.0146e-02, -8.3691e-03,  ..., -2.5026e-05,
+            8.9361e-05, -2.3843e-11],
+          [ 0.0000e+00, -1.9799e-02, -8.9291e-03,  ...,  2.6240e-06,
+            3.5863e-06,  9.8340e-11],
+          [ 0.0000e+00,  1.0029e-02,  1.8008e-03,  ...,  1.0066e-05,
+           -6.8718e-05,  6.9733e-11]], device='cuda:0'),std=tensor([[1.0700e+02, 1.6069e+01, 7.7935e+00,  ..., 5.2202e-01, 5.2196e-01,
+           5.2589e-01],
+          [1.0752e+02, 1.4174e+01, 7.4935e+00,  ..., 5.4505e-01, 5.4477e-01,
+           5.5897e-01],
+          [9.9992e+01, 1.2144e+01, 7.5270e+00,  ..., 5.7209e-01, 5.7132e-01,
+           6.0768e-01],
+          ...,
+          [0.0000e+00, 2.0940e+01, 1.2341e+01,  ..., 1.9821e-01, 1.9649e-01,
+           8.6677e-08],
+          [0.0000e+00, 2.1934e+01, 1.2356e+01,  ..., 1.9538e-01, 1.9351e-01,
+           7.5340e-08],
+          [0.0000e+00, 1.8646e+01, 2.1695e+01,  ..., 5.9280e-02, 4.7258e-02,
+           1.6233e-07]], device='cuda:0'),eps=1e-08)
+),
+ 'preprocess_train': Sequential(
+  (0): EegToDevice(device=cuda)
+  (1): EegNormalizeAge(mean=tensor([71.2164], device='cuda:0'),std=tensor([9.6820]),eps=1e-08)
+  (2): EegAddGaussianNoiseAge(mean=0.0,std=0.001)
+  (3): EegNormalizeMeanStd(mean=tensor([-0.0384,  0.0006,  0.0086,  0.0176, -0.0376, -0.1280, -0.0631,  0.0235,
+          -0.0338, -0.0228, -0.0329,  0.0270,  0.0060, -0.0223, -0.0261,  0.0122,
+           0.0641,  0.0284,  0.0234,  0.0032], device='cuda:0'),std=tensor([45.7019, 20.5953, 12.0251, 12.1081, 16.2011, 48.6628, 20.3841, 10.8768,
+          12.0344, 15.9926, 21.3253, 14.8005, 14.0145, 22.4584, 17.8524, 15.2060,
+          19.6586, 11.8014, 11.9744, 93.7715]),eps=1e-08)
+  (4): EegMultiplicativeGaussianNoise(mean=0.0,std=0.001)
+  (5): EegAdditiveGaussianNoise(mean=0.0,std=0.001)
+  (6): EegSpectrogram(n_fft=126, complex_mode=as_real, stft_kwargs={'hop_length': 32})
+  (7): EegNormalizeMeanStd(mean=tensor([[ 1.1007e-01, -3.1573e-03, -5.4595e-04,  ...,  3.1988e-04,
+            3.1681e-04,  1.4790e-04],
+          [-2.6105e-02, -6.5862e-04,  3.7351e-04,  ...,  4.7449e-04,
+            4.9830e-04,  1.8165e-04],
+          [-4.2660e-01, -9.9290e-04,  3.2437e-03,  ...,  3.1296e-05,
+            6.8729e-05, -2.2571e-05],
+          ...,
+          [ 0.0000e+00, -2.0146e-02, -8.3691e-03,  ..., -2.5026e-05,
+            8.9361e-05, -2.3843e-11],
+          [ 0.0000e+00, -1.9799e-02, -8.9291e-03,  ...,  2.6240e-06,
+            3.5863e-06,  9.8340e-11],
+          [ 0.0000e+00,  1.0029e-02,  1.8008e-03,  ...,  1.0066e-05,
+           -6.8718e-05,  6.9733e-11]], device='cuda:0'),std=tensor([[1.0700e+02, 1.6069e+01, 7.7935e+00,  ..., 5.2202e-01, 5.2196e-01,
+           5.2589e-01],
+          [1.0752e+02, 1.4174e+01, 7.4935e+00,  ..., 5.4505e-01, 5.4477e-01,
+           5.5897e-01],
+          [9.9992e+01, 1.2144e+01, 7.5270e+00,  ..., 5.7209e-01, 5.7132e-01,
+           6.0768e-01],
+          ...,
+          [0.0000e+00, 2.0940e+01, 1.2341e+01,  ..., 1.9821e-01, 1.9649e-01,
+           8.6677e-08],
+          [0.0000e+00, 2.1934e+01, 1.2356e+01,  ..., 1.9538e-01, 1.9351e-01,
+           7.5340e-08],
+          [0.0000e+00, 1.8646e+01, 2.1695e+01,  ..., 5.9280e-02, 4.7258e-02,
+           1.6233e-07]], device='cuda:0'),eps=1e-08)
+),
+ 'project': 'noname',
+ 'run_mode': 'train',
+ 'save_model': True,
+ 'search_lr': True,
+ 'search_multiplier': 1.0,
+ 'seed': 0,
+ 'seq_len_2d': (64, 63),
+ 'seq_length': 2000,
+ 'signal_2d_mean': tensor([[[[ 1.1007e-01],
+          [-3.1573e-03],
+          [-5.4595e-04],
+          ...,
+          [ 3.1988e-04],
+          [ 3.1681e-04],
+          [ 1.4790e-04]],
+
+         [[-2.6105e-02],
+          [-6.5862e-04],
+          [ 3.7351e-04],
+          ...,
+          [ 4.7449e-04],
+          [ 4.9830e-04],
+          [ 1.8165e-04]],
+
+         [[-4.2660e-01],
+          [-9.9290e-04],
+          [ 3.2437e-03],
+          ...,
+          [ 3.1296e-05],
+          [ 6.8729e-05],
+          [-2.2571e-05]],
+
+         ...,
+
+         [[ 0.0000e+00],
+          [-2.0146e-02],
+          [-8.3691e-03],
+          ...,
+          [-2.5026e-05],
+          [ 8.9361e-05],
+          [-2.3843e-11]],
+
+         [[ 0.0000e+00],
+          [-1.9799e-02],
+          [-8.9291e-03],
+          ...,
+          [ 2.6240e-06],
+          [ 3.5863e-06],
+          [ 9.8340e-11]],
+
+         [[ 0.0000e+00],
+          [ 1.0029e-02],
+          [ 1.8008e-03],
+          ...,
+          [ 1.0066e-05],
+          [-6.8718e-05],
+          [ 6.9733e-11]]]], device='cuda:0'),
+ 'signal_2d_std': tensor([[[[1.0700e+02],
+          [1.6069e+01],
+          [7.7935e+00],
+          ...,
+          [5.2202e-01],
+          [5.2196e-01],
+          [5.2589e-01]],
+
+         [[1.0752e+02],
+          [1.4174e+01],
+          [7.4935e+00],
+          ...,
+          [5.4505e-01],
+          [5.4477e-01],
+          [5.5897e-01]],
+
+         [[9.9992e+01],
+          [1.2144e+01],
+          [7.5270e+00],
+          ...,
+          [5.7209e-01],
+          [5.7132e-01],
+          [6.0768e-01]],
+
+         ...,
+
+         [[0.0000e+00],
+          [2.0940e+01],
+          [1.2341e+01],
+          ...,
+          [1.9821e-01],
+          [1.9649e-01],
+          [8.6677e-08]],
+
+         [[0.0000e+00],
+          [2.1934e+01],
+          [1.2356e+01],
+          ...,
+          [1.9538e-01],
+          [1.9351e-01],
+          [7.5340e-08]],
+
+         [[0.0000e+00],
+          [1.8646e+01],
+          [2.1695e+01],
+          ...,
+          [5.9280e-02],
+          [4.7258e-02],
+          [1.6233e-07]]]], device='cuda:0'),
+ 'signal_header': ['Fp1-AVG',
+                   'F3-AVG',
+                   'C3-AVG',
+                   'P3-AVG',
+                   'O1-AVG',
+                   'Fp2-AVG',
+                   'F4-AVG',
+                   'C4-AVG',
+                   'P4-AVG',
+                   'O2-AVG',
+                   'F7-AVG',
+                   'T3-AVG',
+                   'T5-AVG',
+                   'F8-AVG',
+                   'T4-AVG',
+                   'T6-AVG',
+                   'FZ-AVG'wandb: Currently logged in as: ipis-mjkim. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.13.9 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.13.5
+wandb: Run data is saved locally in /home/imkbsz/workspace/eeg_analysis/local/hydra/2023-02-04/12-11-47/wandb/run-20230204_121204-t0a6uj44
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run prosperous-horse-18
+wandb: ⭐️ View project at https://wandb.ai/ipis-mjkim/noname
+wandb: 🚀 View run at https://wandb.ai/ipis-mjkim/noname/runs/t0a6uj44
+
+******************************    Configurations for Train    ******************************
+
+{'EKG': 'O',
+ '_target_': 'models.conformer.ConformerClassifier',
+ 'age_mean': tensor([71.2164]),
+ 'age_std': tensor([9.6820]),
+ 'awgn': 0.001,
+ 'awgn_age': 0.001,
+ 'base_lr': 0.0001,
+ 'class_label_to_name': ['Normal', 'MCI', 'Dementia'],
+ 'class_name_to_label': {'Dementia': 2, 'MCI': 1, 'Normal': 0},
+ 'criterion': 'cross-entropy',
+ 'crop_multiple': 4,
+ 'crop_timing_analysis': False,
+ 'cwd': '/home/imkbsz/workspace/eeg_analysis',
+ 'dataset_name': 'CAUEEG dataset',
+ 'dataset_path': 'local/dataset/caueeg-dataset/',
+ 'ddp': False,
+ 'device': device(type='cuda'),
+ 'draw_result': True,
+ 'dropout': 0.1,
+ 'encoder_dim': 512,
+ 'fc_stages': 3,
+ 'file_format': 'memmap',
+ 'in_channels': 40,
+ 'input_norm': 'dataset',
+ 'latency': 2000,
+ 'load_event': False,
+ 'lr_scheduler_type': 'constant_with_decay',
+ 'mgn': 0.001,
+ 'minibatch': 384,
+ 'minibatch_3090': 384,
+ 'mixup': 0.0,
+ 'model': '2D-Conformer-9-512',
+ 'multi_batch_size': 48,
+ 'num_history': 500,
+ 'num_layers': 9,
+ 'num_params': 73201731,
+ 'out_dims': 3,
+ 'output_length': 31,
+ 'photic': 'X',
+ 'preprocess_test': Sequential(
+  (0): EegToDevice(device=cuda)
+  (1): EegNormalizeAge(mean=tensor([71.2164]),std=tensor([9.6820]),eps=1e-08)
+  (2): EegNormalizeMeanStd(mean=tensor([ 0.0374, -0.0044, -0.0017,  0.0006, -0.0036,  0.0612,  0.0061,  0.0022,
+           0.0126, -0.0177,  0.0170, -0.0061, -0.0030, -0.0136, -0.0058,  0.0101,
+          -0.0071,  0.0058,  0.0062, -0.0015]),std=tensor([52.8352, 22.7091, 12.8963, 13.0412, 17.8048, 56.9217, 21.9316, 11.5770,
+          13.1151, 18.4812, 22.4149, 15.7328, 15.1050, 23.5709, 19.1893, 17.0630,
+          21.5312, 12.4877, 12.8464, 95.1715]),eps=1e-08)
+  (3): EegSpectrogram(n_fft=253, complex_mode=as_real, stft_kwargs={'hop_length': 63})
+  (4): EegNormalizeMeanStd(mean=tensor([[-1.8816e-01, -3.1934e-03, -1.6403e-03,  ...,  2.1740e-05,
+            4.1489e-05,  2.8998e-05],
+          [-4.5855e-02, -8.0903e-04, -2.9678e-03,  ...,  2.8614e-04,
+            2.5422e-04,  2.4671e-04],
+          [ 7.6167e-02, -3.8399e-04, -1.2924e-03,  ..., -1.0978e-04,
+            4.1101e-05,  1.5516e-05],
+          ...,
+          [ 0.0000e+00,  4.5277e-02,  1.9997e-02,  ...,  2.8930e-04,
+           -1.8642e-04, -6.2748e-05],
+          [ 0.0000e+00, -2.3034e-02, -1.0574e-02,  ..., -3.0483e-04,
+            2.5583e-04,  3.8331e-05],
+          [ 0.0000e+00, -1.6206e-03,  1.4568e-03,  ..., -3.2878e-06,
+            8.3182e-06,  6.6354e-06]], device='cuda:0'),std=tensor([[1.9571e+02, 4.5693e+01, 2.2660e+01,  ..., 6.9100e-01, 6.9109e-01,
+           6.9110e-01],
+          [1.9271e+02, 3.9959e+01, 1.9339e+01,  ..., 6.9819e-01, 6.9806e-01,
+           6.9869e-01],
+          [1.8885e+02, 3.4320e+01, 1.6810e+01,  ..., 7.3993e-01, 7.3941e-01,
+           7.4043e-01],
+          ...,
+          [0.0000e+00, 5.7530e+01, 3.0443e+01,  ..., 2.6317e-01, 2.6200e-01,
+           2.6300e-01],
+          [0.0000e+00, 5.9950e+01, 3.1738e+01,  ..., 2.5594e-01, 2.5525e-01,
+           2.5598e-01],
+          [0.0000e+00, 2.0687e+01, 2.5185e+01,  ..., 5.3042e-02, 4.7817e-02,
+           4.6012e-02]], device='cuda:0'),eps=1e-08)
+),
+ 'preprocess_train': Sequential(
+  (0): EegToDevice(device=cuda)
+  (1): EegNormalizeAge(mean=tensor([71.2164], device='cuda:0'),std=tensor([9.6820]),eps=1e-08)
+  (2): EegAddGaussianNoiseAge(mean=0.0,std=0.001)
+  (3): EegNormalizeMeanStd(mean=tensor([ 0.0374, -0.0044, -0.0017,  0.0006, -0.0036,  0.0612,  0.0061,  0.0022,
+           0.0126, -0.0177,  0.0170, -0.0061, -0.0030, -0.0136, -0.0058,  0.0101,
+          -0.0071,  0.0058,  0.0062, -0.0015], device='cuda:0'),std=tensor([52.8352, 22.7091, 12.8963, 13.0412, 17.8048, 56.9217, 21.9316, 11.5770,
+          13.1151, 18.4812, 22.4149, 15.7328, 15.1050, 23.5709, 19.1893, 17.0630,
+          21.5312, 12.4877, 12.8464, 95.1715]),eps=1e-08)
+  (4): EegMultiplicativeGaussianNoise(mean=0.0,std=0.001)
+  (5): EegAdditiveGaussianNoise(mean=0.0,std=0.001)
+  (6): EegSpectrogram(n_fft=253, complex_mode=as_real, stft_kwargs={'hop_length': 63})
+  (7): EegNormalizeMeanStd(mean=tensor([[-1.8816e-01, -3.1934e-03, -1.6403e-03,  ...,  2.1740e-05,
+            4.1489e-05,  2.8998e-05],
+          [-4.5855e-02, -8.0903e-04, -2.9678e-03,  ...,  2.8614e-04,
+            2.5422e-04,  2.4671e-04],
+          [ 7.6167e-02, -3.8399e-04, -1.2924e-03,  ..., -1.0978e-04,
+            4.1101e-05,  1.5516e-05],
+          ...,
+          [ 0.0000e+00,  4.5277e-02,  1.9997e-02,  ...,  2.8930e-04,
+           -1.8642e-04, -6.2748e-05],
+          [ 0.0000e+00, -2.3034e-02, -1.0574e-02,  ..., -3.0483e-04,
+            2.5583e-04,  3.8331e-05],
+          [ 0.0000e+00, -1.6206e-03,  1.4568e-03,  ..., -3.2878e-06,
+            8.3182e-06,  6.6354e-06]], device='cuda:0'),std=tensor([[1.9571e+02, 4.5693e+01, 2.2660e+01,  ..., 6.9100e-01, 6.9109e-01,
+           6.9110e-01],
+          [1.9271e+02, 3.9959e+01, 1.9339e+01,  ..., 6.9819e-01, 6.9806e-01,
+           6.9869e-01],
+          [1.8885e+02, 3.4320e+01, 1.6810e+01,  ..., 7.3993e-01, 7.3941e-01,
+           7.4043e-01],
+          ...,
+          [0.0000e+00, 5.7530e+01, 3.0443e+01,  ..., 2.6317e-01, 2.6200e-01,
+           2.6300e-01],
+          [0.0000e+00, 5.9950e+01, 3.1738e+01,  ..., 2.5594e-01, 2.5525e-01,
+           2.5598e-01],
+          [0.0000e+00, 2.0687e+01, 2.5185e+01,  ..., 5.3042e-02, 4.7817e-02,
+           4.6012e-02]], device='cuda:0'),eps=1e-08)
+),
+ 'project': 'noname',
+ 'run_mode': 'train',
+ 'save_model': True,
+ 'search_lr': True,
+ 'search_multiplier': 1.0,
+ 'seed': 0,
+ 'seq_len_2d': (127, 127),
+ 'seq_length': 8000,
+ 'signal_2d_mean': tensor([[[[-1.8816e-01],
+          [-3.1934e-03],
+          [-1.6403e-03],
+          ...,
+          [ 2.1740e-05],
+          [ 4.1489e-05],
+          [ 2.8998e-05]],
+
+         [[-4.5855e-02],
+          [-8.0903e-04],
+          [-2.9678e-03],
+          ...,
+          [ 2.8614e-04],
+          [ 2.5422e-04],
+          [ 2.4671e-04]],
+
+         [[ 7.6167e-02],
+          [-3.8399e-04],
+          [-1.2924e-03],
+          ...,
+          [-1.0978e-04],
+          [ 4.1101e-05],
+          [ 1.5516e-05]],
+
+         ...,
+
+         [[ 0.0000e+00],
+          [ 4.5277e-02],
+          [ 1.9997e-02],
+          ...,
+          [ 2.8930e-04],
+          [-1.8642e-04],
+          [-6.2748e-05]],
+
+         [[ 0.0000e+00],
+          [-2.3034e-02],
+          [-1.0574e-02],
+          ...,
+          [-3.0483e-04],
+          [ 2.5583e-04],
+          [ 3.8331e-05]],
+
+         [[ 0.0000e+00],
+          [-1.6206e-03],
+          [ 1.4568e-03],
+          ...,
+          [-3.2878e-06],
+          [ 8.3182e-06],
+          [ 6.6354e-06]]]], device='cuda:0'),
+ 'signal_2d_std': tensor([[[[1.9571e+02],
+          [4.5693e+01],
+          [2.2660e+01],
+          ...,
+          [6.9100e-01],
+          [6.9109e-01],
+          [6.9110e-01]],
+
+         [[1.9271e+02],
+          [3.9959e+01],
+          [1.9339e+01],
+          ...,
+          [6.9819e-01],
+          [6.9806e-01],
+          [6.9869e-01]],
+
+         [[1.8885e+02],
+          [3.4320e+01],
+          [1.6810e+01],
+          ...,
+          [7.3993e-01],
+          [7.3941e-01],
+          [7.4043e-01]],
+
+         ...,
+
+         [[0.0000e+00],
+          [5.7530e+01],
+          [3.0443e+01],
+          ...,
+          [2.6317e-01],
+          [2.6200e-01],
+          [2.6300e-01]],
+
+         [[0.0000e+00],
+          [5.9950e+01],
+          [3.1738e+01],
+          ...,
+          [2.5594e-01],
+          [2.5525e-01],
+          [2.5598e-01]],
+
+         [[0.0000e+00],
+          [2.0687e+01],
+          [2.5185e+01],
+          ...,
+          [5.3042e-02],
+          [4.7817e-02],
+          [4.6012e-02]]]], device='cuda:0'),
+ 'signal_header': ['Fp1-AVG',
+                   'F3-AVG',
+                   'C3-AVG',
+                   'P3-AVG',
+                   'O1-AVG',
+                   'Fp2-AVG',
+                   'F4-AVG',
+                   'C4-AVG',
+                   'P4-AVG',
+                   'O2-AVG',
+                   'F7-AVG',
+                   'T3-AVG',
+                   'T5-AVG',
+                   'F8-AVG',
+                   'T4-AVG',
+                   'T6-AVG',
+                   'FZ-AVG'wandb: Currently logged in as: ipis-mjkim. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.13.9 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.13.5
+wandb: Run data is saved locally in /home/imkbsz/workspace/eeg_analysis/local/hydra/2023-02-04/12-11-58/wandb/run-20230204_121229-9o74v61n
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run beaming-rocket-19
+wandb: ⭐️ View project at https://wandb.ai/ipis-mjkim/noname
+wandb: 🚀 View run at https://wandb.ai/ipis-mjkim/noname/runs/9o74v61n
+
+******************************    Configurations for Train    ******************************
+
+{'EKG': 'O',
+ '_target_': 'models.conformer.ConformerClassifier',
+ 'age_mean': tensor([71.2164]),
+ 'age_std': tensor([9.6820]),
+ 'awgn': 0.001,
+ 'awgn_age': 0.001,
+ 'base_lr': 0.0001,
+ 'class_label_to_name': ['Normal', 'MCI', 'Dementia'],
+ 'class_name_to_label': {'Dementia': 2, 'MCI': 1, 'Normal': 0},
+ 'criterion': 'cross-entropy',
+ 'crop_multiple': 4,
+ 'crop_timing_analysis': False,
+ 'cwd': '/home/imkbsz/workspace/eeg_analysis',
+ 'dataset_name': 'CAUEEG dataset',
+ 'dataset_path': 'local/dataset/caueeg-dataset/',
+ 'ddp': False,
+ 'device': device(type='cuda'),
+ 'draw_result': True,
+ 'dropout': 0.1,
+ 'encoder_dim': 512,
+ 'fc_stages': 3,
+ 'file_format': 'memmap',
+ 'in_channels': 40,
+ 'input_norm': 'dataset',
+ 'latency': 2000,
+ 'load_event': False,
+ 'lr_scheduler_type': 'constant_with_decay',
+ 'mgn': 0.001,
+ 'minibatch': 384,
+ 'minibatch_3090': 384,
+ 'mixup': 0.0,
+ 'model': '2D-Conformer-9-512',
+ 'multi_batch_size': 48,
+ 'num_history': 500,
+ 'num_layers': 9,
+ 'num_params': 69007427,
+ 'out_dims': 3,
+ 'output_length': 15,
+ 'photic': 'X',
+ 'preprocess_test': Sequential(
+  (0): EegToDevice(device=cuda)
+  (1): EegNormalizeAge(mean=tensor([71.2164]),std=tensor([9.6820]),eps=1e-08)
+  (2): EegNormalizeMeanStd(mean=tensor([-0.0384,  0.0006,  0.0086,  0.0176, -0.0376, -0.1280, -0.0631,  0.0235,
+          -0.0338, -0.0228, -0.0329,  0.0270,  0.0060, -0.0223, -0.0261,  0.0122,
+           0.0641,  0.0284,  0.0234,  0.0032]),std=tensor([45.7019, 20.5953, 12.0251, 12.1081, 16.2011, 48.6628, 20.3841, 10.8768,
+          12.0344, 15.9926, 21.3253, 14.8005, 14.0145, 22.4584, 17.8524, 15.2060,
+          19.6586, 11.8014, 11.9744, 93.7715]),eps=1e-08)
+  (3): EegSpectrogram(n_fft=126, complex_mode=as_real, stft_kwargs={'hop_length': 32})
+  (4): EegNormalizeMeanStd(mean=tensor([[ 1.1007e-01, -3.1573e-03, -5.4595e-04,  ...,  3.1988e-04,
+            3.1681e-04,  1.4790e-04],
+          [-2.6105e-02, -6.5862e-04,  3.7351e-04,  ...,  4.7449e-04,
+            4.9830e-04,  1.8165e-04],
+          [-4.2660e-01, -9.9290e-04,  3.2437e-03,  ...,  3.1296e-05,
+            6.8729e-05, -2.2571e-05],
+          ...,
+          [ 0.0000e+00, -2.0146e-02, -8.3691e-03,  ..., -2.5026e-05,
+            8.9361e-05, -2.3843e-11],
+          [ 0.0000e+00, -1.9799e-02, -8.9291e-03,  ...,  2.6240e-06,
+            3.5863e-06,  9.8340e-11],
+          [ 0.0000e+00,  1.0029e-02,  1.8008e-03,  ...,  1.0066e-05,
+           -6.8718e-05,  6.9733e-11]], device='cuda:0'),std=tensor([[1.0700e+02, 1.6069e+01, 7.7935e+00,  ..., 5.2202e-01, 5.2196e-01,
+           5.2589e-01],
+          [1.0752e+02, 1.4174e+01, 7.4935e+00,  ..., 5.4505e-01, 5.4477e-01,
+           5.5897e-01],
+          [9.9992e+01, 1.2144e+01, 7.5270e+00,  ..., 5.7209e-01, 5.7132e-01,
+           6.0768e-01],
+          ...,
+          [0.0000e+00, 2.0940e+01, 1.2341e+01,  ..., 1.9821e-01, 1.9649e-01,
+           8.6677e-08],
+          [0.0000e+00, 2.1934e+01, 1.2356e+01,  ..., 1.9538e-01, 1.9351e-01,
+           7.5340e-08],
+          [0.0000e+00, 1.8646e+01, 2.1695e+01,  ..., 5.9280e-02, 4.7258e-02,
+           1.6233e-07]], device='cuda:0'),eps=1e-08)
+),
+ 'preprocess_train': Sequential(
+  (0): EegToDevice(device=cuda)
+  (1): EegNormalizeAge(mean=tensor([71.2164], device='cuda:0'),std=tensor([9.6820]),eps=1e-08)
+  (2): EegAddGaussianNoiseAge(mean=0.0,std=0.001)
+  (3): EegNormalizeMeanStd(mean=tensor([-0.0384,  0.0006,  0.0086,  0.0176, -0.0376, -0.1280, -0.0631,  0.0235,
+          -0.0338, -0.0228, -0.0329,  0.0270,  0.0060, -0.0223, -0.0261,  0.0122,
+           0.0641,  0.0284,  0.0234,  0.0032], device='cuda:0'),std=tensor([45.7019, 20.5953, 12.0251, 12.1081, 16.2011, 48.6628, 20.3841, 10.8768,
+          12.0344, 15.9926, 21.3253, 14.8005, 14.0145, 22.4584, 17.8524, 15.2060,
+          19.6586, 11.8014, 11.9744, 93.7715]),eps=1e-08)
+  (4): EegMultiplicativeGaussianNoise(mean=0.0,std=0.001)
+  (5): EegAdditiveGaussianNoise(mean=0.0,std=0.001)
+  (6): EegSpectrogram(n_fft=126, complex_mode=as_real, stft_kwargs={'hop_length': 32})
+  (7): EegNormalizeMeanStd(mean=tensor([[ 1.1007e-01, -3.1573e-03, -5.4595e-04,  ...,  3.1988e-04,
+            3.1681e-04,  1.4790e-04],
+          [-2.6105e-02, -6.5862e-04,  3.7351e-04,  ...,  4.7449e-04,
+            4.9830e-04,  1.8165e-04],
+          [-4.2660e-01, -9.9290e-04,  3.2437e-03,  ...,  3.1296e-05,
+            6.8729e-05, -2.2571e-05],
+          ...,
+          [ 0.0000e+00, -2.0146e-02, -8.3691e-03,  ..., -2.5026e-05,
+            8.9361e-05, -2.3843e-11],
+          [ 0.0000e+00, -1.9799e-02, -8.9291e-03,  ...,  2.6240e-06,
+            3.5863e-06,  9.8340e-11],
+          [ 0.0000e+00,  1.0029e-02,  1.8008e-03,  ...,  1.0066e-05,
+           -6.8718e-05,  6.9733e-11]], device='cuda:0'),std=tensor([[1.0700e+02, 1.6069e+01, 7.7935e+00,  ..., 5.2202e-01, 5.2196e-01,
+           5.2589e-01],
+          [1.0752e+02, 1.4174e+01, 7.4935e+00,  ..., 5.4505e-01, 5.4477e-01,
+           5.5897e-01],
+          [9.9992e+01, 1.2144e+01, 7.5270e+00,  ..., 5.7209e-01, 5.7132e-01,
+           6.0768e-01],
+          ...,
+          [0.0000e+00, 2.0940e+01, 1.2341e+01,  ..., 1.9821e-01, 1.9649e-01,
+           8.6677e-08],
+          [0.0000e+00, 2.1934e+01, 1.2356e+01,  ..., 1.9538e-01, 1.9351e-01,
+           7.5340e-08],
+          [0.0000e+00, 1.8646e+01, 2.1695e+01,  ..., 5.9280e-02, 4.7258e-02,
+           1.6233e-07]], device='cuda:0'),eps=1e-08)
+),
+ 'project': 'noname',
+ 'resume': 't0a6uj44',
+ 'run_mode': 'train',
+ 'save_model': True,
+ 'search_lr': True,
+ 'search_multiplier': 1.0,
+ 'seed': 0,
+ 'seq_len_2d': (64, 63),
+ 'seq_length': 2000,
+ 'signal_2d_mean': tensor([[[[ 1.1007e-01],
+          [-3.1573e-03],
+          [-5.4595e-04],
+          ...,
+          [ 3.1988e-04],
+          [ 3.1681e-04],
+          [ 1.4790e-04]],
+
+         [[-2.6105e-02],
+          [-6.5862e-04],
+          [ 3.7351e-04],
+          ...,
+          [ 4.7449e-04],
+          [ 4.9830e-04],
+          [ 1.8165e-04]],
+
+         [[-4.2660e-01],
+          [-9.9290e-04],
+          [ 3.2437e-03],
+          ...,
+          [ 3.1296e-05],
+          [ 6.8729e-05],
+          [-2.2571e-05]],
+
+         ...,
+
+         [[ 0.0000e+00],
+          [-2.0146e-02],
+          [-8.3691e-03],
+          ...,
+          [-2.5026e-05],
+          [ 8.9361e-05],
+          [-2.3843e-11]],
+
+         [[ 0.0000e+00],
+          [-1.9799e-02],
+          [-8.9291e-03],
+          ...,
+          [ 2.6240e-06],
+          [ 3.5863e-06],
+          [ 9.8340e-11]],
+
+         [[ 0.0000e+00],
+          [ 1.0029e-02],
+          [ 1.8008e-03],
+          ...,
+          [ 1.0066e-05],
+          [-6.8718e-05],
+          [ 6.9733e-11]]]], device='cuda:0'),
+ 'signal_2d_std': tensor([[[[1.0700e+02],
+          [1.6069e+01],
+          [7.7935e+00],
+          ...,
+          [5.2202e-01],
+          [5.2196e-01],
+          [5.2589e-01]],
+
+         [[1.0752e+02],
+          [1.4174e+01],
+          [7.4935e+00],
+          ...,
+          [5.4505e-01],
+          [5.4477e-01],
+          [5.5897e-01]],
+
+         [[9.9992e+01],
+          [1.2144e+01],
+          [7.5270e+00],
+          ...,
+          [5.7209e-01],
+          [5.7132e-01],
+          [6.0768e-01]],
+
+         ...,
+
+         [[0.0000e+00],
+          [2.0940e+01],
+          [1.2341e+01],
+          ...,
+          [1.9821e-01],
+          [1.9649e-01],
+          [8.6677e-08]],
+
+         [[0.0000e+00],
+          [2.1934e+01],
+          [1.2356e+01],
+          ...,
+          [1.9538e-01],
+          [1.9351e-01],
+          [7.5340e-08]],
+
+         [[0.0000e+00],
+          [1.8646e+01],
+          [2.1695e+01],
+          ...,
+          [5.9280e-02],
+          [4.7258e-02],
+          [1.6233e-07]]]], device='cuda:0'),
+ 'signal_header': ['Fp1-AVG',
+                   'F3-AVG',
+                   'C3-AVG',
+                   'P3-AVG',
+                   'O1-AVG',
+                   'Fp2-AVG',
+                   'F4-AVG',
+                   'C4-AVG',
+                   'P4-AVG',
+                   'O2-AVG',
+                   'F7-AVG',
+                   'T3-AVG',
+                   'T5-AVG',
+                   'F8-AVG',
+                   'T4-AVG',
+                   'T6-AVG'wandb: Currently logged in as: ipis-mjkim. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.13.9 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.13.5
+wandb: Run data is saved locally in /home/imkbsz/workspace/eeg_analysis/local/hydra/2023-02-05/09-55-49/wandb/run-20230205_095611-t0a6uj44
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Resuming run t0a6uj44
+wandb: ⭐️ View project at https://wandb.ai/ipis-mjkim/noname
+wandb: 🚀 View run at https://wandb.ai/ipis-mjkim/noname/runs/t0a6uj44
+,
+                   'FZ-AVG',
+                   'CZ-AVG',
+                   'PZ-AVG',
+                   'EKG',
+                   'Photic'],
+ 'signal_length_limit': 10000000,
+ 'signal_mean': tensor([[[-0.0384],
+         [ 0.0006],
+         [ 0.0086],
+         [ 0.0176],
+         [-0.0376],
+         [-0.1280],
+         [-0.0631],
+         [ 0.0235],
+         [-0.0338],
+         [-0.0228],
+         [-0.0329],
+         [ 0.0270],
+         [ 0.0060],
+         [-0.0223],
+         [-0.0261],
+         [ 0.0122],
+         [ 0.0641],
+         [ 0.0284],
+         [ 0.0234],
+         [ 0.0032]]]),
+ 'signal_std': tensor([[[45.7019],
+         [20.5953],
+         [12.0251],
+         [12.1081],
+         [16.2011],
+         [48.6628],
+         [20.3841],
+         [10.8768],
+         [12.0344],
+         [15.9926],
+         [21.3253],
+         [14.8005],
+         [14.0145],
+         [22.4584],
+         [17.8524],
+         [15.2060],
+         [19.6586],
+         [11.8014],
+         [11.9744],
+         [93.7715]]]),
+ 'stft_params': {'hop_length': 32, 'n_fft': 126},
+ 'task': 'dementia',
+ 'task_description': 'Classification of [Normal], [MCI], and [Dementia] symptoms.',
+ 'task_name': 'CAUEEG-Dementia benchmark',
+ 'test_crop_multiple': 8,
+ 'total_samples': 100000000.0,
+ 'transform': Compose(
+    EegRandomCrop(crop_length=2000, length_limit=10000000, multiple=4, latency=2000, return_timing=False, reject_events=False)
+    EegDropChannels(drop_index=[20])
+    EegToTensor()
+),
+ 'transform_multicrop': Compose(
+    EegRandomCrop(crop_length=2000, length_limit=10000000, multiple=8, latency=2000, return_timing=False, reject_events=False)
+    EegDropChannels(drop_index=[20])
+    EegToTensor()
+),
+ 'use_age': 'fc',
+ 'use_wandb': True,
+ 'warmup_min': 3000,
+ 'warmup_ratio': 0.05,
+ 'watch_model': False,
+ 'weight_decay': 0.01}
+
+********************************************************************************************
+
+Error executing job with overrides: ['data=caueeg-dementia', 'model=2D-Conformer-9-512', 'train=base_train', '++train.project=noname', '++train.resume=t0a6uj44']
+Traceback (most recent call last):
+  File "/home/imkbsz/workspace/eeg_analysis/run_train.py", line 192, in my_app
+    prepare_and_run_train(rank=None, world_size=None, config=config)
+  File "/home/imkbsz/workspace/eeg_analysis/run_train.py", line 167, in prepare_and_run_train
+    train_script(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
+  File "/home/imkbsz/workspace/eeg_analysis/train/train_script.py", line 134, in train_script
+    i_step = int(checkpoint['optimizer_state']['state'][0]['step'].detach().cpu().numpy())
+AttributeError: 'int' object has no attribute 'detach'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: - 0.000 MB of 0.000 MB uploaded (0.000 MB deduped)wandb: \ 0.000 MB of 0.012 MB uploaded (0.000 MB deduped)wandb: | 0.000 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: / 0.013 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: 
+wandb: Run summary:
+wandb:       Learning Rate 0.0007
+wandb:                Loss 0.00675
+wandb:      Train Accuracy 99.78616
+wandb: Validation Accuracy 55.90336
+wandb: 
+wandb: Synced t0a6uj44: https://wandb.ai/ipis-mjkim/noname/runs/t0a6uj44
+wandb: Synced 3 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20230205_095611-t0a6uj44/logs
+
+******************************    Configurations for Train    ******************************
+
+{'EKG': 'O',
+ '_target_': 'models.conformer.ConformerClassifier',
+ 'age_mean': tensor([71.2164]),
+ 'age_std': tensor([9.6820]),
+ 'awgn': 0.001,
+ 'awgn_age': 0.001,
+ 'base_lr': 0.0001,
+ 'class_label_to_name': ['Normal', 'MCI', 'Dementia'],
+ 'class_name_to_label': {'Dementia': 2, 'MCI': 1, 'Normal': 0},
+ 'criterion': 'cross-entropy',
+ 'crop_multiple': 4,
+ 'crop_timing_analysis': False,
+ 'cwd': '/home/imkbsz/workspace/eeg_analysis',
+ 'dataset_name': 'CAUEEG dataset',
+ 'dataset_path': 'local/dataset/caueeg-dataset/',
+ 'ddp': False,
+ 'device': device(type='cuda'),
+ 'draw_result': True,
+ 'dropout': 0.1,
+ 'encoder_dim': 512,
+ 'fc_stages': 3,
+ 'file_format': 'memmap',
+ 'in_channels': 40,
+ 'input_norm': 'dataset',
+ 'latency': 2000,
+ 'load_event': False,
+ 'lr_scheduler_type': 'constant_with_decay',
+ 'mgn': 0.001,
+ 'minibatch': 384,
+ 'minibatch_3090': 384,
+ 'mixup': 0.0,
+ 'model': '2D-Conformer-9-512',
+ 'multi_batch_size': 48,
+ 'num_history': 500,
+ 'num_layers': 9,
+ 'num_params': 73201731,
+ 'out_dims': 3,
+ 'output_length': 31,
+ 'photic': 'X',
+ 'preprocess_test': Sequential(
+  (0): EegToDevice(device=cuda)
+  (1): EegNormalizeAge(mean=tensor([71.2164]),std=tensor([9.6820]),eps=1e-08)
+  (2): EegNormalizeMeanStd(mean=tensor([ 0.0374, -0.0044, -0.0017,  0.0006, -0.0036,  0.0612,  0.0061,  0.0022,
+           0.0126, -0.0177,  0.0170, -0.0061, -0.0030, -0.0136, -0.0058,  0.0101,
+          -0.0071,  0.0058,  0.0062, -0.0015]),std=tensor([52.8352, 22.7091, 12.8963, 13.0412, 17.8048, 56.9217, 21.9316, 11.5770,
+          13.1151, 18.4812, 22.4149, 15.7328, 15.1050, 23.5709, 19.1893, 17.0630,
+          21.5312, 12.4877, 12.8464, 95.1715]),eps=1e-08)
+  (3): EegSpectrogram(n_fft=253, complex_mode=as_real, stft_kwargs={'hop_length': 63})
+  (4): EegNormalizeMeanStd(mean=tensor([[-1.8816e-01, -3.1934e-03, -1.6403e-03,  ...,  2.1740e-05,
+            4.1489e-05,  2.8998e-05],
+          [-4.5855e-02, -8.0903e-04, -2.9678e-03,  ...,  2.8614e-04,
+            2.5422e-04,  2.4671e-04],
+          [ 7.6167e-02, -3.8399e-04, -1.2924e-03,  ..., -1.0978e-04,
+            4.1101e-05,  1.5516e-05],
+          ...,
+          [ 0.0000e+00,  4.5277e-02,  1.9997e-02,  ...,  2.8930e-04,
+           -1.8642e-04, -6.2748e-05],
+          [ 0.0000e+00, -2.3034e-02, -1.0574e-02,  ..., -3.0483e-04,
+            2.5583e-04,  3.8331e-05],
+          [ 0.0000e+00, -1.6206e-03,  1.4568e-03,  ..., -3.2878e-06,
+            8.3182e-06,  6.6354e-06]], device='cuda:0'),std=tensor([[1.9571e+02, 4.5693e+01, 2.2660e+01,  ..., 6.9100e-01, 6.9109e-01,
+           6.9110e-01],
+          [1.9271e+02, 3.9959e+01, 1.9339e+01,  ..., 6.9819e-01, 6.9806e-01,
+           6.9869e-01],
+          [1.8885e+02, 3.4320e+01, 1.6810e+01,  ..., 7.3993e-01, 7.3941e-01,
+           7.4043e-01],
+          ...,
+          [0.0000e+00, 5.7530e+01, 3.0443e+01,  ..., 2.6317e-01, 2.6200e-01,
+           2.6300e-01],
+          [0.0000e+00, 5.9950e+01, 3.1738e+01,  ..., 2.5594e-01, 2.5525e-01,
+           2.5598e-01],
+          [0.0000e+00, 2.0687e+01, 2.5185e+01,  ..., 5.3042e-02, 4.7817e-02,
+           4.6012e-02]], device='cuda:0'),eps=1e-08)
+),
+ 'preprocess_train': Sequential(
+  (0): EegToDevice(device=cuda)
+  (1): EegNormalizeAge(mean=tensor([71.2164], device='cuda:0'),std=tensor([9.6820]),eps=1e-08)
+  (2): EegAddGaussianNoiseAge(mean=0.0,std=0.001)
+  (3): EegNormalizeMeanStd(mean=tensor([ 0.0374, -0.0044, -0.0017,  0.0006, -0.0036,  0.0612,  0.0061,  0.0022,
+           0.0126, -0.0177,  0.0170, -0.0061, -0.0030, -0.0136, -0.0058,  0.0101,
+          -0.0071,  0.0058,  0.0062, -0.0015], device='cuda:0'),std=tensor([52.8352, 22.7091, 12.8963, 13.0412, 17.8048, 56.9217, 21.9316, 11.5770,
+          13.1151, 18.4812, 22.4149, 15.7328, 15.1050, 23.5709, 19.1893, 17.0630,
+          21.5312, 12.4877, 12.8464, 95.1715]),eps=1e-08)
+  (4): EegMultiplicativeGaussianNoise(mean=0.0,std=0.001)
+  (5): EegAdditiveGaussianNoise(mean=0.0,std=0.001)
+  (6): EegSpectrogram(n_fft=253, complex_mode=as_real, stft_kwargs={'hop_length': 63})
+  (7): EegNormalizeMeanStd(mean=tensor([[-1.8816e-01, -3.1934e-03, -1.6403e-03,  ...,  2.1740e-05,
+            4.1489e-05,  2.8998e-05],
+          [-4.5855e-02, -8.0903e-04, -2.9678e-03,  ...,  2.8614e-04,
+            2.5422e-04,  2.4671e-04],
+          [ 7.6167e-02, -3.8399e-04, -1.2924e-03,  ..., -1.0978e-04,
+            4.1101e-05,  1.5516e-05],
+          ...,
+          [ 0.0000e+00,  4.5277e-02,  1.9997e-02,  ...,  2.8930e-04,
+           -1.8642e-04, -6.2748e-05],
+          [ 0.0000e+00, -2.3034e-02, -1.0574e-02,  ..., -3.0483e-04,
+            2.5583e-04,  3.8331e-05],
+          [ 0.0000e+00, -1.6206e-03,  1.4568e-03,  ..., -3.2878e-06,
+            8.3182e-06,  6.6354e-06]], device='cuda:0'),std=tensor([[1.9571e+02, 4.5693e+01, 2.2660e+01,  ..., 6.9100e-01, 6.9109e-01,
+           6.9110e-01],
+          [1.9271e+02, 3.9959e+01, 1.9339e+01,  ..., 6.9819e-01, 6.9806e-01,
+           6.9869e-01],
+          [1.8885e+02, 3.4320e+01, 1.6810e+01,  ..., 7.3993e-01, 7.3941e-01,
+           7.4043e-01],
+          ...,
+          [0.0000e+00, 5.7530e+01, 3.0443e+01,  ..., 2.6317e-01, 2.6200e-01,
+           2.6300e-01],
+          [0.0000e+00, 5.9950e+01, 3.1738e+01,  ..., 2.5594e-01, 2.5525e-01,
+           2.5598e-01],
+          [0.0000e+00, 2.0687e+01, 2.5185e+01,  ..., 5.3042e-02, 4.7817e-02,
+           4.6012e-02]], device='cuda:0'),eps=1e-08)
+),
+ 'project': 'noname',
+ 'resume': '9o74v61n',
+ 'run_mode': 'train',
+ 'save_model': True,
+ 'search_lr': True,
+ 'search_multiplier': 1.0,
+ 'seed': 0,
+ 'seq_len_2d': (127, 127),
+ 'seq_length': 8000,
+ 'signal_2d_mean': tensor([[[[-1.8816e-01],
+          [-3.1934e-03],
+          [-1.6403e-03],
+          ...,
+          [ 2.1740e-05],
+          [ 4.1489e-05],
+          [ 2.8998e-05]],
+
+         [[-4.5855e-02],
+          [-8.0903e-04],
+          [-2.9678e-03],
+          ...,
+          [ 2.8614e-04],
+          [ 2.5422e-04],
+          [ 2.4671e-04]],
+
+         [[ 7.6167e-02],
+          [-3.8399e-04],
+          [-1.2924e-03],
+          ...,
+          [-1.0978e-04],
+          [ 4.1101e-05],
+          [ 1.5516e-05]],
+
+         ...,
+
+         [[ 0.0000e+00],
+          [ 4.5277e-02],
+          [ 1.9997e-02],
+          ...,
+          [ 2.8930e-04],
+          [-1.8642e-04],
+          [-6.2748e-05]],
+
+         [[ 0.0000e+00],
+          [-2.3034e-02],
+          [-1.0574e-02],
+          ...,
+          [-3.0483e-04],
+          [ 2.5583e-04],
+          [ 3.8331e-05]],
+
+         [[ 0.0000e+00],
+          [-1.6206e-03],
+          [ 1.4568e-03],
+          ...,
+          [-3.2878e-06],
+          [ 8.3182e-06],
+          [ 6.6354e-06]]]], device='cuda:0'),
+ 'signal_2d_std': tensor([[[[1.9571e+02],
+          [4.5693e+01],
+          [2.2660e+01],
+          ...,
+          [6.9100e-01],
+          [6.9109e-01],
+          [6.9110e-01]],
+
+         [[1.9271e+02],
+          [3.9959e+01],
+          [1.9339e+01],
+          ...,
+          [6.9819e-01],
+          [6.9806e-01],
+          [6.9869e-01]],
+
+         [[1.8885e+02],
+          [3.4320e+01],
+          [1.6810e+01],
+          ...,
+          [7.3993e-01],
+          [7.3941e-01],
+          [7.4043e-01]],
+
+         ...,
+
+         [[0.0000e+00],
+          [5.7530e+01],
+          [3.0443e+01],
+          ...,
+          [2.6317e-01],
+          [2.6200e-01],
+          [2.6300e-01]],
+
+         [[0.0000e+00],
+          [5.9950e+01],
+          [3.1738e+01],
+          ...,
+          [2.5594e-01],
+          [2.5525e-01],
+          [2.5598e-01]],
+
+         [[0.0000e+00],
+          [2.0687e+01],
+          [2.5185e+01],
+          ...,
+          [5.3042e-02],
+          [4.7817e-02],
+          [4.6012e-02]]]], device='cuda:0'),
+ 'signal_header': ['Fp1-AVG',
+                   'F3-AVG',
+                   'C3-AVG',
+                   'P3-AVG',
+                   'O1-AVG',
+                   'Fp2-AVG',
+                   'F4-AVG',
+                   'C4-AVG',
+                   'P4-AVG',
+                   'O2-AVG',
+                   'F7-AVG',
+                   'T3-AVG',
+                   'T5-AVG',
+                   'F8-AVG',
+                   'T4-AVG',
+                   'T6-AVG'wandb: Currently logged in as: ipis-mjkim. Use `wandb login --relogin` to force relogin
+wandb: wandb version 0.13.9 is available!  To upgrade, please run:
+wandb:  $ pip install wandb --upgrade
+wandb: Tracking run with wandb version 0.13.5
+wandb: Run data is saved locally in /home/imkbsz/workspace/eeg_analysis/local/hydra/2023-02-05/09-56-04/wandb/run-20230205_095635-9o74v61n
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Resuming run 9o74v61n
+wandb: ⭐️ View project at https://wandb.ai/ipis-mjkim/noname
+wandb: 🚀 View run at https://wandb.ai/ipis-mjkim/noname/runs/9o74v61n
+,
+                   'FZ-AVG',
+                   'CZ-AVG',
+                   'PZ-AVG',
+                   'EKG',
+                   'Photic'],
+ 'signal_length_limit': 10000000,
+ 'signal_mean': tensor([[[ 0.0374],
+         [-0.0044],
+         [-0.0017],
+         [ 0.0006],
+         [-0.0036],
+         [ 0.0612],
+         [ 0.0061],
+         [ 0.0022],
+         [ 0.0126],
+         [-0.0177],
+         [ 0.0170],
+         [-0.0061],
+         [-0.0030],
+         [-0.0136],
+         [-0.0058],
+         [ 0.0101],
+         [-0.0071],
+         [ 0.0058],
+         [ 0.0062],
+         [-0.0015]]]),
+ 'signal_std': tensor([[[52.8352],
+         [22.7091],
+         [12.8963],
+         [13.0412],
+         [17.8048],
+         [56.9217],
+         [21.9316],
+         [11.5770],
+         [13.1151],
+         [18.4812],
+         [22.4149],
+         [15.7328],
+         [15.1050],
+         [23.5709],
+         [19.1893],
+         [17.0630],
+         [21.5312],
+         [12.4877],
+         [12.8464],
+         [95.1715]]]),
+ 'stft_params': {'hop_length': 63, 'n_fft': 253},
+ 'task': 'dementia',
+ 'task_description': 'Classification of [Normal], [MCI], and [Dementia] symptoms.',
+ 'task_name': 'CAUEEG-Dementia benchmark',
+ 'test_crop_multiple': 8,
+ 'total_samples': 100000000.0,
+ 'transform': Compose(
+    EegRandomCrop(crop_length=8000, length_limit=10000000, multiple=4, latency=2000, return_timing=False, reject_events=False)
+    EegDropChannels(drop_index=[20])
+    EegToTensor()
+),
+ 'transform_multicrop': Compose(
+    EegRandomCrop(crop_length=8000, length_limit=10000000, multiple=8, latency=2000, return_timing=False, reject_events=False)
+    EegDropChannels(drop_index=[20])
+    EegToTensor()
+),
+ 'use_age': 'fc',
+ 'use_wandb': True,
+ 'warmup_min': 3000,
+ 'warmup_ratio': 0.05,
+ 'watch_model': False,
+ 'weight_decay': 0.01}
+
+********************************************************************************************
+
+Error executing job with overrides: ['data=caueeg-dementia', '++data.seq_length=8000', 'model=2D-Conformer-9-512', 'train=base_train', '++train.project=noname', '++train.resume=9o74v61n']
+Traceback (most recent call last):
+  File "/home/imkbsz/workspace/eeg_analysis/run_train.py", line 192, in my_app
+    prepare_and_run_train(rank=None, world_size=None, config=config)
+  File "/home/imkbsz/workspace/eeg_analysis/run_train.py", line 167, in prepare_and_run_train
+    train_script(config, model, train_loader, val_loader, test_loader, multicrop_test_loader,
+  File "/home/imkbsz/workspace/eeg_analysis/train/train_script.py", line 134, in train_script
+    i_step = int(checkpoint['optimizer_state']['state'][0]['step'].detach().cpu().numpy())
+AttributeError: 'int' object has no attribute 'detach'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+wandb: Waiting for W&B process to finish... (failed 1). Press Control-C to abort syncing.
+wandb: - 0.000 MB of 0.000 MB uploaded (0.000 MB deduped)wandb: \ 0.000 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: | 0.000 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: / 0.013 MB of 0.013 MB uploaded (0.000 MB deduped)wandb: 
+wandb: Run summary:
+wandb:       Learning Rate 5e-05
+wandb:                Loss 0.00366
+wandb:      Train Accuracy 99.88932
+wandb: Validation Accuracy 53.21429
+wandb: 
+wandb: Synced 9o74v61n: https://wandb.ai/ipis-mjkim/noname/runs/9o74v61n
+wandb: Synced 3 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20230205_095635-9o74v61n/logs
