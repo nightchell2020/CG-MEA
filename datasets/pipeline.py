@@ -514,6 +514,27 @@ class EegNormalizeMeanStd(torch.nn.Module):
         return f"{self.__class__.__name__}(mean={self.mean.squeeze()},std={self.std.squeeze()},eps={self.eps})"
 
 
+class EegChannelDropOut(torch.nn.Module):
+    """DropOut some channels using the specified ratio.
+
+    Args:
+        p (float): Probability to drop each channel
+    """
+    def __init__(self, p):
+        super().__init__()
+        self.p = p
+
+    def forward(self, sample):
+        signal = sample['signal']
+        ind = torch.rand((signal.shape[0], signal.shape[1]), device=signal.get_device()) < self.p
+        signal[ind] = 0
+        sample['signal'] = signal
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(p={self.p})"
+
+
 class EegAdditiveGaussianNoise(torch.nn.Module):
     """Additive white Gaussian noise."""
 

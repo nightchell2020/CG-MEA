@@ -14,6 +14,7 @@ from .pipeline import EegNormalizeAge
 from .pipeline import EegDropChannels
 from .pipeline import EegAdditiveGaussianNoise, EegMultiplicativeGaussianNoise
 from .pipeline import EegAddGaussianNoiseAge
+from .pipeline import EegChannelDropOut
 from .pipeline import EegToTensor, EegToDevice
 from .pipeline import EegSpectrogram
 from .pipeline import eeg_collate_fn
@@ -262,8 +263,11 @@ def calculate_age_statistics(train_loader, verbose=False):
     return age_mean, age_std
 
 
-def calculate_stft_params(seq_length, hop_ratio=1.0 / 4.0, verbose=False):
-    n_fft = round(math.sqrt(2.0 * seq_length / hop_ratio))
+def calculate_stft_params(seq_length, n_fft=0, hop_ratio=1.0 / 4.0, verbose=False):
+    if n_fft == 0:
+        n_fft = round(math.sqrt(2.0 * seq_length / hop_ratio))
+    elif isinstance(n_fft, float):
+        n_fft = round(n_fft)
     hop_length = round(n_fft * hop_ratio)
     seq_len_2d = (math.floor(n_fft / 2.0) + 1, math.floor(seq_length / hop_length) + 1)
 
@@ -395,6 +399,12 @@ def compose_preprocess(config, train_loader, verbose=True):
     else:
         raise ValueError(f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']")
 
+    ###############################
+    # dropout channel (1D signal) #
+    ###############################
+    if config.get('channel_dropout', 0.0) > 1e-8:
+        preprocess_train += [EegChannelDropOut(p=config['channel_dropout'])]
+
     ##############################################################
     # multiplicative Gaussian noise for augmentation (1D signal) #
     ##############################################################
@@ -425,7 +435,8 @@ def compose_preprocess(config, train_loader, verbose=True):
     if config.get('model', '1D').startswith('2D'):
         stft_params = config.pop('stft_params', {})
         n_fft, hop_length, seq_len_2d = calculate_stft_params(seq_length=config['seq_length'],
-                                                              hop_ratio=stft_params.pop('hop_ratio', 1/4.0),
+                                                              n_fft=stft_params.pop('n_fft', 0),
+                                                              hop_ratio=stft_params.pop('hop_ratio', 1 / 4.0),
                                                               verbose=False)
         config['stft_params'] = {'n_fft': n_fft,
                                  'hop_length': hop_length,
