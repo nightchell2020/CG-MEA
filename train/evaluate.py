@@ -56,6 +56,16 @@ def calculate_confusion_matrix(pred, target, num_classes):
     return confusion
 
 
+def calculate_confusion_matrix2(pred, target, num_classes, set_size):
+    N = set_size
+    repeat = target.shape[0] // N
+    confusion = []
+    for r in range(repeat):
+        cm = calculate_confusion_matrix(pred[r * N:(r + 1) * N], target[r * N:(r + 1) * N], num_classes=num_classes)
+        confusion.append(cm)
+    return np.array(confusion)
+
+
 def calculate_class_wise_metrics(confusion_matrix):
     n_classes = confusion_matrix.shape[0]
 

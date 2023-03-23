@@ -6,6 +6,10 @@ import torch
 import torchaudio
 
 
+def make_variable_repr(a: dict):
+    return f"({', '.join([f'{k}={v!r}' for k, v in a.items() if not (k.startswith('_') or k == 'training')])})"
+
+
 class EegLimitMaxLength(object):
     """Cut off the start and end signals by the specified amount.
 
@@ -24,7 +28,7 @@ class EegLimitMaxLength(object):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(max_length={self.max_length})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegRandomCrop(object):
@@ -125,9 +129,7 @@ class EegRandomCrop(object):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(crop_length={self.crop_length}, length_limit={self.length_limit}, " \
-               f"multiple={self.multiple}, latency={self.latency}, return_timing={self.return_timing}, " \
-               f"reject_events={self.reject_events})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegEyeOpenCrop(object):
@@ -202,9 +204,7 @@ class EegEyeOpenCrop(object):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(crop_before={self.crop_before}, " \
-               f"crop_after={self.crop_after}, jitter={self.jitter}, mode={self.mode}, " \
-               f"length_limit={self.length_limit})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegEyeClosedCrop(object):
@@ -293,9 +293,7 @@ class EegEyeClosedCrop(object):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(transition={self.transition}, " \
-               f"crop_length={self.crop_length}, jitter={self.jitter}, mode={self.mode}, " \
-               f"length_limit={self.length_limit})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegChangeMontageOrder(object):
@@ -338,7 +336,7 @@ class EegChangeMontageOrder(object):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(channel_change={self.channel_change})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegDropChannels(object):
@@ -367,7 +365,7 @@ class EegDropChannels(object):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(drop_index={self.drop_index})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegToTensor(object):
@@ -400,7 +398,7 @@ class EegToTensor(object):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}()"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 def eeg_collate_fn(batch):
@@ -450,7 +448,7 @@ class EegToDevice(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(device={self.device})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegNormalizePerSignal(torch.nn.Module):
@@ -468,7 +466,7 @@ class EegNormalizePerSignal(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(eps={self.eps})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegNormalizeMeanStd(torch.nn.Module):
@@ -511,7 +509,7 @@ class EegNormalizeMeanStd(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(mean={self.mean.squeeze()},std={self.std.squeeze()},eps={self.eps})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegChannelDropOut(torch.nn.Module):
@@ -532,7 +530,7 @@ class EegChannelDropOut(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(p={self.p})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegAdditiveGaussianNoise(torch.nn.Module):
@@ -551,7 +549,7 @@ class EegAdditiveGaussianNoise(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(mean={self.mean},std={self.std})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegMultiplicativeGaussianNoise(torch.nn.Module):
@@ -570,7 +568,7 @@ class EegMultiplicativeGaussianNoise(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(mean={self.mean},std={self.std})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegNormalizeAge(torch.nn.Module):
@@ -601,7 +599,7 @@ class EegNormalizeAge(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(mean={self.mean},std={self.std},eps={self.eps})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegAddGaussianNoiseAge(torch.nn.Module):
@@ -625,7 +623,7 @@ class EegAddGaussianNoiseAge(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(mean={self.mean},std={self.std})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegAgeBias(torch.nn.Module):
@@ -644,7 +642,7 @@ class EegAgeBias(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(bias={self.bias})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegAgeSetConstant(torch.nn.Module):
@@ -663,7 +661,7 @@ class EegAgeSetConstant(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(bias={self.bias})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegSpectrogram(torch.nn.Module):
@@ -729,8 +727,7 @@ class EegSpectrogram(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(n_fft={self.n_fft}, complex_mode={self.complex_mode}, " \
-               f"stft_kwargs={self.stft_kwargs})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class EegResample(torch.nn.Module):
@@ -771,8 +768,7 @@ class EegResample(torch.nn.Module):
         return sample
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(resampling_method='{self.resampling_method}', " \
-               f"orig_freq={self.orig_freq}, new_freq={self.new_freq})"
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
 class TransformTimeChecker(object):

@@ -268,8 +268,8 @@ def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=Fa
 
 def draw_confusion2(mean_confusion, std_confusion, class_label_to_name, use_wandb=False, save_path=None):
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
-    H = len(class_label_to_name) + 0.5
-    W = len(class_label_to_name) + 0.5
+    H = len(class_label_to_name) + 0.8
+    W = len(class_label_to_name) + 0.8
     fig = plt.figure(num=1, clear=True, figsize=(W, H), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
 
@@ -281,11 +281,11 @@ def draw_confusion2(mean_confusion, std_confusion, class_label_to_name, use_wand
                      threshold=0.7, text_kw={"weight": "semibold"})
 
     annotate_heatmap(im, data=mean_confusion, data_for_color=data,
-                     anno_format="\n\n({x:3.1f}         ", text_colors=("black", "white"),
+                     anno_format="\n\n({x:4.1f}           ", text_colors=("black", "white"),
                      threshold=0.7, text_kw={"size": "small"})
 
     annotate_heatmap(im, data=std_confusion, data_for_color=data,
-                     anno_format="\n\n        ±{x:.1f})", text_colors=("black", "white"),
+                     anno_format="\n\n         ±{x:4.1f})", text_colors=("black", "white"),
                      threshold=0.7, text_kw={"size": "small"})
 
     ax.set_title('Confusion Matrix')
@@ -309,7 +309,7 @@ def draw_confusion2(mean_confusion, std_confusion, class_label_to_name, use_wand
     # fig.clear()
     plt.close(fig)
 
-def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False, save_path=None):
+def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False, save_path=None, percent=False):
     class_wise_metrics = calculate_class_wise_metrics(confusion)
 
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
@@ -318,14 +318,22 @@ def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False, sav
     fig = plt.figure(num=1, clear=True, figsize=(W, H), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
 
-    im = draw_heatmap(data=np.array([*class_wise_metrics.values()]).T,  # np.ones((C, len(class_wise_metrics))),
-                      row_labels=class_label_to_name, col_labels=[*class_wise_metrics.keys()],
-                      ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
-                      draw_cbar=False,  cbar_label="", cbar_kw={'alpha': 0.9})
-
-    annotate_heatmap(im, data=np.array([*class_wise_metrics.values()]).T,
-                     anno_format="{x:.2f}", text_colors=("black", "white"),
-                     threshold=0.7, text_kw={"weight": "semibold"})
+    if percent:
+        im = draw_heatmap(data=np.array([*class_wise_metrics.values()]).T * 100,  # np.ones((C, len(class_wise_metrics))),
+                          row_labels=class_label_to_name, col_labels=[*class_wise_metrics.keys()],
+                          ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
+                          draw_cbar=False, cbar_label="", cbar_kw={'alpha': 0.9})
+        annotate_heatmap(im, data=np.array([*class_wise_metrics.values()]).T * 100,
+                         anno_format="{x:.2f}%", text_colors=("black", "white"),
+                         threshold=0.7, text_kw={"weight": "semibold"})
+    else:
+        im = draw_heatmap(data=np.array([*class_wise_metrics.values()]).T,  # np.ones((C, len(class_wise_metrics))),
+                          row_labels=class_label_to_name, col_labels=[*class_wise_metrics.keys()],
+                          ax=ax, imshow_kw={'alpha': 0.9, 'cmap': "YlOrRd"},  # jet, YlOrRd, RdPu
+                          draw_cbar=False, cbar_label="", cbar_kw={'alpha': 0.9})
+        annotate_heatmap(im, data=np.array([*class_wise_metrics.values()]).T,
+                         anno_format="{x:.2f}", text_colors=("black", "white"),
+                         threshold=0.7, text_kw={"weight": "semibold"})
 
     ax.set_title('Class-wise metrics')
 
