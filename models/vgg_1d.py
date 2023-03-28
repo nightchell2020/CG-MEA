@@ -174,6 +174,10 @@ class VGG1D(nn.Module):
     def get_output_length(self):
         return self.output_length
 
+    def get_dims_from_last(self, target_from_last: int):
+        l = self.fc_stages - target_from_last
+        return self.fc_stage[l][0].in_features
+
     def get_num_fc_stages(self):
         return self.fc_stages
 

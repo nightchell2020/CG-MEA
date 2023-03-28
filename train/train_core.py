@@ -129,3 +129,57 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
     avg_loss = cumu_loss / steps
 
     return avg_loss, train_acc
+
+
+def ssl_train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps):
+    model.train()
+
+    i = 0
+    cumu_loss = 0
+
+    while True:
+        for sample_batched in loader:
+            optimizer.zero_grad()
+
+            # preprocessing (this includes to-device operation)
+            preprocess(sample_batched)
+
+            # pull the data
+            x = sample_batched['signal']
+            age = sample_batched['age']
+
+            # mixed precision training if needed
+            with autocast(enabled=config.get('mixed_precision', False)):
+                # forward pass
+                loss = model(x, age)
+
+            # backward and update
+            if config.get('mixed_precision', False):
+                amp_scaler.scale(loss).backward()
+                if 'clip_grad_norm' in config:
+                    amp_scaler.unscale_(optimizer)
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config['clip_grad_norm'])
+                amp_scaler.step(optimizer)
+                amp_scaler.update()
+                scheduler.step()
+                model.post_update_params()
+            else:
+                loss.backward()
+                if 'clip_grad_norm' in config:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config['clip_grad_norm'])
+                optimizer.step()
+                scheduler.step()
+                model.post_update_params()
+
+            # train accuracy
+            cumu_loss += loss.item()
+
+            i += 1
+            if steps <= i:
+                break
+        if steps <= i:
+            break
+
+    avg_loss = cumu_loss / steps
+
+    return avg_loss

@@ -3,6 +3,7 @@ defaults:
   - train: base_train
   - model: base_model
   - optional sweep: optional
+  - optional ssl: optional
   - _self_
 
 hydra:

@@ -1,0 +1,8 @@
+defaults:
+  - _self_
+
+_ssl_target_: models.ssl.byol.BYOL
+embedding_layer: 'pool'  # -2
+mlp_hidden_size: 4096
+projection_size: 256
+target_ema: 0.99
