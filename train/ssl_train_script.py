@@ -9,7 +9,7 @@ from datetime import datetime
 
 from .train_core import ssl_train_multistep
 from optim import get_lr_scheduler
-from .visualize import draw_lr_search_record
+from .visualize import draw_ssl_lr_search_record
 
 # __all__ = []
 
@@ -19,8 +19,8 @@ def learning_rate_search(config, model, loader, preprocess, trials, steps):
     given_model_state = deepcopy(model.state_dict())
 
     # default learning rate range is set based on a minibatch size of 32
-    min_log_lr = -3.2 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
-    max_log_lr = -6.0 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
+    min_log_lr = -1.0 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
+    max_log_lr = -5.0 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
         lr = 10 ** log_lr
@@ -45,7 +45,7 @@ def learning_rate_search(config, model, loader, preprocess, trials, steps):
 
     # find the best starting point (if a tie occurs, average them)
     losses = np.array([loss for _, loss in learning_rate_record])
-    induces = np.argwhere(losses == np.max(losses))
+    induces = np.argwhere(losses == np.min(losses))
     best_log_lr = np.average(np.array([log_lr for log_lr, _ in learning_rate_record])[induces])
 
     # recover the given  model state
@@ -84,7 +84,7 @@ def ssl_train_script(config, model, loader, preprocess):
                                                             loader=loader, preprocess=preprocess,
                                                             trials=20, steps=500)
         if main_process:
-            draw_lr_search_record(lr_search, use_wandb=config['use_wandb'])
+            draw_ssl_lr_search_record(lr_search, use_wandb=config['use_wandb'])
 
     # training iteration and other conditions
     config['base_lr'] = config['base_lr'] * config.get('search_multiplier', 1.0)

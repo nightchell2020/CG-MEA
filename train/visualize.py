@@ -51,6 +51,31 @@ def draw_lr_search_record(learning_rate_record, use_wandb=False):
     plt.close(fig)
 
 
+def draw_ssl_lr_search_record(learning_rate_record, use_wandb=False):
+    plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
+
+    fig = plt.figure(num=1, clear=True, constrained_layout=True, figsize=(7.0, 4.0))
+    ax = fig.add_subplot(1, 1, 1)
+    ax.set_title('Learning Rate Search')
+    ax.set_xlabel('Learning rate in log-scale')
+    ax.set_ylabel('Train Loss')
+
+    lr_records = np.array(learning_rate_record)
+
+    ax.plot(lr_records [:, 0], lr_records [:, 1], 'o',
+            color='tab:red', alpha=0.6, label='Train Loss')
+
+    if use_wandb:
+        warnings.filterwarnings(action='ignore')
+        wandb.log({"Learning Rate Search": mpl_to_plotly(fig)})
+        warnings.filterwarnings(action='default')
+    else:
+        plt.show()
+
+    fig.clear()
+    plt.close(fig)
+
+
 def draw_loss_plot(losses, lr_decay_step=None):
     plt.style.use('default')  # default, ggplot, fivethirtyeight, classic
     fig = plt.figure(num=1, clear=True, figsize=(8.0, 3.0), constrained_layout=True)
