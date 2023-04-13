@@ -40,7 +40,7 @@ def learning_rate_search(config, model, train_loader, val_loader,
                                      iterations=config['total_samples'], warmup_steps=config['total_samples'])
         amp_scaler = torch.cuda.amp.GradScaler() if config.get('mixed_precision', False) else None
 
-        train_multistep(model, train_loader, preprocess_train, optimizer, scheduler, amp_scaler, config, steps)
+        loss, _ = train_multistep(model, train_loader, preprocess_train, optimizer, scheduler, amp_scaler, config, steps)
 
         train_accuracy = check_accuracy(model, train_loader, preprocess_test, config,
                                         repeat=max(config.get('val_accuracy_repeat', 15) // 5, 3))
@@ -48,7 +48,8 @@ def learning_rate_search(config, model, train_loader, val_loader,
                                       repeat=config.get('val_accuracy_repeat', 15))
 
         # Train accuracy for the final epoch is stored
-        learning_rate_record.append((log_lr, train_accuracy, val_accuracy))
+        if np.isfinite(loss):
+            learning_rate_record.append((log_lr, train_accuracy, val_accuracy))
 
         del optimizer, scheduler
         torch.cuda.empty_cache()

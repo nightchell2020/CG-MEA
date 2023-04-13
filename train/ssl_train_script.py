@@ -19,7 +19,7 @@ def learning_rate_search(config, model, loader, preprocess, trials, steps):
     given_model_state = deepcopy(model.state_dict())
 
     # default learning rate range is set based on a minibatch size of 32
-    min_log_lr = -1.0 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
+    min_log_lr = -1.5 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
     max_log_lr = -5.0 + np.log10(config['minibatch'] * config.get('ddp_size', 1) / 32)
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
@@ -37,7 +37,8 @@ def learning_rate_search(config, model, loader, preprocess, trials, steps):
         loss = ssl_train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps)
 
         # Train accuracy for the final epoch is stored
-        learning_rate_record.append((log_lr, loss))
+        if np.isfinite(loss):
+            learning_rate_record.append((log_lr, loss))
 
         del optimizer, scheduler
         torch.cuda.empty_cache()
