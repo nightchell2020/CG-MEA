@@ -1,6 +1,6 @@
 # dataset
 dataset_name: tuab
-dataset_path: local/dataset/Temple_EEG/
+dataset_path: local/dataset/TUAB/
 file_format: memmap
 crop_multiple: 4
 test_crop_multiple: 8

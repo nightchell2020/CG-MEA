@@ -2,6 +2,7 @@
 import os
 from copy import deepcopy
 import gc
+from packaging import version
 from omegaconf import DictConfig, OmegaConf
 from collections import OrderedDict
 import hydra
@@ -37,6 +38,12 @@ def check_device_env(config):
             config['minibatch'] = config['minibatch_3090'] // 4
         elif '1070' in device_name:
             config['minibatch'] = config['minibatch_3090'] // 4
+        else:
+            config['minibatch'] = config['minibatch_3090']
+            print('*' * 150)
+            print(f"- WARNING: this process set the minibatch size as {config['minibatch']}, assuming that your VRAM size of GPU is equivalent to NVIDIA RTX 3090.")
+            print(f"- If you want to change the minibatch size, add '++minibatch=MINIBACH_SIZE' option to the command.")
+            print('*' * 150)
 
     # distributed training
     if config.get('ddp', False):
@@ -84,6 +91,15 @@ def generate_model(config):
         model = model.to(config['device'])
         config['output_length'] = model.get_output_length()
         config['num_params'] = count_parameters(model)
+
+    if 'model_compile' in config.keys():
+        if version.parse("2.0.0") <= version.parse(torch.__version__):
+            model = torch.compile(model, mode=config.get('model_compile', None))
+        else:
+            print("WARNING: PyTorch version ({str(torch.__version__)}) older than 2.0.0 cannot compile the model. "
+                  "The config option['model_compile'] is ignored.")
+            config.pop('model_compile', None)
+
     return model
 
 

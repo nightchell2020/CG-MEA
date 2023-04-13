@@ -66,6 +66,7 @@ class BYOL(nn.Module):
             return out_a_online[:, :-1]
         else:
             return out_a_online
+
     def forward(self, x: torch.Tensor, age: torch.Tensor):
         # divide x's depending on the branch
         N = x.shape[0]
