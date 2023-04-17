@@ -162,13 +162,17 @@ def ssl_train_multistep(model, loader, preprocess, optimizer, scheduler, amp_sca
                 amp_scaler.step(optimizer)
                 amp_scaler.update()
                 scheduler.step()
-                model.post_update_params()
             else:
                 loss.backward()
                 if 'clip_grad_norm' in config:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), config['clip_grad_norm'])
                 optimizer.step()
                 scheduler.step()
+
+            # post update (e.g., momentum)
+            if config.get('ddp', False):
+                model.module.post_update_params()
+            else:
                 model.post_update_params()
 
             # train accuracy

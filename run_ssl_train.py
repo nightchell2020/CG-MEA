@@ -41,7 +41,9 @@ def generate_ssl_model(config):
     device = config['device']
     if config.get('ddp', False):
         torch.cuda.set_device(device)
-        model = DDP(model, device_ids=[device])
+        model.cuda(config["device"])
+        model = DDP(model, device_ids=[device], find_unused_parameters=True)
+        torch.distributed.barrier()
     else:
         model = model.to(device)
 
@@ -59,7 +61,7 @@ def prepare_and_run_ssl_train(rank, world_size, config):
 
     # setup for distributed training
     if config.get('ddp', False):
-        initialize_ddp(rank, world_size, config)
+        config = initialize_ddp(rank, world_size, config)
 
     # compose dataset
     train_loader, _, _, _ = compose_dataset(config)

@@ -15,3 +15,5 @@
 /wandb/
 
 *.pyc
+
+nohup.out
