@@ -280,6 +280,7 @@ class ConformerClassifier(nn.Module):
             prev_dim = prev_dim // 2
         heads_layers["head"] = nn.Linear(prev_dim, out_dims)
         self.heads = nn.Sequential(heads_layers)
+        # self.fc_stage = self.heads
 
         self.reset_weights()
 

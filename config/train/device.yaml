@@ -1,6 +1,0 @@
-defaults:
-  - base_train
-  - _self_
-
-# GPU
-device: 0  # modify this

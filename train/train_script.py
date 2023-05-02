@@ -174,9 +174,9 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                            'Validation Accuracy': val_acc,
                            'Learning Rate': optimizer.state_dict()['param_groups'][0]['lr'],
                            }, step=i_step * config["minibatch"])
-            else:
-                print(f"{i_step:7>} / {config['iterations']:>7} iter - "
-                      f"Loss: {loss:.4}, Train Acc.: {train_acc:.4}, Val. Acc.: {val_acc:.4}")
+            else: # print(f"{i_step: >8} / {config['iterations']: >8} iter - Loss: {loss:.4f}")
+                print(f"{i_step:>8} / {config['iterations']:>8} iter - "
+                      f"Loss: {loss:.4f}, Train Acc.: {train_acc:.4f}, Val. Acc.: {val_acc:.4f}")
 
             # save the model
             if config['save_model']:
@@ -233,7 +233,7 @@ def train_script(config, model, train_loader, val_loader, test_loader, multicrop
                        'Multi-Crop Test Accuracy': multicrop_test_acc,})
         else:
             print(f"\n{'*'*30} {run_name:^30} {'*'*30}\n")
-            pprint.pprint({'Test Accuracy': test_acc,
+            pprint.pprint({f'Test Accuracy': test_acc,
                            '(Best, Last) Test Accuracy': ('Best' if last_test_acc < best_test_acc else 'Last',
                                                           round(best_test_acc, 2), round(last_test_acc, 2)),
                            'Confusion Matrix (Array)': test_confusion,

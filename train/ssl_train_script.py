@@ -149,11 +149,11 @@ def ssl_train_script(config, model, loader, preprocess):
                 wandb.log({'Loss': loss, 'Learning Rate': optimizer.state_dict()['param_groups'][0]['lr'], },
                           step=i_step * config["minibatch"])
             else:
-                print(f"{i_step:7>} / {config['iterations']:>7} iter - Loss: {loss:.4}")
+                print(f"{i_step: >8} / {config['iterations']: >8} iter - Loss: {loss:.4f}")
 
             # save the model
             if config['save_model']:
-                checkpoint = {'model_state': model.backbone.state_dict(), 'ssl_model_state': model.state_dict(),
+                checkpoint = {'ssl_model_state': model.state_dict(),
                               'config': config, 'optimizer_state': optimizer.state_dict(),
                               'scheduler_state': scheduler.state_dict()}
                 torch.save(checkpoint, os.path.join(save_path, 'checkpoint_.pt'))
@@ -163,7 +163,7 @@ def ssl_train_script(config, model, loader, preprocess):
     if main_process:
         # save the model
         if config['save_model']:
-            checkpoint = {'model_state': model.backbone.state_dict(), 'ssl_model_state':  model.state_dict(),
+            checkpoint = {'ssl_model_state':  model.state_dict(),
                           'config': config, 'optimizer_state': optimizer.state_dict(),
                           'scheduler_state': scheduler.state_dict()}
             torch.save(checkpoint, os.path.join(save_path, 'checkpoint.pt'))
