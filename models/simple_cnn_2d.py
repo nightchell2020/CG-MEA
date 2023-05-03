@@ -22,24 +22,16 @@ class IeracitanoCNN(nn.Module):
         super().__init__()
 
         if use_age != "no":
-            raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) accepts for only 'no'."
-            )
+            raise ValueError(f"{self.__class__.__name__}.__init__(use_age) accepts for only 'no'.")
 
         if fc_stages != 1:
-            raise ValueError(
-                f"{self.__class__.__name__}.__init__(fc_stages) accepts for only 1."
-            )
+            raise ValueError(f"{self.__class__.__name__}.__init__(fc_stages) accepts for only 1.")
 
         self.sequence_length = seq_length
         self.fc_stages = fc_stages
 
-        self.nn_act = get_activation_class(
-            activation, class_name=self.__class__.__name__
-        )
-        self.F_act = get_activation_functional(
-            activation, class_name=self.__class__.__name__
-        )
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
+        self.F_act = get_activation_functional(activation, class_name=self.__class__.__name__)
 
         if base_pool == "average":
             self.base_pool = nn.AvgPool2d

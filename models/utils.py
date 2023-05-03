@@ -28,8 +28,7 @@ def program_conv_filters(
     in_out_ratio = float(sequence_length) / mid
 
     base_stride = np.power(
-        in_out_ratio
-        / np.prod([cf["kernel_size"] for cf in conv_filter_list], dtype=np.float64),
+        in_out_ratio / np.prod([cf["kernel_size"] for cf in conv_filter_list], dtype=np.float64),
         1.0 / len(conv_filter_list),
     )
 
@@ -39,11 +38,7 @@ def program_conv_filters(
             total_stride = max(1.0, base_stride * cf["kernel_size"] * 0.7)
             cf["pool"] = max(
                 1,
-                round(
-                    np.sqrt(total_stride / stride_to_pool_ratio)
-                    * stride_to_pool_ratio
-                    * 0.3
-                ),
+                round(np.sqrt(total_stride / stride_to_pool_ratio) * stride_to_pool_ratio * 0.3),
             )
             cf["stride"] = max(1, round(total_stride / cf["pool"]))
         else:
@@ -52,10 +47,7 @@ def program_conv_filters(
                 cf["pool"] = min(
                     max(
                         1,
-                        round(
-                            np.sqrt(total_stride / stride_to_pool_ratio)
-                            * stride_to_pool_ratio
-                        ),
+                        round(np.sqrt(total_stride / stride_to_pool_ratio) * stride_to_pool_ratio),
                     ),
                     round(total_stride),
                 )
@@ -72,9 +64,7 @@ def program_conv_filters(
         conv_filter_list[i] = cf
 
     success = False
-    str_debug = (
-        f"\n{'-'*100}\nstarting from sequence length: {sequence_length}\n{'-'*100}\n"
-    )
+    str_debug = f"\n{'-'*100}\nstarting from sequence length: {sequence_length}\n{'-'*100}\n"
     current_length = sequence_length
 
     for k in range(trials):
@@ -90,9 +80,7 @@ def program_conv_filters(
 
                 effective_kernel_size = (cf["kernel_size"] - 1) * cf.get("dilation", 1)
                 both_side_pad = 2 * (cf["kernel_size"] // 2) if pad is True else 0
-                current_length = (
-                    current_length + both_side_pad - effective_kernel_size - 1
-                ) // cf["stride"] + 1
+                current_length = (current_length + both_side_pad - effective_kernel_size - 1) // cf["stride"] + 1
                 str_debug += f">> {current_length}\n"
 
             pool = conv_filter_list[pivot]["pool"]

@@ -5,14 +5,22 @@ import math
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from torch.utils.data.distributed import DistributedSampler
+from torch.utils.data.distributed import (
+    DistributedSampler,
+)
 
 from .caueeg_dataset import CauEegDataset
 from .pipeline import EegRandomCrop
-from .pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
+from .pipeline import (
+    EegNormalizeMeanStd,
+    EegNormalizePerSignal,
+)
 from .pipeline import EegNormalizeAge
 from .pipeline import EegDropChannels
-from .pipeline import EegAdditiveGaussianNoise, EegMultiplicativeGaussianNoise
+from .pipeline import (
+    EegAdditiveGaussianNoise,
+    EegMultiplicativeGaussianNoise,
+)
 from .pipeline import EegAddGaussianNoiseAge
 from .pipeline import EegChannelDropOut
 from .pipeline import EegToTensor, EegToDevice
@@ -30,7 +38,10 @@ def load_caueeg_config(dataset_path: str):
         dataset_path (str): The file path where the dataset files are located.
     """
     try:
-        with open(os.path.join(dataset_path, "annotation.json"), "r") as json_file:
+        with open(
+            os.path.join(dataset_path, "annotation.json"),
+            "r",
+        ) as json_file:
             annotation = json.load(json_file)
     except FileNotFoundError as e:
         print(
@@ -44,7 +55,10 @@ def load_caueeg_config(dataset_path: str):
 
 
 def load_caueeg_full_dataset(
-    dataset_path: str, load_event: bool = True, file_format: str = "edf", transform=None
+    dataset_path: str,
+    load_event: bool = True,
+    file_format: str = "edf",
+    transform=None,
 ):
     """Load the whole CAUEEG dataset as a PyTorch dataset instance without considering the target task.
 
@@ -58,7 +72,10 @@ def load_caueeg_full_dataset(
         The PyTorch dataset instance for the entire CAUEEG dataset.
     """
     try:
-        with open(os.path.join(dataset_path, "annotation.json"), "r") as json_file:
+        with open(
+            os.path.join(dataset_path, "annotation.json"),
+            "r",
+        ) as json_file:
             annotation = json.load(json_file)
     except FileNotFoundError as e:
         print(
@@ -114,7 +131,10 @@ def load_caueeg_task_datasets(
         )
 
     try:
-        with open(os.path.join(dataset_path, task + ".json"), "r") as json_file:
+        with open(
+            os.path.join(dataset_path, task + ".json"),
+            "r",
+        ) as json_file:
             task_dict = json.load(json_file)
 
         train_dataset = CauEegDataset(
@@ -145,15 +165,18 @@ def load_caueeg_task_datasets(
         )
         raise
     except ValueError as e:
-        print(
-            f"ERROR: load_caueeg_task_datasets(file_format={file_format}) encounters an error of {e}."
-        )
+        print(f"ERROR: load_caueeg_task_datasets(file_format={file_format}) encounters an error of {e}.")
         raise
 
     config = {
         k: v
         for k, v in task_dict.items()
-        if k not in ["train_split", "validation_split", "test_split"]
+        if k
+        not in [
+            "train_split",
+            "validation_split",
+            "test_split",
+        ]
     }
 
     if verbose:
@@ -165,9 +188,15 @@ def load_caueeg_task_datasets(
         pprint.pprint(train_dataset[0].keys(), compact=True)
 
         if torch.is_tensor(train_dataset[0]):
-            print("train signal shape:", train_dataset[0]["signal"].shape)
+            print(
+                "train signal shape:",
+                train_dataset[0]["signal"].shape,
+            )
         else:
-            print("train signal shape:", train_dataset[0]["signal"][0].shape)
+            print(
+                "train signal shape:",
+                train_dataset[0]["signal"][0].shape,
+            )
 
         print()
         print("\n" + "-" * 100 + "\n")
@@ -180,7 +209,12 @@ def load_caueeg_task_datasets(
         pprint.pprint(test_dataset[0].keys(), compact=True)
         print("\n" + "-" * 100 + "\n")
 
-    return config, train_dataset, val_dataset, test_dataset
+    return (
+        config,
+        train_dataset,
+        val_dataset,
+        test_dataset,
+    )
 
 
 def load_caueeg_task_split(
@@ -219,7 +253,10 @@ def load_caueeg_task_split(
         )
 
     try:
-        with open(os.path.join(dataset_path, task + ".json"), "r") as json_file:
+        with open(
+            os.path.join(dataset_path, task + ".json"),
+            "r",
+        ) as json_file:
             task_dict = json.load(json_file)
     except FileNotFoundError as e:
         print(
@@ -228,7 +265,12 @@ def load_caueeg_task_split(
         )
         raise
 
-    if split in ["train", "training", "train_split", "training_split"]:
+    if split in [
+        "train",
+        "training",
+        "train_split",
+        "training_split",
+    ]:
         dataset = CauEegDataset(
             dataset_path,
             task_dict["train_split"],
@@ -236,7 +278,12 @@ def load_caueeg_task_split(
             file_format=file_format,
             transform=transform,
         )
-    elif split in ["val", "validation", "val_split", "validation_split"]:
+    elif split in [
+        "val",
+        "validation",
+        "val_split",
+        "validation_split",
+    ]:
         dataset = CauEegDataset(
             dataset_path,
             task_dict["validation_split"],
@@ -254,14 +301,18 @@ def load_caueeg_task_split(
         )
     else:
         raise ValueError(
-            f"ERROR: load_caueeg_task_split(split) needs string among of "
-            f"'train', 'validation', and 'test'"
+            f"ERROR: load_caueeg_task_split(split) needs string among of " f"'train', 'validation', and 'test'"
         )
 
     config = {
         k: v
         for k, v in task_dict.items()
-        if k not in ["train_split", "validation_split", "test_split"]
+        if k
+        not in [
+            "train_split",
+            "validation_split",
+            "test_split",
+        ]
     }
 
     if verbose:
@@ -269,9 +320,15 @@ def load_caueeg_task_split(
         pprint.pprint(dataset[0].keys(), compact=True)
 
         if torch.is_tensor(dataset[0]):
-            print(f"{split} signal shape:", dataset[0]["signal"].shape)
+            print(
+                f"{split} signal shape:",
+                dataset[0]["signal"].shape,
+            )
         else:
-            print(f"{split} signal shape:", dataset[0]["signal"][0].shape)
+            print(
+                f"{split} signal shape:",
+                dataset[0]["signal"][0].shape,
+            )
 
         print("\n" + "-" * 100 + "\n")
 
@@ -279,7 +336,10 @@ def load_caueeg_task_split(
 
 
 def calculate_signal_statistics(
-    train_loader, preprocess_train=None, repeats=5, verbose=False
+    train_loader,
+    preprocess_train=None,
+    repeats=5,
+    verbose=False,
 ):
     signal_means = torch.zeros((1,))
     signal_stds = torch.zeros((1,))
@@ -291,9 +351,7 @@ def calculate_signal_statistics(
                 preprocess_train(sample)
 
             signal = sample["signal"]
-            std, mean = torch.std_mean(
-                signal, dim=-1, keepdim=True
-            )  # [N, C, L] or [N, (2)C, F, T]
+            std, mean = torch.std_mean(signal, dim=-1, keepdim=True)  # [N, C, L] or [N, (2)C, F, T]
 
             if r == 0 and i == 0:
                 signal_means = torch.zeros_like(mean)
@@ -304,7 +362,9 @@ def calculate_signal_statistics(
             n_count += 1
 
     signal_mean = torch.mean(
-        signal_means / n_count, dim=0, keepdim=True
+        signal_means / n_count,
+        dim=0,
+        keepdim=True,
     )  # [N, C, L] or [N, (2)C, F, T]
     signal_std = torch.mean(signal_stds / n_count, dim=0, keepdim=True)
 
@@ -346,13 +406,21 @@ def calculate_age_statistics(train_loader, verbose=False):
     return age_mean, age_std
 
 
-def calculate_stft_params(seq_length, n_fft=0, hop_ratio=1.0 / 4.0, verbose=False):
+def calculate_stft_params(
+    seq_length,
+    n_fft=0,
+    hop_ratio=1.0 / 4.0,
+    verbose=False,
+):
     if n_fft == 0:
         n_fft = round(math.sqrt(2.0 * seq_length / hop_ratio))
     elif isinstance(n_fft, float):
         n_fft = round(n_fft)
     hop_length = round(n_fft * hop_ratio)
-    seq_len_2d = (math.floor(n_fft / 2.0) + 1, math.floor(seq_length / hop_length) + 1)
+    seq_len_2d = (
+        math.floor(n_fft / 2.0) + 1,
+        math.floor(seq_length / hop_length) + 1,
+    )
 
     if verbose:
         print(
@@ -398,24 +466,30 @@ def compose_transforms(config, verbose=False):
     ###################################
     # usage of EKG or photic channels #
     ###################################
-    channel_ekg = config["signal_header"].index("EKG")
-    channel_photic = config["signal_header"].index("Photic")
+    channel_reduction_list = config.get("channel_reduction_list", [])
 
-    if config["EKG"] == "O" and config["photic"] == "O":
-        pass
-    elif config["EKG"] == "O" and config["photic"] == "X":
-        transform += [EegDropChannels([channel_photic])]
-        transform_multicrop += [EegDropChannels([channel_photic])]
-    elif config["EKG"] == "X" and config["photic"] == "O":
-        transform += [EegDropChannels([channel_ekg])]
-        transform_multicrop += [EegDropChannels([channel_ekg])]
-    elif config["EKG"] == "X" and config["photic"] == "X":
-        transform += [EegDropChannels([channel_ekg, channel_photic])]
-        transform_multicrop += [EegDropChannels([channel_ekg, channel_photic])]
-    else:
-        raise ValueError(
-            f"Both config['EKG'] and config['photic'] have to be set to one of ['O', 'X']"
-        )
+    if config.get("EKG", None) not in [
+        "O",
+        "X",
+        None,
+    ]:
+        raise ValueError(f"Both config['EKG'] should be one of ['O', 'X', None]")
+    elif config.get("EKG", None) == "X":
+        channel_reduction_list.append(config["signal_header"].index("EKG"))
+
+    if config.get("photic", None) not in [
+        "O",
+        "X",
+        None,
+    ]:
+        raise ValueError(f"Both config['photic'] should be one of ['O', 'X', None]")
+    elif config.get("photic", None) == "X":
+        channel_reduction_list.append(config["signal_header"].index("Photic"))
+
+    channel_reduction_set = set(channel_reduction_list)
+
+    transform += [EegDropChannels(sorted([*channel_reduction_set]))]
+    transform_multicrop += [EegDropChannels(sorted([*channel_reduction_set]))]
 
     ###################
     # numpy to tensor #
@@ -436,7 +510,10 @@ def compose_transforms(config, verbose=False):
         print("transform:", transform)
         print("\n" + "-" * 100 + "\n")
 
-        print("transform_multicrop:", transform_multicrop)
+        print(
+            "transform_multicrop:",
+            transform_multicrop,
+        )
         print("\n" + "-" * 100 + "\n")
         print()
 
@@ -457,13 +534,22 @@ def compose_preprocess(config, train_loader, verbose=True):
     # data normalization (age) #
     ############################
     if "age_mean" not in config or "age_std" not in config:
-        config["age_mean"], config["age_std"] = calculate_age_statistics(
-            train_loader, verbose=False
-        )
+        (
+            config["age_mean"],
+            config["age_std"],
+        ) = calculate_age_statistics(train_loader, verbose=False)
     preprocess_train += [
-        EegNormalizeAge(mean=config["age_mean"], std=config["age_std"])
+        EegNormalizeAge(
+            mean=config["age_mean"],
+            std=config["age_std"],
+        )
     ]
-    preprocess_test += [EegNormalizeAge(mean=config["age_mean"], std=config["age_std"])]
+    preprocess_test += [
+        EegNormalizeAge(
+            mean=config["age_mean"],
+            std=config["age_std"],
+        )
+    ]
 
     ##################################################
     # additive Gaussian noise for augmentation (age) #
@@ -475,23 +561,32 @@ def compose_preprocess(config, train_loader, verbose=True):
     elif config["awgn_age"] > 0.0:
         preprocess_train += [EegAddGaussianNoiseAge(mean=0.0, std=config["awgn_age"])]
     else:
-        raise ValueError(
-            f"config['awgn_age'] have to be None or a positive floating point number"
-        )
+        raise ValueError(f"config['awgn_age'] have to be None or a positive floating point number")
 
     ##################################
     # data normalization (1D signal) #
     ##################################
     if config["input_norm"] == "dataset":
         if "signal_mean" not in config or "signal_std" not in config:
-            config["signal_mean"], config["signal_std"] = calculate_signal_statistics(
-                train_loader, repeats=5, verbose=False
+            (
+                config["signal_mean"],
+                config["signal_std"],
+            ) = calculate_signal_statistics(
+                train_loader,
+                repeats=5,
+                verbose=False,
             )
         preprocess_train += [
-            EegNormalizeMeanStd(mean=config["signal_mean"], std=config["signal_std"])
+            EegNormalizeMeanStd(
+                mean=config["signal_mean"],
+                std=config["signal_std"],
+            )
         ]
         preprocess_test += [
-            EegNormalizeMeanStd(mean=config["signal_mean"], std=config["signal_std"])
+            EegNormalizeMeanStd(
+                mean=config["signal_mean"],
+                std=config["signal_std"],
+            )
         ]
     elif config["input_norm"] == "datapoint":
         preprocess_train += [EegNormalizePerSignal()]
@@ -499,9 +594,7 @@ def compose_preprocess(config, train_loader, verbose=True):
     elif config["input_norm"] == "no":
         pass
     else:
-        raise ValueError(
-            f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']"
-        )
+        raise ValueError(f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']")
 
     ###############################
     # dropout channel (1D signal) #
@@ -517,13 +610,9 @@ def compose_preprocess(config, train_loader, verbose=True):
     elif config.get("mgn") is None or config["mgn"] <= 1e-12:
         pass
     elif config["mgn"] > 0.0:
-        preprocess_train += [
-            EegMultiplicativeGaussianNoise(mean=0.0, std=config["mgn"])
-        ]
+        preprocess_train += [EegMultiplicativeGaussianNoise(mean=0.0, std=config["mgn"])]
     else:
-        raise ValueError(
-            f"config['mgn'] have to be None or a positive floating point number"
-        )
+        raise ValueError(f"config['mgn'] have to be None or a positive floating point number")
 
     ########################################################
     # additive Gaussian noise for augmentation (1D signal) #
@@ -535,16 +624,18 @@ def compose_preprocess(config, train_loader, verbose=True):
     elif config["awgn"] > 0.0:
         preprocess_train += [EegAdditiveGaussianNoise(mean=0.0, std=config["awgn"])]
     else:
-        raise ValueError(
-            f"config['awgn'] have to be None or a positive floating point number"
-        )
+        raise ValueError(f"config['awgn'] have to be None or a positive floating point number")
 
     ###################
     # STFT (1D -> 2D) #
     ###################
     if config.get("model", "1D").startswith("2D"):
         stft_params = config.pop("stft_params", {})
-        n_fft, hop_length, seq_len_2d = calculate_stft_params(
+        (
+            n_fft,
+            hop_length,
+            seq_len_2d,
+        ) = calculate_stft_params(
             seq_length=config["seq_length"],
             n_fft=stft_params.pop("n_fft", 0),
             hop_ratio=stft_params.pop("hop_ratio", 1 / 4.0),
@@ -569,7 +660,10 @@ def compose_preprocess(config, train_loader, verbose=True):
                 preprocess_temp = transforms.Compose(preprocess_train)
                 preprocess_temp = torch.nn.Sequential(*preprocess_temp.transforms)
 
-                signal_2d_mean, signal_2d_std = calculate_signal_statistics(
+                (
+                    signal_2d_mean,
+                    signal_2d_std,
+                ) = calculate_signal_statistics(
                     train_loader,
                     preprocess_train=preprocess_temp,
                     repeats=5,
@@ -580,12 +674,14 @@ def compose_preprocess(config, train_loader, verbose=True):
 
             preprocess_train += [
                 EegNormalizeMeanStd(
-                    mean=config["signal_2d_mean"], std=config["signal_2d_std"]
+                    mean=config["signal_2d_mean"],
+                    std=config["signal_2d_std"],
                 )
             ]
             preprocess_test += [
                 EegNormalizeMeanStd(
-                    mean=config["signal_2d_mean"], std=config["signal_2d_std"]
+                    mean=config["signal_2d_mean"],
+                    std=config["signal_2d_std"],
                 )
             ]
 
@@ -597,9 +693,7 @@ def compose_preprocess(config, train_loader, verbose=True):
             pass
 
         else:
-            raise ValueError(
-                f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']"
-            )
+            raise ValueError(f"config['input_norm'] have to be set to one of ['dataset', 'datapoint', 'no']")
 
     #######################
     # Compose All at Once #
@@ -729,7 +823,12 @@ def make_dataloader(
         print(multicrop_test_loader)
         print("\n" + "-" * 100 + "\n")
 
-    return train_loader, val_loader, test_loader, multicrop_test_loader
+    return (
+        train_loader,
+        val_loader,
+        test_loader,
+        multicrop_test_loader,
+    )
 
 
 def build_dataset_for_train(config, verbose=False):
@@ -742,18 +841,24 @@ def build_dataset_for_train(config, verbose=False):
 
     if "run_mode" not in config.keys():
         print("\n" + "=" * 80 + "\n")
-        print(
-            'WARNING: run_mode is not specified.\n \t==> run_mode is set to "train" automatically.'
-        )
+        print('WARNING: run_mode is not specified.\n \t==> run_mode is set to "train" automatically.')
         print("\n" + "=" * 80 + "\n")
         config["run_mode"] = "train"
 
-    transform, transform_multicrop = compose_transforms(config, verbose=verbose)
+    (
+        transform,
+        transform_multicrop,
+    ) = compose_transforms(config, verbose=verbose)
     config["transform"] = transform
     config["transform_multicrop"] = transform_multicrop
     load_event = config["load_event"] or config.get("reject_events", False)
 
-    config_task, train_dataset, val_dataset, test_dataset = load_caueeg_task_datasets(
+    (
+        config_task,
+        train_dataset,
+        val_dataset,
+        test_dataset,
+    ) = load_caueeg_task_datasets(
         dataset_path=dataset_path,
         task=config["task"],
         load_event=load_event,
@@ -763,7 +868,10 @@ def build_dataset_for_train(config, verbose=False):
     )
     config.update(**config_task)
 
-    _, multicrop_test_dataset = load_caueeg_task_split(
+    (
+        _,
+        multicrop_test_dataset,
+    ) = load_caueeg_task_split(
         dataset_path=dataset_path,
         task=config["task"],
         split="test",
@@ -773,7 +881,12 @@ def build_dataset_for_train(config, verbose=False):
         verbose=verbose,
     )
 
-    train_loader, val_loader, test_loader, multicrop_test_loader = make_dataloader(
+    (
+        train_loader,
+        val_loader,
+        test_loader,
+        multicrop_test_loader,
+    ) = make_dataloader(
         config,
         train_dataset,
         val_dataset,
@@ -782,14 +895,13 @@ def build_dataset_for_train(config, verbose=False):
         verbose=False,
     )
 
-    preprocess_train, preprocess_test = compose_preprocess(
-        config, train_loader, verbose=verbose
-    )
+    (
+        preprocess_train,
+        preprocess_test,
+    ) = compose_preprocess(config, train_loader, verbose=verbose)
     config["preprocess_train"] = preprocess_train
     config["preprocess_test"] = preprocess_test
-    config["in_channels"] = preprocess_train(next(iter(train_loader)))["signal"].shape[
-        1
-    ]
+    config["in_channels"] = preprocess_train(next(iter(train_loader)))["signal"].shape[1]
     config["out_dims"] = len(config["class_label_to_name"])
 
     if verbose:
@@ -808,4 +920,9 @@ def build_dataset_for_train(config, verbose=False):
                 break
         print("\n" + "-" * 100 + "\n")
 
-    return train_loader, val_loader, test_loader, multicrop_test_loader
+    return (
+        train_loader,
+        val_loader,
+        test_loader,
+        multicrop_test_loader,
+    )

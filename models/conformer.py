@@ -128,14 +128,10 @@ class Attention(nn.Module):
             context_mask = (
                 default(context_mask, mask)
                 if not has_context
-                else default(
-                    context_mask, lambda: torch.ones(*context.shape[:2], device=device)
-                )
+                else default(context_mask, lambda: torch.ones(*context.shape[:2], device=device))
             )
             mask_value = -torch.finfo(dots.dtype).max
-            mask = rearrange(mask, "b i -> b () i ()") * rearrange(
-                context_mask, "b j -> b () () j"
-            )
+            mask = rearrange(mask, "b i -> b () i ()") * rearrange(context_mask, "b j -> b () () j")
             dots.masked_fill_(~mask, mask_value)
 
         attn = dots.softmax(dim=-1)
@@ -162,9 +158,7 @@ class FeedForward(nn.Module):
 
 
 class ConformerConvModule(nn.Module):
-    def __init__(
-        self, dim, causal=False, expansion_factor=2, kernel_size=31, dropout=0.0
-    ):
+    def __init__(self, dim, causal=False, expansion_factor=2, kernel_size=31, dropout=0.0):
         super().__init__()
         inner_dim = dim * expansion_factor
         padding = calc_same_padding(kernel_size) if not causal else (kernel_size - 1, 0)
@@ -174,9 +168,7 @@ class ConformerConvModule(nn.Module):
             Rearrange("b n c -> b c n"),
             nn.Conv1d(dim, inner_dim * 2, 1),
             GLU(dim=1),
-            DepthWiseConv1d(
-                inner_dim, inner_dim, kernel_size=kernel_size, padding=padding
-            ),
+            DepthWiseConv1d(inner_dim, inner_dim, kernel_size=kernel_size, padding=padding),
             nn.BatchNorm1d(inner_dim) if not causal else nn.Identity(),
             Swish(),
             nn.Conv1d(inner_dim, dim, 1),
@@ -205,9 +197,7 @@ class ConformerBlock(nn.Module):
     ):
         super().__init__()
         self.ff1 = FeedForward(dim=dim, mult=ff_mult, dropout=ff_dropout)
-        self.attn = Attention(
-            dim=dim, dim_head=dim_head, heads=heads, dropout=attn_dropout
-        )
+        self.attn = Attention(dim=dim, dim_head=dim_head, heads=heads, dropout=attn_dropout)
         self.conv = ConformerConvModule(
             dim=dim,
             causal=False,
@@ -251,20 +241,17 @@ class ConformerClassifier(nn.Module):
 
         if use_age not in ["fc", "conv", "embedding", "no"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) "
-                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+                f"{self.__class__.__name__}.__init__(use_age) " f"receives one of ['fc', 'conv', 'embedding', 'no']."
             )
 
         if final_pool not in ["average", "max"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(final_pool) both "
-                f"receives one of ['average', 'max']."
+                f"{self.__class__.__name__}.__init__(final_pool) both " f"receives one of ['average', 'max']."
             )
 
         if fc_stages < 1:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(fc_stages) receives "
-                f"an integer equal to ore more than 1."
+                f"{self.__class__.__name__}.__init__(fc_stages) receives " f"an integer equal to ore more than 1."
             )
 
         self.use_age = use_age
@@ -279,9 +266,7 @@ class ConformerClassifier(nn.Module):
         self.seq_len_2d = seq_len_2d
         self.dropout = dropout
         self.num_classes = out_dims
-        self.nn_act = get_activation_class(
-            activation, class_name=self.__class__.__name__
-        )
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.activation = activation
 
         self.conv_subsample = nn.Sequential(
@@ -352,9 +337,7 @@ class ConformerClassifier(nn.Module):
 
         for i in range(self.fc_stages - 1):
             linear_name = f"linear{i + 1}"
-            if hasattr(self.heads, linear_name) and isinstance(
-                getattr(self.heads, linear_name), nn.Linear
-            ):
+            if hasattr(self.heads, linear_name) and isinstance(getattr(self.heads, linear_name), nn.Linear):
                 fan_in = getattr(self.heads, linear_name).in_features
                 if self.activation == "tanh":
                     nn.init.trunc_normal_(

@@ -73,9 +73,7 @@ class EncoderBlock(nn.Module):
 
         # Attention block
         self.ln_1 = norm_layer(hidden_dim)
-        self.self_attention = nn.MultiheadAttention(
-            hidden_dim, num_heads, dropout=attention_dropout, batch_first=True
-        )
+        self.self_attention = nn.MultiheadAttention(hidden_dim, num_heads, dropout=attention_dropout, batch_first=True)
         self.dropout = nn.Dropout(dropout)
 
         # MLP block
@@ -115,9 +113,7 @@ class Encoder(nn.Module):
         super().__init__()
         # Note that batch_size is on the first dim because
         # we have batch_first=True in nn.MultiAttention() by default
-        self.pos_embedding = nn.Parameter(
-            torch.empty(1, seq_length, hidden_dim).normal_(std=0.02)
-        )  # from BERT
+        self.pos_embedding = nn.Parameter(torch.empty(1, seq_length, hidden_dim).normal_(std=0.02))  # from BERT
         self.dropout = nn.Dropout(dropout)
         layers: OrderedDict[str, nn.Module] = OrderedDict()
         for i in range(num_layers):
@@ -169,13 +165,11 @@ class VisionTransformer(nn.Module):
 
         if use_age not in ["fc", "conv", "embedding", "no"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) "
-                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+                f"{self.__class__.__name__}.__init__(use_age) " f"receives one of ['fc', 'conv', 'embedding', 'no']."
             )
         if fc_stages < 1:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(fc_stages) receives "
-                f"an integer equal to ore more than 1."
+                f"{self.__class__.__name__}.__init__(fc_stages) receives " f"an integer equal to ore more than 1."
             )
 
         self.use_age = use_age
@@ -187,9 +181,7 @@ class VisionTransformer(nn.Module):
 
         self.fc_stages = fc_stages
 
-        self.nn_act = get_activation_class(
-            activation, class_name=self.__class__.__name__
-        )
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.activation = activation
 
         self.image_h, self.image_w = seq_len_2d
@@ -202,8 +194,7 @@ class VisionTransformer(nn.Module):
 
         if conv_stem_configs is not None:
             raise NotImplementedError(
-                f"{self.__class__.__name__}.__init__(conv_stem_configs) "
-                f"functionality is not implemented yet."
+                f"{self.__class__.__name__}.__init__(conv_stem_configs) " f"functionality is not implemented yet."
             )
             # As per https://arxiv.org/abs/2106.14881
             # seq_proj = nn.Sequential()
@@ -232,14 +223,8 @@ class VisionTransformer(nn.Module):
             self.n_w, w_conv_filter = self._decide_patch_size(
                 in_size=self.image_w, target_num_min=size_min, target_num_max=size_max
             )
-            conv_filter = {
-                k: (h_conv_filter[k], w_conv_filter[k])
-                for k in h_conv_filter.keys()
-                if k != "pool"
-            }
-            self.conv_proj = nn.Conv2d(
-                in_channels=in_channels, out_channels=hidden_dim, **conv_filter
-            )
+            conv_filter = {k: (h_conv_filter[k], w_conv_filter[k]) for k in h_conv_filter.keys() if k != "pool"}
+            self.conv_proj = nn.Conv2d(in_channels=in_channels, out_channels=hidden_dim, **conv_filter)
 
         # Add a class token
         self.seq_length = self.n_h * self.n_w + 1
@@ -281,17 +266,11 @@ class VisionTransformer(nn.Module):
 
         if isinstance(self.conv_proj, nn.Conv2d):
             # Init the patchify stem
-            fan_in = (
-                self.conv_proj.in_channels
-                * self.conv_proj.kernel_size[0]
-                * self.conv_proj.kernel_size[1]
-            )
+            fan_in = self.conv_proj.in_channels * self.conv_proj.kernel_size[0] * self.conv_proj.kernel_size[1]
             nn.init.trunc_normal_(self.conv_proj.weight, std=math.sqrt(1 / fan_in))
             if self.conv_proj.bias is not None:
                 nn.init.zeros_(self.conv_proj.bias)
-        elif self.conv_proj.conv_last is not None and isinstance(
-            self.conv_proj.conv_last, nn.Conv2d
-        ):
+        elif self.conv_proj.conv_last is not None and isinstance(self.conv_proj.conv_last, nn.Conv2d):
             # Init the last 1x1 conv of the conv stem
             nn.init.normal_(
                 self.conv_proj.conv_last.weight,
@@ -303,9 +282,7 @@ class VisionTransformer(nn.Module):
 
         for i in range(self.fc_stages - 1):
             linear_name = f"linear{i + 1}"
-            if hasattr(self.heads, linear_name) and isinstance(
-                getattr(self.heads, linear_name), nn.Linear
-            ):
+            if hasattr(self.heads, linear_name) and isinstance(getattr(self.heads, linear_name), nn.Linear):
                 fan_in = getattr(self.heads, linear_name).in_features
                 if self.activation == "tanh":
                     nn.init.trunc_normal_(
@@ -322,17 +299,13 @@ class VisionTransformer(nn.Module):
             nn.init.zeros_(self.heads.head.weight)
             nn.init.zeros_(self.heads.head.bias)
 
-    def _decide_patch_size(
-        self, in_size: int, target_num_min: int, target_num_max: int
-    ):
+    def _decide_patch_size(self, in_size: int, target_num_min: int, target_num_max: int):
         success = False
 
         for target_num in reversed(range(target_num_min, target_num_max + 1)):
             kernel_size_base = int(np.ceil(in_size / target_num))
 
-            for kernel_size in range(
-                kernel_size_base, kernel_size_base + kernel_size_base // 2 + 1
-            ):
+            for kernel_size in range(kernel_size_base, kernel_size_base + kernel_size_base // 2 + 1):
                 conv_filter_list = [{"kernel_size": kernel_size}]
                 try:
                     program_conv_filters(
@@ -353,8 +326,7 @@ class VisionTransformer(nn.Module):
 
         if success is False:
             raise RuntimeError(
-                f"{self.__class__.__name__}._decide_patch_size() "
-                f"failed to calculate the proper patch size"
+                f"{self.__class__.__name__}._decide_patch_size() " f"failed to calculate the proper patch size"
             )
 
     def get_output_length(self):
@@ -603,9 +575,7 @@ def interpolate_embeddings(
         )
 
         # (1, hidden_dim, seq_length) -> (1, hidden_dim, seq_l_1d, seq_l_1d)
-        pos_embedding_img = pos_embedding_img.reshape(
-            1, hidden_dim, seq_length_1d, seq_length_1d
-        )
+        pos_embedding_img = pos_embedding_img.reshape(1, hidden_dim, seq_length_1d, seq_length_1d)
         new_seq_length_1d = image_size // patch_size
 
         # Perform interpolation.
@@ -618,15 +588,11 @@ def interpolate_embeddings(
         )
 
         # (1, hidden_dim, new_seq_l_1d, new_seq_l_1d) -> (1, hidden_dim, new_seq_length)
-        new_pos_embedding_img = new_pos_embedding_img.reshape(
-            1, hidden_dim, new_seq_length
-        )
+        new_pos_embedding_img = new_pos_embedding_img.reshape(1, hidden_dim, new_seq_length)
 
         # (1, hidden_dim, new_seq_length) -> (1, new_seq_length, hidden_dim)
         new_pos_embedding_img = new_pos_embedding_img.permute(0, 2, 1)
-        new_pos_embedding = torch.cat(
-            [pos_embedding_token, new_pos_embedding_img], dim=1
-        )
+        new_pos_embedding = torch.cat([pos_embedding_token, new_pos_embedding_img], dim=1)
 
         model_state["encoder.pos_embedding"] = new_pos_embedding
 

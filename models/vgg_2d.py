@@ -67,14 +67,12 @@ class VGG2D(nn.Module):
 
         if model not in vgg_layer_cfgs.keys():
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(model) "
-                f"receives one of [{vgg_layer_cfgs.keys()}]."
+                f"{self.__class__.__name__}.__init__(model) " f"receives one of [{vgg_layer_cfgs.keys()}]."
             )
 
         if use_age not in ["fc", "conv", "embedding", "no"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) "
-                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+                f"{self.__class__.__name__}.__init__(use_age) " f"receives one of ['fc', 'conv', 'embedding', 'no']."
             )
 
         if final_pool not in ["average", "max"] or base_pool not in ["average", "max"]:
@@ -85,8 +83,7 @@ class VGG2D(nn.Module):
 
         if fc_stages < 1:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(fc_stages) receives "
-                f"an integer equal to ore more than 1."
+                f"{self.__class__.__name__}.__init__(fc_stages) receives " f"an integer equal to ore more than 1."
             )
 
         self.use_age = use_age
@@ -99,9 +96,7 @@ class VGG2D(nn.Module):
         self.fc_stages = fc_stages
 
         self.batch_norm = batch_norm
-        self.nn_act = get_activation_class(
-            activation, class_name=self.__class__.__name__
-        )
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
 
         if base_pool == "average":
             self.base_pool = nn.AvgPool2d
@@ -124,21 +119,11 @@ class VGG2D(nn.Module):
 
         # convolution stage
         self.current_channels = in_channels
-        self.conv_stage1 = self._make_conv_stage(
-            conv_filter_list[0], layer_cfgs[0], base_channels
-        )
-        self.conv_stage2 = self._make_conv_stage(
-            conv_filter_list[1], layer_cfgs[1], base_channels
-        )
-        self.conv_stage3 = self._make_conv_stage(
-            conv_filter_list[2], layer_cfgs[2], base_channels
-        )
-        self.conv_stage4 = self._make_conv_stage(
-            conv_filter_list[3], layer_cfgs[3], base_channels
-        )
-        self.conv_stage5 = self._make_conv_stage(
-            conv_filter_list[4], layer_cfgs[4], base_channels
-        )
+        self.conv_stage1 = self._make_conv_stage(conv_filter_list[0], layer_cfgs[0], base_channels)
+        self.conv_stage2 = self._make_conv_stage(conv_filter_list[1], layer_cfgs[1], base_channels)
+        self.conv_stage3 = self._make_conv_stage(conv_filter_list[2], layer_cfgs[2], base_channels)
+        self.conv_stage4 = self._make_conv_stage(conv_filter_list[3], layer_cfgs[3], base_channels)
+        self.conv_stage5 = self._make_conv_stage(conv_filter_list[4], layer_cfgs[4], base_channels)
 
         # pooling right before fully-connection
         if final_pool == "average":
@@ -154,18 +139,14 @@ class VGG2D(nn.Module):
         for i in range(fc_stages - 1):
             if self.batch_norm:
                 layer = nn.Sequential(
-                    nn.Linear(
-                        self.current_channels, self.current_channels // 2, bias=False
-                    ),
+                    nn.Linear(self.current_channels, self.current_channels // 2, bias=False),
                     nn.Dropout(p=dropout),
                     nn.BatchNorm1d(self.current_channels // 2),
                     self.nn_act(),
                 )
             else:
                 layer = nn.Sequential(
-                    nn.Linear(
-                        self.current_channels, self.current_channels // 2, bias=True
-                    ),
+                    nn.Linear(self.current_channels, self.current_channels // 2, bias=True),
                     nn.Dropout(p=dropout),
                     self.nn_act(),
                 )

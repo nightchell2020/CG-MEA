@@ -19,10 +19,7 @@ class PositionalEncoding(nn.Module):
     def __init__(self, d_model: int, max_len: int = 1024):
         super().__init__()
         position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, d_model, 2, dtype=torch.float)
-            * (-np.log(10000.0) / d_model)
-        )
+        div_term = torch.exp(torch.arange(0, d_model, 2, dtype=torch.float) * (-np.log(10000.0) / d_model))
 
         pe = torch.zeros(max_len, 1, d_model, requires_grad=False)
         pe[:, 0, 0::2] = torch.sin(position * div_term)
@@ -59,8 +56,7 @@ class CNNTransformer(nn.Module):
 
         if use_age not in ["fc", "conv", "embedding", "no"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) "
-                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+                f"{self.__class__.__name__}.__init__(use_age) " f"receives one of ['fc', 'conv', 'embedding', 'no']."
             )
 
         if final_pool not in ["average", "max"] or base_pool not in ["average", "max"]:
@@ -71,8 +67,7 @@ class CNNTransformer(nn.Module):
 
         if fc_stages < 1:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(fc_stages) receives "
-                f"an integer equal to ore more than 1."
+                f"{self.__class__.__name__}.__init__(fc_stages) receives " f"an integer equal to ore more than 1."
             )
 
         self.use_age = use_age
@@ -84,12 +79,8 @@ class CNNTransformer(nn.Module):
             torch.nn.init.trunc_normal_(self.age_embedding, std=0.02)
         self.fc_stages = fc_stages
 
-        self.nn_act = get_activation_class(
-            activation, class_name=self.__class__.__name__
-        )
-        self.F_act = get_activation_functional(
-            activation, class_name=self.__class__.__name__
-        )
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
+        self.F_act = get_activation_functional(activation, class_name=self.__class__.__name__)
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm1d
@@ -242,14 +233,10 @@ class CNNTransformer(nn.Module):
         x = self.act2(self.norm2(x))
 
         # transformer encoder layers
-        x = torch.permute(
-            x, (2, 0, 1)
-        )  # minibatch, dimension, length --> length, minibatch, dimension
+        x = torch.permute(x, (2, 0, 1))  # minibatch, dimension, length --> length, minibatch, dimension
         x = x + self.pos_encoder(x)
         x = self.transformer_encoder(x)
-        x = torch.permute(
-            x, (1, 2, 0)
-        )  # length, minibatch, dimension --> minibatch, dimension, length
+        x = torch.permute(x, (1, 2, 0))  # length, minibatch, dimension --> minibatch, dimension, length
 
         # conv-bn-act again
         x = self.pool3(x)

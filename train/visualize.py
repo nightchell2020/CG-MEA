@@ -22,9 +22,7 @@ def draw_lr_search_record(learning_rate_record, use_wandb=False):
 
     train_accs = np.array([[log_lr, tr] for log_lr, tr, vl in learning_rate_record])
     val_accs = np.array([[log_lr, vl] for log_lr, tr, vl in learning_rate_record])
-    midpoints = np.array(
-        [[log_lr, (tr + vl) / 2] for log_lr, tr, vl in learning_rate_record]
-    )
+    midpoints = np.array([[log_lr, (tr + vl) / 2] for log_lr, tr, vl in learning_rate_record])
 
     ax.plot(
         train_accs[:, 0],
@@ -54,9 +52,7 @@ def draw_lr_search_record(learning_rate_record, use_wandb=False):
 
     midpoints = np.array([(tr + vl) / 2 for _, tr, vl in learning_rate_record])
     induces = np.argwhere(midpoints == np.max(midpoints))
-    starting_log_lr = np.average(
-        np.array([log_lr for log_lr, _, _ in learning_rate_record])[induces]
-    )
+    starting_log_lr = np.average(np.array([log_lr for log_lr, _, _ in learning_rate_record])[induces])
 
     ax.plot(
         starting_log_lr,
@@ -68,9 +64,7 @@ def draw_lr_search_record(learning_rate_record, use_wandb=False):
         label="Start LR",
     )
 
-    ax.legend(
-        loc="lower center", fancybox=True, framealpha=0.7
-    ).get_frame().set_facecolor("white")
+    ax.legend(loc="lower center", fancybox=True, framealpha=0.7).get_frame().set_facecolor("white")
 
     if use_wandb:
         warnings.filterwarnings(action="ignore")
@@ -159,9 +153,7 @@ def draw_loss_plot(losses, lr_decay_step=None):
     plt.close(fig)
 
 
-def draw_accuracy_history(
-    train_acc_history, val_acc_history, history_interval, lr_decay_step=None
-):
+def draw_accuracy_history(train_acc_history, val_acc_history, history_interval, lr_decay_step=None):
     plt.style.use("default")  # default, ggplot, fivethirtyeight, classic
     fig = plt.figure(num=1, clear=True, figsize=(8.0, 3.0), constrained_layout=True)
     ax = fig.add_subplot(1, 1, 1)
@@ -323,9 +315,7 @@ def annotate_heatmap(
             im.axes.text(j, i, anno_format(data[i, j], None), **kw)
 
 
-def draw_confusion(
-    confusion, class_label_to_name, normalize=False, use_wandb=False, save_path=None
-):
+def draw_confusion(confusion, class_label_to_name, normalize=False, use_wandb=False, save_path=None):
     plt.style.use("default")  # default, ggplot, fivethirtyeight, classic
     H = len(class_label_to_name) + 0.5
     W = len(class_label_to_name) + 0.5
@@ -344,9 +334,7 @@ def draw_confusion(
             cbar_label="",
             cbar_kw={},
         )
-        annotate_heatmap(
-            im, anno_format="{x:d}", text_colors=("black", "white"), threshold=0.7
-        )
+        annotate_heatmap(im, anno_format="{x:d}", text_colors=("black", "white"), threshold=0.7)
     else:
         data = confusion / confusion.sum(axis=1, keepdims=True)
         im = draw_heatmap(
@@ -398,9 +386,7 @@ def draw_confusion(
     plt.close(fig)
 
 
-def draw_confusion2(
-    mean_confusion, std_confusion, class_label_to_name, use_wandb=False, save_path=None
-):
+def draw_confusion2(mean_confusion, std_confusion, class_label_to_name, use_wandb=False, save_path=None):
     plt.style.use("default")  # default, ggplot, fivethirtyeight, classic
     H = len(class_label_to_name) + 0.8
     W = len(class_label_to_name) + 0.8
@@ -468,9 +454,7 @@ def draw_confusion2(
     plt.close(fig)
 
 
-def draw_class_wise_metrics(
-    confusion, class_label_to_name, use_wandb=False, save_path=None, percent=False
-):
+def draw_class_wise_metrics(confusion, class_label_to_name, use_wandb=False, save_path=None, percent=False):
     class_wise_metrics = calculate_class_wise_metrics(confusion)
 
     plt.style.use("default")  # default, ggplot, fivethirtyeight, classic
@@ -481,8 +465,7 @@ def draw_class_wise_metrics(
 
     if percent:
         im = draw_heatmap(
-            data=np.array([*class_wise_metrics.values()]).T
-            * 100,  # np.ones((C, len(class_wise_metrics))),
+            data=np.array([*class_wise_metrics.values()]).T * 100,  # np.ones((C, len(class_wise_metrics))),
             row_labels=class_label_to_name,
             col_labels=[*class_wise_metrics.keys()],
             ax=ax,
@@ -501,9 +484,7 @@ def draw_class_wise_metrics(
         )
     else:
         im = draw_heatmap(
-            data=np.array(
-                [*class_wise_metrics.values()]
-            ).T,  # np.ones((C, len(class_wise_metrics))),
+            data=np.array([*class_wise_metrics.values()]).T,  # np.ones((C, len(class_wise_metrics))),
             row_labels=class_label_to_name,
             col_labels=[*class_wise_metrics.keys()],
             ax=ax,
@@ -687,14 +668,10 @@ def draw_error_table(error_table, use_wandb=False, fig_size=(40.0, 4.0)):
             ax.bar(
                 serial,
                 err / cnt,
-                color=["tab:green", "tab:orange", "tab:red", "tab:blue", "tab:purple"][
-                    gt_table[indices[0]]
-                ],
+                color=["tab:green", "tab:orange", "tab:red", "tab:blue", "tab:purple"][gt_table[indices[0]]],
             )
 
-    ax.set_title(
-        f"Error Table (Acc. {1.0 - total_error / total_count: .2f}%)", fontsize=18
-    )
+    ax.set_title(f"Error Table (Acc. {1.0 - total_error / total_count: .2f}%)", fontsize=18)
     ax.set_ylim(0.0, 1.0)
     plt.setp(ax.get_xticklabels(), rotation=90, ha="right", fontsize=9, visible=True)
 

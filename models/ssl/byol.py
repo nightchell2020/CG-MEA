@@ -14,22 +14,25 @@ from ..activation import get_activation_class
 
 
 class BYOL(nn.Module):
-    def __init__(self,
-                 backbone,
-                 embedding_layer,
-                 activation='relu',
-                 mlp_hidden_size=4096,
-                 projection_size=256,
-                 target_ema=0.99,
-                 **kwargs):
+    def __init__(
+        self,
+        backbone,
+        embedding_layer,
+        activation="relu",
+        mlp_hidden_size=4096,
+        projection_size=256,
+        target_ema=0.99,
+        **kwargs,
+    ):
         super().__init__()
 
         self.backbone = backbone
         self.online_backbone = self.backbone
         self.embedding_layer = embedding_layer
         self.base_dim = backbone.get_dims_from_last(embedding_layer)
-        self.cut_last_dim = self.online_backbone.use_age == 'fc' and \
-                            self.embedding_layer == self.online_backbone.get_num_fc_stages()
+        self.cut_last_dim = (
+            self.online_backbone.use_age == "fc" and self.embedding_layer == self.online_backbone.get_num_fc_stages()
+        )
         if self.cut_last_dim:
             self.base_dim += -1
         self.mlp_hidden_size = mlp_hidden_size
@@ -38,14 +41,18 @@ class BYOL(nn.Module):
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
 
-        self.online_proj = nn.Sequential(nn.Linear(self.base_dim, self.mlp_hidden_size),
-                                         nn.BatchNorm1d(self.mlp_hidden_size),
-                                         self.nn_act(),
-                                         nn.Linear(self.mlp_hidden_size, self.projection_size))
-        self.online_pred = nn.Sequential(nn.Linear(self.projection_size, self.mlp_hidden_size),
-                                         nn.BatchNorm1d(self.mlp_hidden_size),
-                                         self.nn_act(),
-                                         nn.Linear(self.mlp_hidden_size, self.projection_size))
+        self.online_proj = nn.Sequential(
+            nn.Linear(self.base_dim, self.mlp_hidden_size),
+            nn.BatchNorm1d(self.mlp_hidden_size),
+            self.nn_act(),
+            nn.Linear(self.mlp_hidden_size, self.projection_size),
+        )
+        self.online_pred = nn.Sequential(
+            nn.Linear(self.projection_size, self.mlp_hidden_size),
+            nn.BatchNorm1d(self.mlp_hidden_size),
+            self.nn_act(),
+            nn.Linear(self.mlp_hidden_size, self.projection_size),
+        )
 
         self.target_backbone = deepcopy(self.online_backbone)
         self.target_backbone.requires_grad_(False)
@@ -84,7 +91,7 @@ class BYOL(nn.Module):
             out_b_target = self._compute_embedding(x_b, age_b, self.target_backbone)
             out_b_target = self.target_proj(out_b_target.detach())  # with stop_gradient and no prediction
             out_b_target = F.normalize(out_b_target, p=2, dim=-1)
-        loss = 2.0 - 2. * torch.mean((out_a_online * out_b_target).sum(dim=-1))
+        loss = 2.0 - 2.0 * torch.mean((out_a_online * out_b_target).sum(dim=-1))
 
         # symmetrize the above work
         out_b_online = self._compute_embedding(x_b, age_b, self.online_backbone)
@@ -94,6 +101,6 @@ class BYOL(nn.Module):
             out_a_target = self._compute_embedding(x_a, age_a, self.target_backbone)
             out_a_target = self.target_proj(out_a_target.detach())  # with stop_gradient and no prediction
             out_a_target = F.normalize(out_a_target, p=2, dim=-1)
-        loss += 2.0 - 2. * torch.mean((out_b_online * out_a_target).sum(dim=-1))
+        loss += 2.0 - 2.0 * torch.mean((out_b_online * out_a_target).sum(dim=-1))
 
         return loss

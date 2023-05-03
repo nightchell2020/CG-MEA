@@ -192,15 +192,11 @@ class ResNet1D(nn.Module):
         super().__init__()
 
         if block not in ["basic", "bottleneck"]:
-            raise ValueError(
-                f"{self.__class__.__name__}.__init__(block) "
-                f"receives one of ['basic', 'bottleneck']."
-            )
+            raise ValueError(f"{self.__class__.__name__}.__init__(block) " f"receives one of ['basic', 'bottleneck'].")
 
         if use_age not in ["fc", "conv", "embedding", "no"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) "
-                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+                f"{self.__class__.__name__}.__init__(use_age) " f"receives one of ['fc', 'conv', 'embedding', 'no']."
             )
 
         if final_pool not in ["average", "max"] or base_pool not in ["average", "max"]:
@@ -211,8 +207,7 @@ class ResNet1D(nn.Module):
 
         if fc_stages < 1:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(fc_stages) receives "
-                f"an integer equal to ore more than 1."
+                f"{self.__class__.__name__}.__init__(fc_stages) receives " f"an integer equal to ore more than 1."
             )
 
         self.use_age = use_age
@@ -224,9 +219,7 @@ class ResNet1D(nn.Module):
 
         self.fc_stages = fc_stages
 
-        self.nn_act = get_activation_class(
-            activation, class_name=self.__class__.__name__
-        )
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm1d
@@ -247,18 +240,10 @@ class ResNet1D(nn.Module):
             block = BasicBlock1D
             conv_filter_list = [
                 {"kernel_size": 41},
-                {
-                    "kernel_size": 9
-                },  # 9 or 17 to reflect the composition of 9conv and 9conv
-                {
-                    "kernel_size": 9
-                },  # 9 or 17 to reflect the composition of 9conv and 9conv
-                {
-                    "kernel_size": 9
-                },  # 9 or 17 to reflect the composition of 9conv and 9conv
-                {
-                    "kernel_size": 9
-                },  # 9 or 17 to reflect the composition of 9conv and 9conv
+                {"kernel_size": 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
+                {"kernel_size": 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
+                {"kernel_size": 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
+                {"kernel_size": 9},  # 9 or 17 to reflect the composition of 9conv and 9conv
             ]
         else:  # bottleneck case
             block = BottleneckBlock1D
@@ -349,9 +334,7 @@ class ResNet1D(nn.Module):
 
         for i in range(fc_stages - 1):
             layer = nn.Sequential(
-                nn.Linear(
-                    self.current_channels, self.current_channels // 2, bias=False
-                ),
+                nn.Linear(self.current_channels, self.current_channels // 2, bias=False),
                 nn.Dropout(p=dropout),
                 norm_layer(self.current_channels // 2),
                 self.nn_act(),

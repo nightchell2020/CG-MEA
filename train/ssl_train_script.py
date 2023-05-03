@@ -29,24 +29,16 @@ def learning_rate_search(config, model, loader, preprocess, trials, steps):
         model.load_state_dict(deepcopy(given_model_state))
         # model.module.reset_weights() if config.get('ddp', False) else model.reset_weights()
 
-        optimizer = optim.AdamW(
-            model.parameters(), lr=lr, weight_decay=config["weight_decay"]
-        )
+        optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
         scheduler = get_lr_scheduler(
             optimizer,
             scheduler_type="constant_with_decay",  # constant for search
             iterations=config["total_samples"],
             warmup_steps=config["total_samples"],
         )
-        amp_scaler = (
-            torch.cuda.amp.GradScaler()
-            if config.get("mixed_precision", False)
-            else None
-        )
+        amp_scaler = torch.cuda.amp.GradScaler() if config.get("mixed_precision", False) else None
 
-        loss = ssl_train_multistep(
-            model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps
-        )
+        loss = ssl_train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps)
 
         # Train accuracy for the final epoch is stored
         if np.isfinite(loss):
@@ -59,9 +51,7 @@ def learning_rate_search(config, model, loader, preprocess, trials, steps):
     # find the best starting point (if a tie occurs, average them)
     losses = np.array([loss for _, loss in learning_rate_record])
     induces = np.argwhere(losses == np.min(losses))
-    best_log_lr = np.average(
-        np.array([log_lr for log_lr, _ in learning_rate_record])[induces]
-    )
+    best_log_lr = np.average(np.array([log_lr for log_lr, _ in learning_rate_record])[induces])
 
     # recover the given  model state
     model.load_state_dict(deepcopy(given_model_state))
@@ -80,12 +70,8 @@ def ssl_train_script(config, model, loader, preprocess):
 
     # load if using an existing model
     if config.get("init_from", None):
-        init_path = os.path.join(
-            config.get("cwd", ""), f'local/checkpoint/{config["init_from"]}/'
-        )
-        checkpoint = torch.load(
-            os.path.join(init_path, "checkpoint.pt"), map_location=config["device"]
-        )
+        init_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["init_from"]}/')
+        checkpoint = torch.load(os.path.join(init_path, "checkpoint.pt"), map_location=config["device"])
         model.load_state_dict(checkpoint["ssl_model_state"])
         pprint.pprint(f'Load an existing model from {config["init_from"]}\n', width=120)
 
@@ -116,27 +102,19 @@ def ssl_train_script(config, model, loader, preprocess):
 
     # training iteration and other conditions
     config["base_lr"] = config["base_lr"] * config.get("search_multiplier", 1.0)
-    config["iterations"] = round(
-        config["total_samples"] / config["minibatch"] / config.get("ddp_size", 1)
-    )
-    config["warmup_steps"] = max(
-        round(config["iterations"] * config["warmup_ratio"]), config["warmup_min"]
-    )
+    config["iterations"] = round(config["total_samples"] / config["minibatch"] / config.get("ddp_size", 1))
+    config["warmup_steps"] = max(round(config["iterations"] * config["warmup_ratio"]), config["warmup_min"])
     history_interval = max(config["iterations"] // config["num_history"], 1)
 
     # generate the trainers
-    optimizer = optim.AdamW(
-        model.parameters(), lr=config["base_lr"], weight_decay=config["weight_decay"]
-    )
+    optimizer = optim.AdamW(model.parameters(), lr=config["base_lr"], weight_decay=config["weight_decay"])
     scheduler = get_lr_scheduler(
         optimizer,
         config["lr_scheduler_type"],
         iterations=config["iterations"],
         warmup_steps=config["warmup_steps"],
     )
-    amp_scaler = (
-        torch.cuda.amp.GradScaler() if config.get("mixed_precision", False) else None
-    )
+    amp_scaler = torch.cuda.amp.GradScaler() if config.get("mixed_precision", False) else None
 
     # local variable for training loop
     i_step = 0
@@ -144,12 +122,8 @@ def ssl_train_script(config, model, loader, preprocess):
     # load if resuming
     if config.get("resume", None):
         resume = config["resume"]
-        save_path = os.path.join(
-            config.get("cwd", ""), f'local/checkpoint/{config["resume"]}/'
-        )
-        checkpoint = torch.load(
-            os.path.join(save_path, "checkpoint.pt"), map_location=config["device"]
-        )
+        save_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["resume"]}/')
+        checkpoint = torch.load(os.path.join(save_path, "checkpoint.pt"), map_location=config["device"])
         model.load_state_dict(checkpoint["ssl_model_state"])
         optimizer.load_state_dict(checkpoint["optimizer_state"])
         scheduler.load_state_dict(checkpoint["scheduler_state"])
@@ -173,15 +147,9 @@ def ssl_train_script(config, model, loader, preprocess):
                 wandb.watch(model, log="all", log_freq=history_interval, log_graph=True)
 
         # directory to save
-        run_name = (
-            wandb.run.name
-            if config["use_wandb"]
-            else datetime.now().strftime("%Y-%m%d-%H%M")
-        )
+        run_name = wandb.run.name if config["use_wandb"] else datetime.now().strftime("%Y-%m%d-%H%M")
         if config["save_model"]:
-            save_path = os.path.join(
-                config.get("cwd", ""), f"local/checkpoint/{run_name}/"
-            )
+            save_path = os.path.join(config.get("cwd", ""), f"local/checkpoint/{run_name}/")
             os.makedirs(save_path, exist_ok=True)
 
     # train and validation routine
@@ -205,16 +173,12 @@ def ssl_train_script(config, model, loader, preprocess):
                 wandb.log(
                     {
                         "Loss": loss,
-                        "Learning Rate": optimizer.state_dict()["param_groups"][0][
-                            "lr"
-                        ],
+                        "Learning Rate": optimizer.state_dict()["param_groups"][0]["lr"],
                     },
                     step=i_step * config["minibatch"],
                 )
             else:
-                print(
-                    f"{i_step: >8} / {config['iterations']: >8} iter - Loss: {loss:.4f}"
-                )
+                print(f"{i_step: >8} / {config['iterations']: >8} iter - Loss: {loss:.4f}")
 
             # save the model
             if config["save_model"]:

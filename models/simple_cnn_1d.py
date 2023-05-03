@@ -28,8 +28,7 @@ class TinyCNN1D(nn.Module):
 
         if use_age not in ["fc", "conv", "embedding", "no"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) "
-                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+                f"{self.__class__.__name__}.__init__(use_age) " f"receives one of ['fc', 'conv', 'embedding', 'no']."
             )
 
         if final_pool not in ["average", "max"] or base_pool not in ["average", "max"]:
@@ -40,8 +39,7 @@ class TinyCNN1D(nn.Module):
 
         if fc_stages < 1:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(fc_stages) receives "
-                f"an integer equal to ore more than 1."
+                f"{self.__class__.__name__}.__init__(fc_stages) receives " f"an integer equal to ore more than 1."
             )
 
         self.use_age = use_age
@@ -53,12 +51,8 @@ class TinyCNN1D(nn.Module):
 
         self.fc_stages = fc_stages
 
-        self.nn_act = get_activation_class(
-            activation, class_name=self.__class__.__name__
-        )
-        self.F_act = get_activation_functional(
-            activation, class_name=self.__class__.__name__
-        )
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
+        self.F_act = get_activation_functional(activation, class_name=self.__class__.__name__)
 
         if base_pool == "average":
             self.base_pool = nn.AvgPool1d
@@ -203,8 +197,7 @@ class M5(nn.Module):
 
         if use_age not in ["fc", "conv", "embedding", "no"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) "
-                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+                f"{self.__class__.__name__}.__init__(use_age) " f"receives one of ['fc', 'conv', 'embedding', 'no']."
             )
 
         if final_pool not in ["average", "max"] or base_pool not in ["average", "max"]:
@@ -215,8 +208,7 @@ class M5(nn.Module):
 
         if fc_stages < 1:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(fc_stages) receives "
-                f"an integer equal to ore more than 1."
+                f"{self.__class__.__name__}.__init__(fc_stages) receives " f"an integer equal to ore more than 1."
             )
 
         self.use_age = use_age
@@ -226,12 +218,8 @@ class M5(nn.Module):
             self.age_embedding = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
             torch.nn.init.trunc_normal_(self.age_embedding, std=0.02)
 
-        self.nn_act = get_activation_class(
-            activation, class_name=self.__class__.__name__
-        )
-        self.F_act = get_activation_functional(
-            activation, class_name=self.__class__.__name__
-        )
+        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
+        self.F_act = get_activation_functional(activation, class_name=self.__class__.__name__)
 
         if base_pool == "average":
             self.base_pool = nn.AvgPool1d

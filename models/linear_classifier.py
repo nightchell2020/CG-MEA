@@ -21,15 +21,12 @@ class LinearClassifier(nn.Module):
         self.use_age = use_age
         if use_age not in ["fc", "conv", "embedding", "no"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) "
-                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+                f"{self.__class__.__name__}.__init__(use_age) " f"receives one of ['fc', 'conv', 'embedding', 'no']."
             )
         elif self.use_age == "conv":
             in_channels += 1
         elif self.use_age == "embedding":
-            self.age_embedding = torch.nn.Parameter(
-                (torch.zeros(1, seq_length * in_channels))
-            )
+            self.age_embedding = torch.nn.Parameter((torch.zeros(1, seq_length * in_channels)))
             torch.nn.init.trunc_normal_(self.age_embedding, std=0.02)
 
         self.sequence_length = seq_length
@@ -91,15 +88,12 @@ class LinearClassifier2D(nn.Module):
         self.use_age = use_age
         if use_age not in ["fc", "conv", "embedding", "no"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(use_age) "
-                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+                f"{self.__class__.__name__}.__init__(use_age) " f"receives one of ['fc', 'conv', 'embedding', 'no']."
             )
         elif self.use_age == "conv":
             in_channels += 1
         elif self.use_age == "embedding":
-            self.age_embedding = torch.nn.Parameter(
-                (torch.zeros(1, seq_len_2d[0] * seq_len_2d[1] * in_channels))
-            )
+            self.age_embedding = torch.nn.Parameter((torch.zeros(1, seq_len_2d[0] * seq_len_2d[1] * in_channels)))
             torch.nn.init.trunc_normal_(self.age_embedding, std=0.02)
 
         self.seq_len_2d = seq_len_2d

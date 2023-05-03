@@ -42,20 +42,14 @@ def learning_rate_search(
         model.load_state_dict(deepcopy(given_model_state))
         # model.module.reset_weights() if config.get('ddp', False) else model.reset_weights()
 
-        optimizer = optim.AdamW(
-            model.parameters(), lr=lr, weight_decay=config["weight_decay"]
-        )
+        optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
         scheduler = get_lr_scheduler(
             optimizer,
             scheduler_type="constant_with_decay",  # constant for search
             iterations=config["total_samples"],
             warmup_steps=config["total_samples"],
         )
-        amp_scaler = (
-            torch.cuda.amp.GradScaler()
-            if config.get("mixed_precision", False)
-            else None
-        )
+        amp_scaler = torch.cuda.amp.GradScaler() if config.get("mixed_precision", False) else None
 
         loss, _ = train_multistep(
             model,
@@ -94,9 +88,7 @@ def learning_rate_search(
     # find the best starting point (if a tie occurs, average them)
     midpoints = np.array([(tr + vl) / 2 for _, tr, vl in learning_rate_record])
     induces = np.argwhere(midpoints == np.max(midpoints))
-    best_log_lr = np.average(
-        np.array([log_lr for log_lr, _, _ in learning_rate_record])[induces]
-    )
+    best_log_lr = np.average(np.array([log_lr for log_lr, _, _ in learning_rate_record])[induces])
 
     # recover the given  model state
     model.load_state_dict(deepcopy(given_model_state))
@@ -124,12 +116,8 @@ def train_script(
 
     # load if using an existing model
     if config.get("init_from", None):
-        init_path = os.path.join(
-            config.get("cwd", ""), f'local/checkpoint/{config["init_from"]}/'
-        )
-        checkpoint = torch.load(
-            os.path.join(init_path, "checkpoint.pt"), map_location=config["device"]
-        )
+        init_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["init_from"]}/')
+        checkpoint = torch.load(os.path.join(init_path, "checkpoint.pt"), map_location=config["device"])
         model.load_state_dict(checkpoint["model_state"])
         pprint.pprint(f'Load an existing model from {config["init_from"]}\n', width=120)
 
@@ -162,27 +150,19 @@ def train_script(
 
     # training iteration and other conditions
     config["base_lr"] = config["base_lr"] * config.get("search_multiplier", 1.0)
-    config["iterations"] = round(
-        config["total_samples"] / config["minibatch"] / config.get("ddp_size", 1)
-    )
-    config["warmup_steps"] = max(
-        round(config["iterations"] * config["warmup_ratio"]), config["warmup_min"]
-    )
+    config["iterations"] = round(config["total_samples"] / config["minibatch"] / config.get("ddp_size", 1))
+    config["warmup_steps"] = max(round(config["iterations"] * config["warmup_ratio"]), config["warmup_min"])
     history_interval = max(config["iterations"] // config["num_history"], 1)
 
     # generate the trainers
-    optimizer = optim.AdamW(
-        model.parameters(), lr=config["base_lr"], weight_decay=config["weight_decay"]
-    )
+    optimizer = optim.AdamW(model.parameters(), lr=config["base_lr"], weight_decay=config["weight_decay"])
     scheduler = get_lr_scheduler(
         optimizer,
         config["lr_scheduler_type"],
         iterations=config["iterations"],
         warmup_steps=config["warmup_steps"],
     )
-    amp_scaler = (
-        torch.cuda.amp.GradScaler() if config.get("mixed_precision", False) else None
-    )
+    amp_scaler = torch.cuda.amp.GradScaler() if config.get("mixed_precision", False) else None
 
     # local variable for training loop
     best_val_acc = 0
@@ -192,12 +172,8 @@ def train_script(
     # load if resuming
     if config.get("resume", None):
         resume = config["resume"]
-        save_path = os.path.join(
-            config.get("cwd", ""), f'local/checkpoint/{config["resume"]}/'
-        )
-        checkpoint = torch.load(
-            os.path.join(save_path, "checkpoint.pt"), map_location=config["device"]
-        )
+        save_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["resume"]}/')
+        checkpoint = torch.load(os.path.join(save_path, "checkpoint.pt"), map_location=config["device"])
         best_model_state = checkpoint["model_state"]
         model.load_state_dict(best_model_state)
         best_val_acc = check_accuracy(
@@ -229,15 +205,9 @@ def train_script(
                 wandb.watch(model, log="all", log_freq=history_interval, log_graph=True)
 
         # directory to save
-        run_name = (
-            wandb.run.name
-            if config["use_wandb"]
-            else datetime.now().strftime("%Y-%m%d-%H%M")
-        )
+        run_name = wandb.run.name if config["use_wandb"] else datetime.now().strftime("%Y-%m%d-%H%M")
         if config["save_model"]:
-            save_path = os.path.join(
-                config.get("cwd", ""), f"local/checkpoint/{run_name}/"
-            )
+            save_path = os.path.join(config.get("cwd", ""), f"local/checkpoint/{run_name}/")
             os.makedirs(save_path, exist_ok=True)
 
     # train and validation routine
@@ -272,9 +242,7 @@ def train_script(
                         "Loss": loss,
                         "Train Accuracy": train_acc,
                         "Validation Accuracy": val_acc,
-                        "Learning Rate": optimizer.state_dict()["param_groups"][0][
-                            "lr"
-                        ],
+                        "Learning Rate": optimizer.state_dict()["param_groups"][0]["lr"],
                     },
                     step=i_step * config["minibatch"],
                 )

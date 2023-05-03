@@ -6,9 +6,7 @@ import torch.nn.functional as F
 
 
 @torch.no_grad()
-def compute_feature_embedding(
-    model, sample_batched, preprocess, config, target_from_last=1
-):
+def compute_feature_embedding(model, sample_batched, preprocess, config, target_from_last=1):
     # evaluation mode
     model.eval()
 
@@ -32,9 +30,7 @@ def compute_feature_embedding(
 @torch.no_grad()
 def estimate_score(model, sample_batched, preprocess, config):
     # compute output embedding
-    output = compute_feature_embedding(
-        model, sample_batched, preprocess, config, target_from_last=0
-    )
+    output = compute_feature_embedding(model, sample_batched, preprocess, config, target_from_last=0)
 
     # map depending on the loss function
     if config["criterion"] == "cross-entropy":
@@ -44,9 +40,7 @@ def estimate_score(model, sample_batched, preprocess, config):
     elif config["criterion"] == "svm":
         score = output
     else:
-        raise ValueError(
-            f"estimate_score(): cannot parse config['criterion']={config['criterion']}."
-        )
+        raise ValueError(f"estimate_score(): cannot parse config['criterion']={config['criterion']}.")
     return score
 
 
@@ -170,9 +164,7 @@ def check_accuracy_extended(model, loader, preprocess, config, repeat=1, dummy=1
 
             # confusion matrix
             pred = s.argmax(dim=-1)
-            confusion_matrix += calculate_confusion_matrix(
-                pred, y, num_classes=config["out_dims"]
-            )
+            confusion_matrix += calculate_confusion_matrix(pred, y, num_classes=config["out_dims"])
 
             # total samples
             total += pred.shape[0]
@@ -190,10 +182,7 @@ def check_accuracy_extended_debug(model, loader, preprocess, config, repeat=1):
     confusion_matrix = np.zeros((C, C), dtype=np.int32)
 
     # for error table
-    error_table = {
-        data["serial"]: {"GT": data["class_label"].item(), "Pred": [0] * C}
-        for data in loader.dataset
-    }
+    error_table = {data["serial"]: {"GT": data["class_label"].item(), "Pred": [0] * C} for data in loader.dataset}
 
     # for crop timing
     crop_timing = dict()
@@ -218,9 +207,7 @@ def check_accuracy_extended_debug(model, loader, preprocess, config, repeat=1):
 
             # confusion matrix
             pred = s.argmax(dim=-1)
-            confusion_matrix += calculate_confusion_matrix(
-                pred, y, num_classes=config["out_dims"]
-            )
+            confusion_matrix += calculate_confusion_matrix(pred, y, num_classes=config["out_dims"])
 
             # error table
             for n in range(pred.shape[0]):
@@ -237,9 +224,7 @@ def check_accuracy_extended_debug(model, loader, preprocess, config, repeat=1):
                 if pred[n] == y[n]:
                     crop_timing[ct]["correct"] = crop_timing[ct].get("correct", 0) + 1
                 else:
-                    crop_timing[ct]["incorrect"] = (
-                        crop_timing[ct].get("incorrect", 0) + 1
-                    )
+                    crop_timing[ct]["incorrect"] = crop_timing[ct].get("incorrect", 0) + 1
 
     # error table update
     error_table_serial = []
@@ -301,9 +286,7 @@ def check_accuracy_multicrop(model, loader, preprocess, config, repeat=1):
 
 
 @torch.no_grad()
-def check_accuracy_multicrop_extended(
-    model, loader, preprocess, config, repeat=1, dummy=1
-):
+def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=1, dummy=1):
     # for confusion matrix
     C = config["out_dims"]
     confusion_matrix = np.zeros((C, C), dtype=np.int32)
@@ -325,9 +308,7 @@ def check_accuracy_multicrop_extended(
 
     for k in range(repeat):
         for sample_batched in loader:
-            real_minibatch = (
-                sample_batched["signal"].size(0) // config["test_crop_multiple"]
-            )
+            real_minibatch = sample_batched["signal"].size(0) // config["test_crop_multiple"]
             s_merge = torch.zeros((real_minibatch, config["out_dims"]))
             y_merge = torch.zeros((real_minibatch,), dtype=torch.int32)
 
@@ -365,9 +346,7 @@ def check_accuracy_multicrop_extended(
 
             # confusion matrix
             pred = s.argmax(dim=-1)
-            confusion_matrix += calculate_confusion_matrix(
-                pred, y, num_classes=config["out_dims"]
-            )
+            confusion_matrix += calculate_confusion_matrix(pred, y, num_classes=config["out_dims"])
 
             # total samples
             total += pred.shape[0]

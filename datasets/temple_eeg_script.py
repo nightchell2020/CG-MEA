@@ -14,9 +14,7 @@ from .pipeline import EegToTensor
 # __all__ = []
 
 
-def load_tuab_task_datasets(
-    dataset_path: str, file_format: str = "edf", transform=None, verbose=False
-):
+def load_tuab_task_datasets(dataset_path: str, file_format: str = "edf", transform=None, verbose=False):
     """Load the TUAB datasets for the target benchmark task as PyTorch dataset instances.
 
     Args:
@@ -38,26 +36,16 @@ def load_tuab_task_datasets(
         train_list = []
         val_list = []
         for pathology in ["abnormal", "normal"]:
-            for i, file in enumerate(
-                glob.glob(
-                    os.path.join(dataset_path, f"train/{pathology}/*." + extension)
-                )
-            ):
+            for i, file in enumerate(glob.glob(os.path.join(dataset_path, f"train/{pathology}/*." + extension))):
                 if i % 10 == 0:
                     val_list.append(file)
                 else:
                     train_list.append(file)
         test_list = glob.glob(os.path.join(dataset_path, f"eval/*/*." + extension))
 
-        train_dataset = TuhAbnormalDataset(
-            train_list, file_format=file_format, transform=transform
-        )
-        val_dataset = TuhAbnormalDataset(
-            val_list, file_format=file_format, transform=transform
-        )
-        test_dataset = TuhAbnormalDataset(
-            test_list, file_format=file_format, transform=transform
-        )
+        train_dataset = TuhAbnormalDataset(train_list, file_format=file_format, transform=transform)
+        val_dataset = TuhAbnormalDataset(val_list, file_format=file_format, transform=transform)
+        test_dataset = TuhAbnormalDataset(test_list, file_format=file_format, transform=transform)
 
     except FileNotFoundError as e:
         print(
@@ -66,9 +54,7 @@ def load_tuab_task_datasets(
         )
         raise
     except ValueError as e:
-        print(
-            f"ERROR: load_tuab_task_datasets(file_format={file_format}) encounters an error of {e}."
-        )
+        print(f"ERROR: load_tuab_task_datasets(file_format={file_format}) encounters an error of {e}.")
         raise
 
     config = {
@@ -158,29 +144,19 @@ def load_tuab_task_split(
             train_list = []
             val_list = []
             for pathology in ["abnormal", "normal"]:
-                for i, file in enumerate(
-                    glob.glob(
-                        os.path.join(dataset_path, f"train/{pathology}/*." + extension)
-                    )
-                ):
+                for i, file in enumerate(glob.glob(os.path.join(dataset_path, f"train/{pathology}/*." + extension))):
                     if i % 10 == 0:
                         val_list.append(file)
                     else:
                         train_list.append(file)
 
             if split in "train":
-                dataset = TuhAbnormalDataset(
-                    train_list, file_format=file_format, transform=transform
-                )
+                dataset = TuhAbnormalDataset(train_list, file_format=file_format, transform=transform)
             else:
-                dataset = TuhAbnormalDataset(
-                    val_list, file_format=file_format, transform=transform
-                )
+                dataset = TuhAbnormalDataset(val_list, file_format=file_format, transform=transform)
         elif split in ["test", "eval", "evaluation"]:
             test_list = glob.glob(os.path.join(dataset_path, f"eval/*/*." + extension))
-            dataset = TuhAbnormalDataset(
-                test_list, file_format=file_format, transform=transform
-            )
+            dataset = TuhAbnormalDataset(test_list, file_format=file_format, transform=transform)
         else:
             raise ValueError(f"split is unknown: {split}.")
 
@@ -191,9 +167,7 @@ def load_tuab_task_split(
         )
         raise
     except ValueError as e:
-        print(
-            f"ERROR: load_tuab_task_split(file_format={file_format}) encounters an error of {e}."
-        )
+        print(f"ERROR: load_tuab_task_split(file_format={file_format}) encounters an error of {e}.")
         raise
 
     config = {
@@ -322,15 +296,11 @@ def build_dataset_for_tuab_train(config, verbose=False):
 
     if "run_mode" not in config.keys():
         print("\n" + "=" * 80 + "\n" + "=" * 80 + "\n")
-        print(
-            'WARNING: run_mode is not specified.\n \t==> run_mode is set to "train" automatically.'
-        )
+        print('WARNING: run_mode is not specified.\n \t==> run_mode is set to "train" automatically.')
         print("\n" + "=" * 80 + "\n" + "=" * 80 + "\n")
         config["run_mode"] = "train"
 
-    config_task, _ = load_tuab_task_split(
-        dataset_path=dataset_path, split="test", file_format=config["file_format"]
-    )
+    config_task, _ = load_tuab_task_split(dataset_path=dataset_path, split="test", file_format=config["file_format"])
     config.update(**config_task)
 
     transform, transform_multicrop = compose_tuab_transforms(config, verbose=verbose)
@@ -363,14 +333,10 @@ def build_dataset_for_tuab_train(config, verbose=False):
         verbose=False,
     )
 
-    preprocess_train, preprocess_test = compose_preprocess(
-        config, train_loader, verbose=verbose
-    )
+    preprocess_train, preprocess_test = compose_preprocess(config, train_loader, verbose=verbose)
     config["preprocess_train"] = preprocess_train
     config["preprocess_test"] = preprocess_test
-    config["in_channels"] = preprocess_train(next(iter(train_loader)))["signal"].shape[
-        1
-    ]
+    config["in_channels"] = preprocess_train(next(iter(train_loader)))["signal"].shape[1]
     config["out_dims"] = len(config["class_label_to_name"])
 
     if verbose:

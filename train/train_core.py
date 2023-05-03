@@ -9,9 +9,7 @@ from .evaluate import compute_feature_embedding
 # __all__ = []
 
 
-def train_multistep(
-    model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps
-):
+def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps):
     model.train()
 
     i = 0
@@ -66,9 +64,7 @@ def train_multistep(
                 elif config["criterion"] == "svm":
                     loss = mixup_criterion(F.multi_margin_loss, output, y1, y2, lam)
                 else:
-                    raise ValueError(
-                        "config['criterion'] must be set to one of ['cross-entropy', 'multi-bce', 'svm']"
-                    )
+                    raise ValueError("config['criterion'] must be set to one of ['cross-entropy', 'multi-bce', 'svm']")
 
                 # distillation loss computation
                 if config.get("distil_teacher", None):
@@ -83,9 +79,7 @@ def train_multistep(
 
                     if config["criterion"] == "cross-entropy":
                         if config.get("distil_type") == "hard":
-                            distil_loss = F.cross_entropy(
-                                output_kd, teacher_output.argmax(dim=1)
-                            )
+                            distil_loss = F.cross_entropy(output_kd, teacher_output.argmax(dim=1))
                         elif config.get("distil_type") == "soft":
                             distil_loss = F.kl_div(
                                 F.log_softmax(output_kd / distil_tau, dim=1),
@@ -93,11 +87,7 @@ def train_multistep(
                                 reduction="sum",
                                 log_target=True,
                             )
-                            distil_loss = (
-                                distil_loss
-                                * (distil_tau * distil_tau)
-                                / output_kd.numel()
-                            )
+                            distil_loss = distil_loss * (distil_tau * distil_tau) / output_kd.numel()
 
                     elif config["criterion"] == "multi-bce":
                         if config.get("distil_type") == "hard":
@@ -105,26 +95,18 @@ def train_multistep(
                                 teacher_output.argmax(dim=1),
                                 num_classes=output_kd.size(dim=1),
                             )
-                            distil_loss = F.binary_cross_entropy_with_logits(
-                                output_kd, teacher_y_oh.float()
-                            )
+                            distil_loss = F.binary_cross_entropy_with_logits(output_kd, teacher_y_oh.float())
                         elif config.get("distil_type") == "soft":
                             distil_loss = F.binary_cross_entropy_with_logits(
                                 output_kd / distil_tau,
                                 (teacher_output / distil_tau).sigmoid(),
                                 reduction="sum",
                             )
-                            distil_loss = (
-                                distil_loss
-                                * (distil_tau * distil_tau)
-                                / output_kd.numel()
-                            )
+                            distil_loss = distil_loss * (distil_tau * distil_tau) / output_kd.numel()
 
                     elif config["criterion"] == "svm":
                         if config.get("distil_type") == "hard":
-                            distil_loss = F.multi_margin_loss(
-                                output_kd, teacher_output.argmax(dim=1)
-                            )
+                            distil_loss = F.multi_margin_loss(output_kd, teacher_output.argmax(dim=1))
 
                     distil_alpha = config["distil_alpha"]
                     loss = (1 - distil_alpha) * loss + distil_alpha * distil_loss
@@ -134,18 +116,14 @@ def train_multistep(
                 amp_scaler.scale(loss).backward()
                 if "clip_grad_norm" in config:
                     amp_scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), config["clip_grad_norm"]
-                    )
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config["clip_grad_norm"])
                 amp_scaler.step(optimizer)
                 amp_scaler.update()
                 scheduler.step()
             else:
                 loss.backward()
                 if "clip_grad_norm" in config:
-                    torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), config["clip_grad_norm"]
-                    )
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config["clip_grad_norm"])
                 optimizer.step()
                 scheduler.step()
 
@@ -169,9 +147,7 @@ def train_multistep(
     return avg_loss, train_acc
 
 
-def ssl_train_multistep(
-    model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps
-):
+def ssl_train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler, config, steps):
     model.train()
 
     i = 0
@@ -198,18 +174,14 @@ def ssl_train_multistep(
                 amp_scaler.scale(loss).backward()
                 if "clip_grad_norm" in config:
                     amp_scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), config["clip_grad_norm"]
-                    )
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config["clip_grad_norm"])
                 amp_scaler.step(optimizer)
                 amp_scaler.update()
                 scheduler.step()
             else:
                 loss.backward()
                 if "clip_grad_norm" in config:
-                    torch.nn.utils.clip_grad_norm_(
-                        model.parameters(), config["clip_grad_norm"]
-                    )
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), config["clip_grad_norm"])
                 optimizer.step()
                 scheduler.step()
 

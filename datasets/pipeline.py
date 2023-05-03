@@ -20,8 +20,7 @@ class EegLimitMaxLength(object):
     def __init__(self, max_length: int):
         if isinstance(max_length, int) is False or max_length <= 0:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(front_cut) "
-                f"needs a positive integer to initialize"
+                f"{self.__class__.__name__}.__init__(front_cut) " f"needs a positive integer to initialize"
             )
         self.max_length = max_length
 
@@ -56,19 +55,12 @@ class EegRandomCrop(object):
         reject_events: bool = False,
     ):
         if isinstance(crop_length, int) is False:
-            raise ValueError(
-                f"{self.__class__.__name__}.__init__(crop_length) "
-                f"needs a integer to initialize"
-            )
+            raise ValueError(f"{self.__class__.__name__}.__init__(crop_length) " f"needs a integer to initialize")
         if isinstance(crop_length, int) is False or multiple < 1:
-            raise ValueError(
-                f"{self.__class__.__name__}.__init__(multiple)"
-                f" needs a positive integer to initialize"
-            )
+            raise ValueError(f"{self.__class__.__name__}.__init__(multiple)" f" needs a positive integer to initialize")
         if isinstance(latency, int) is False or latency < 0:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(latency)"
-                f" needs a non negative integer to initialize"
+                f"{self.__class__.__name__}.__init__(latency)" f" needs a non negative integer to initialize"
             )
 
         self.crop_length = crop_length
@@ -81,10 +73,7 @@ class EegRandomCrop(object):
 
     def __call__(self, sample):
         if self.reject_events and "event" not in sample.keys():
-            raise ValueError(
-                f"{self.__class__.__name__}, this dataset "
-                f"does not have the event information at all."
-            )
+            raise ValueError(f"{self.__class__.__name__}, this dataset " f"does not have the event information at all.")
 
         signal = sample["signal"]
         signal_length = min(signal.shape[-1], self.length_limit)
@@ -97,17 +86,12 @@ class EegRandomCrop(object):
                 start = max(e[0] - self.crop_length + 1, 0)
                 possible_timeline[start : e[0] + 1] = 0
 
-        cts = np.random.choice(
-            np.arange(signal_length)[possible_timeline == 1], self.multiple
-        )
+        cts = np.random.choice(np.arange(signal_length)[possible_timeline == 1], self.multiple)
 
         if self.multiple == 1:
             ct = cts[0]
             if self.segment_simulation:
-                ct = (
-                    int((ct - self.latency) / self.crop_length) * self.crop_length
-                    + self.latency
-                )
+                ct = int((ct - self.latency) / self.crop_length) * self.crop_length + self.latency
 
             sample["signal"] = signal[:, ct : ct + self.crop_length]
 
@@ -129,10 +113,7 @@ class EegRandomCrop(object):
             for r in range(self.multiple):
                 ct = cts[r]
                 if self.segment_simulation:
-                    ct = (
-                        int((ct - self.latency) / self.crop_length) * self.crop_length
-                        + self.latency
-                    )
+                    ct = int((ct - self.latency) / self.crop_length) * self.crop_length + self.latency
 
                 signals.append(signal[:, ct : ct + self.crop_length])
 
@@ -178,10 +159,7 @@ class EegEyeOpenCrop(object):
         length_limit: int = 10**7,
     ):
         if mode not in ("first", "random"):
-            raise ValueError(
-                f"{self.__class__.__name__}.__init__(mode) "
-                f'must be set to one of ("first", "random")'
-            )
+            raise ValueError(f"{self.__class__.__name__}.__init__(mode) " f'must be set to one of ("first", "random")')
 
         self.crop_before = crop_before
         self.crop_after = crop_after
@@ -191,10 +169,7 @@ class EegEyeOpenCrop(object):
 
     def __call__(self, sample):
         if "event" not in sample.keys():
-            raise ValueError(
-                f"{self.__class__.__name__}, this dataset "
-                f"does not have the event information at all."
-            )
+            raise ValueError(f"{self.__class__.__name__}, this dataset " f"does not have the event information at all.")
 
         signal = sample["signal"]
         total_length = min(signal.shape[-1], self.length_limit)
@@ -206,8 +181,7 @@ class EegEyeOpenCrop(object):
 
         if len(candidates) == 0:
             raise ValueError(
-                f'{self.__class__.__name__}.__call__(), {sample["serial"]} '
-                f"does not have an eye open event."
+                f'{self.__class__.__name__}.__call__(), {sample["serial"]} ' f"does not have an eye open event."
             )
 
         if self.mode == "first":
@@ -267,10 +241,7 @@ class EegEyeClosedCrop(object):
         length_limit: int = 10 * 7,
     ):
         if mode not in ("random", "exact"):
-            raise ValueError(
-                f"{self.__class__.__name__}.__init__(mode) "
-                f'must be set to one of ("random", "exact")'
-            )
+            raise ValueError(f"{self.__class__.__name__}.__init__(mode) " f'must be set to one of ("random", "exact")')
 
         self.transition = transition
         self.crop_length = crop_length
@@ -281,8 +252,7 @@ class EegEyeClosedCrop(object):
     def __call__(self, sample):
         if "event" not in sample.keys():
             raise ValueError(
-                f"{self.__class__.__name__}.__call__(), this dataset does not have "
-                f"an event information at all."
+                f"{self.__class__.__name__}.__call__(), this dataset does not have " f"an event information at all."
             )
 
         signal = sample["signal"]
@@ -315,8 +285,7 @@ class EegEyeClosedCrop(object):
         intervals = [
             (x[0], min(x[1], total_length))
             for x in intervals
-            if min(x[1], total_length) - x[0]
-            >= self.transition + self.crop_length + self.jitter
+            if min(x[1], total_length) - x[0] >= self.transition + self.crop_length + self.jitter
         ]
 
         if len(intervals) == 0:
@@ -334,9 +303,7 @@ class EegEyeClosedCrop(object):
             if t1 + self.transition == t2 - self.crop_length:
                 time = t1 + self.transition
             else:
-                time = np.random.randint(
-                    low=t1 + self.transition, high=t2 - self.crop_length
-                )
+                time = np.random.randint(low=t1 + self.transition, high=t2 - self.crop_length)
         elif self.mode == "exact":
             t1, t2 = intervals[k]
             if self.jitter == 0:
@@ -451,8 +418,7 @@ class EegToTensor(object):
             sample["signal"] = signals
         else:
             raise ValueError(
-                f'{self.__class__.__name__}.__call__(sample["signal"]) needs to be set to np.ndarray '
-                f"or their list"
+                f'{self.__class__.__name__}.__call__(sample["signal"]) needs to be set to np.ndarray ' f"or their list"
             )
 
         sample["age"] = torch.tensor(sample["age"], dtype=torch.float32)
@@ -469,9 +435,7 @@ def eeg_collate_fn(batch):
     batched_sample = {k: [] for k in batch[0].keys()}
 
     for sample in batch:
-        if isinstance(sample["signal"], (np.ndarray,)) or torch.is_tensor(
-            sample["signal"]
-        ):
+        if isinstance(sample["signal"], (np.ndarray,)) or torch.is_tensor(sample["signal"]):
             for k in sample.keys():
                 batched_sample[k] += [sample[k]]
 
@@ -595,10 +559,7 @@ class EegChannelDropOut(torch.nn.Module):
 
     def forward(self, sample):
         signal = sample["signal"]
-        ind = (
-            torch.rand((signal.shape[0], signal.shape[1]), device=signal.get_device())
-            < self.p
-        )
+        ind = torch.rand((signal.shape[0], signal.shape[1]), device=signal.get_device()) < self.p
         signal[ind] = 0
         sample["signal"] = signal
         return sample
@@ -695,9 +656,7 @@ class EegAddGaussianNoiseAge(torch.nn.Module):
 
     def forward(self, sample):
         age = sample["age"]
-        noise = torch.normal(
-            mean=torch.ones_like(age) * self.mean, std=torch.ones_like(age) * self.std
-        )
+        noise = torch.normal(mean=torch.ones_like(age) * self.mean, std=torch.ones_like(age) * self.std)
         sample["age"] = age + noise
         return sample
 
@@ -750,9 +709,7 @@ class EegSpectrogram(torch.nn.Module):
     def __init__(self, n_fft, complex_mode="as_real", **kwargs):
         super().__init__()
         if complex_mode not in ("as_real", "power", "remove"):
-            raise ValueError(
-                'complex_mode must be set to one of ("as_real", "power", "remove")'
-            )
+            raise ValueError('complex_mode must be set to one of ("as_real", "power", "remove")')
 
         self.n_fft = n_fft
         self.complex_mode = complex_mode
@@ -763,9 +720,7 @@ class EegSpectrogram(torch.nn.Module):
             N = x.shape[0]
 
             for i in range(N):
-                xf = torch.stft(
-                    x[i], n_fft=self.n_fft, return_complex=True, **self.stft_kwargs
-                )
+                xf = torch.stft(x[i], n_fft=self.n_fft, return_complex=True, **self.stft_kwargs)
 
                 if i == 0:
                     if self.complex_mode == "as_real":
@@ -775,9 +730,7 @@ class EegSpectrogram(torch.nn.Module):
                             device=x.device,
                         )
                     else:
-                        x_out = torch.zeros(
-                            (N, *xf.shape), dtype=x.dtype, device=x.device
-                        )
+                        x_out = torch.zeros((N, *xf.shape), dtype=x.dtype, device=x.device)
 
                 if self.complex_mode == "as_real":
                     x_out[i] = torch.cat(
@@ -793,9 +746,7 @@ class EegSpectrogram(torch.nn.Module):
                     x_out[i] = torch.real(xf)
 
         elif len(x.shape) == 2:
-            xf = torch.stft(
-                x, n_fft=self.n_fft, return_complex=True, **self.stft_kwargs
-            )
+            xf = torch.stft(x, n_fft=self.n_fft, return_complex=True, **self.stft_kwargs)
 
             if self.complex_mode == "as_real":
                 x_out = torch.cat(
@@ -809,8 +760,7 @@ class EegSpectrogram(torch.nn.Module):
 
         else:
             raise ValueError(
-                f'{self.__class__.__name__}._spectrogram(sample["signal"]) '
-                f"- check the signal tensor size."
+                f'{self.__class__.__name__}._spectrogram(sample["signal"]) ' f"- check the signal tensor size."
             )
 
         return x_out
@@ -851,9 +801,7 @@ class EegResample(torch.nn.Module):
             "kaiser_best",
             "kaiser_fast",
         ):
-            raise ValueError(
-                'complex_mode must be set to one of ("as_real", "power", "remove")'
-            )
+            raise ValueError('complex_mode must be set to one of ("as_real", "power", "remove")')
 
         self.orig_freq = orig_freq
         self.new_freq = new_freq
@@ -903,9 +851,7 @@ class TransformTimeChecker(object):
         start = time.time()
         sample = self.instance(sample)
         end = time.time()
-        print(
-            f"{self.header + type(self.instance).__name__:{self.str_format}}> {end - start :.5f}"
-        )
+        print(f"{self.header + type(self.instance).__name__:{self.str_format}}> {end - start :.5f}")
         return sample
 
 
