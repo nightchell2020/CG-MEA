@@ -21,11 +21,20 @@ class CauEegDataset(Dataset):
         transform (callable): Optional transform to be applied on each data.
     """
 
-    def __init__(self, root_dir: str, data_list: list, load_event: bool,
-                 file_format: str = 'edf', use_prefix_signal: bool = True, transform=None):
-        if file_format not in ['edf', 'feather', 'memmap', 'np']:
-            raise ValueError(f"{self.__class__.__name__}.__init__(file_format) "
-                             f"must be set to one of 'edf', 'feather', 'memmap' and 'np'")
+    def __init__(
+        self,
+        root_dir: str,
+        data_list: list,
+        load_event: bool,
+        file_format: str = "edf",
+        use_prefix_signal: bool = True,
+        transform=None,
+    ):
+        if file_format not in ["edf", "feather", "memmap", "np"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(file_format) "
+                f"must be set to one of 'edf', 'feather', 'memmap' and 'np'"
+            )
 
         self.root_dir = root_dir
         self.data_list = data_list
@@ -45,11 +54,11 @@ class CauEegDataset(Dataset):
         sample = deepcopy(self.data_list[idx])
 
         # signal
-        sample['signal'] = self._read_signal(sample)
+        sample["signal"] = self._read_signal(sample)
 
         # event
         if self.load_event:
-            sample['event'] = self._read_event(sample)
+            sample["event"] = self._read_event(sample)
 
         if self.transform:
             sample = self.transform(sample)
@@ -57,38 +66,38 @@ class CauEegDataset(Dataset):
         return sample
 
     def _read_signal(self, anno):
-        if self.file_format == 'edf':
+        if self.file_format == "edf":
             return self._read_edf(anno)
-        elif self.file_format == 'feather':
+        elif self.file_format == "feather":
             return self._read_feather(anno)
         else:
             return self._read_memmap(anno)
 
     def _read_edf(self, anno):
-        prefix = 'signal/edf/' if self.use_prefix_signal else ''
+        prefix = "signal/edf/" if self.use_prefix_signal else ""
         edf_file = os.path.join(self.root_dir, prefix, f"{anno['serial']}.edf")
         signal, signal_headers, _ = pyedflib.highlevel.read_edf(edf_file)
         return signal
 
     def _read_feather(self, anno):
-        prefix = 'signal/feather/' if self.use_prefix_signal else ''
+        prefix = "signal/feather/" if self.use_prefix_signal else ""
         fname = os.path.join(self.root_dir, prefix, f"{anno['serial']}.feather")
         df = feather.read_feather(fname)
         return df.values.T
 
     def _read_memmap(self, anno):
-        prefix = 'signal/memmap/' if self.use_prefix_signal else ''
+        prefix = "signal/memmap/" if self.use_prefix_signal else ""
         fname = os.path.join(self.root_dir, prefix, f"{anno['serial']}.dat")
-        signal = np.memmap(fname, dtype='int32', mode='r').reshape(21, -1)
+        signal = np.memmap(fname, dtype="int32", mode="r").reshape(21, -1)
         return signal
 
     def _read_np(self, anno):
-        prefix = 'signal/np/' if self.use_prefix_signal else ''
+        prefix = "signal/np/" if self.use_prefix_signal else ""
         fname = os.path.join(self.root_dir, prefix, f"{anno['serial']}.npy")
         return np.load(fname)
 
     def _read_event(self, m):
-        fname = os.path.join(self.root_dir, 'event', m['serial'] + '.json')
-        with open(fname, 'r') as json_file:
+        fname = os.path.join(self.root_dir, "event", m["serial"] + ".json")
+        with open(fname, "r") as json_file:
             event = json.load(json_file)
         return event

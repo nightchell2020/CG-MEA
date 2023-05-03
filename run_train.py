@@ -23,7 +23,9 @@ def check_device_env(config):
         raise ValueError("ERROR: No GPU is available. Check the environment again!!")
 
     # assign GPU
-    config["device"] = torch.device(config.get("device", "cuda") if torch.cuda.is_available() else "cpu")
+    config["device"] = torch.device(
+        config.get("device", "cuda") if torch.cuda.is_available() else "cpu"
+    )
 
     device_name = torch.cuda.get_device_name(0)
     # minibatch sizes
@@ -40,8 +42,13 @@ def check_device_env(config):
         else:
             config["minibatch"] = config["minibatch_3090"]
             print("*" * 150)
-            print(f"- WARNING: this process set the minibatch size as {config['minibatch']}, assuming that your VRAM size of GPU is equivalent to NVIDIA RTX 3090.")
-            print(f"- If you want to change the minibatch size, add '++minibatch=MINIBACH_SIZE' option to the command.")
+            print(
+                f"- WARNING: this process set the minibatch size as {config['minibatch']}, "
+                f"assuming that your VRAM size of GPU is equivalent to NVIDIA RTX 3090."
+            )
+            print(
+                f"- If you want to change the minibatch size, add '++minibatch=MINIBACH_SIZE' option to the command."
+            )
             print("*" * 150)
 
     # distributed training
@@ -108,8 +115,12 @@ def generate_model(config):
 
 
 def load_pretrained_params(model, config):
-    save_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["load_pretrained"]}/')
-    ckpt = torch.load(os.path.join(save_path, "checkpoint.pt"), map_location=config["device"])
+    save_path = os.path.join(
+        config.get("cwd", ""), f'local/checkpoint/{config["load_pretrained"]}/'
+    )
+    ckpt = torch.load(
+        os.path.join(save_path, "checkpoint.pt"), map_location=config["device"]
+    )
 
     if ckpt["config"]["ddp"] == config["ddp"]:
         model.load_state_dict(ckpt["model_state"])
@@ -126,8 +137,12 @@ def load_pretrained_params(model, config):
 
 def load_distill_teacher(config):
     # load teacher model
-    save_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["distil_teacher"]}/')
-    ckpt = torch.load(os.path.join(save_path, "checkpoint.pt"), map_location=config["device"])
+    save_path = os.path.join(
+        config.get("cwd", ""), f'local/checkpoint/{config["distil_teacher"]}/'
+    )
+    ckpt = torch.load(
+        os.path.join(save_path, "checkpoint.pt"), map_location=config["device"]
+    )
     model_teacher = hydra.utils.instantiate(ckpt["config"])
 
     if config.get("ddp", False):
@@ -163,19 +178,30 @@ def load_distill_teacher(config):
 
     # sanity check
     if config["distil_type"] not in ["hard", "soft"]:
-        raise ValueError(f"ERROR: Choose the correct option for knowledge distillation: 'soft' or 'hard.'")
-    elif config["distil_type"] == "soft" and config["distil_teacher_criterion"] != config["criterion"]:
+        raise ValueError(
+            f"ERROR: Choose the correct option for knowledge distillation: 'soft' or 'hard.'"
+        )
+    elif (
+        config["distil_type"] == "soft"
+        and config["distil_teacher_criterion"] != config["criterion"]
+    ):
         raise ValueError(
             f"ERROR: In the case of 'soft' knowledge distillation, "
             f"the objective functions must be equal between teacher and student models.\n"
             f"Current state: teacher - {config['distil_teacher_criterion']}"
             f" / student - {config['criterion']}"
         )
-    elif config["distil_type"] == "soft" and config["distil_teacher_criterion"] == "svm":
+    elif (
+        config["distil_type"] == "soft" and config["distil_teacher_criterion"] == "svm"
+    ):
         raise ValueError(
-            f"ERROR: In our implementation, " f"the SVM classifier does not support for 'soft' knowledge distillation."
+            f"ERROR: In our implementation, "
+            f"the SVM classifier does not support for 'soft' knowledge distillation."
         )
-    elif config["EKG"] != ckpt["config"]["EKG"] or config["photic"] != ckpt["config"]["photic"]:
+    elif (
+        config["EKG"] != ckpt["config"]["EKG"]
+        or config["photic"] != ckpt["config"]["photic"]
+    ):
         raise ValueError(
             f"ERROR: The teacher and student networks must have the same EEG channel configuration:\n"
             f"Current state: teacher - EKG {ckpt['config']['EKG']}, Photic {ckpt['config']['photic']}"
@@ -197,7 +223,9 @@ def prepare_and_run_train(rank, world_size, config):
         config = initialize_ddp(rank, world_size, config)
 
     # compose dataset
-    train_loader, val_loader, test_loader, multicrop_test_loader = compose_dataset(config)
+    train_loader, val_loader, test_loader, multicrop_test_loader = compose_dataset(
+        config
+    )
 
     # generate the model and update some configurations
     model = generate_model(config)
@@ -243,7 +271,12 @@ def my_app(cfg: DictConfig) -> None:
 
     # build the dataset and train the model
     if config.get("ddp", False):
-        mp.spawn(prepare_and_run_train, args=(config["ddp_size"], config), nprocs=config["ddp_size"], join=True)
+        mp.spawn(
+            prepare_and_run_train,
+            args=(config["ddp_size"], config),
+            nprocs=config["ddp_size"],
+            join=True,
+        )
     else:
         prepare_and_run_train(rank=None, world_size=None, config=config)
 

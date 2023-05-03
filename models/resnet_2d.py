@@ -15,24 +15,36 @@ import torch.nn as nn
 from .activation import get_activation_class
 from .utils import program_conv_filters
 
-__all__ = ["ResNet2D",
-           "resnet18_2d",
-           "resnet34_2d",
-           "resnet50_2d",
-           "resnet101_2d",
-           "resnet152_2d",
-           "resnext50_32x4d_2d",
-           "resnext101_32x8d_2d",
-           "wide_resnet50_2d",
-           "wide_resnet101_2_2d",
-           "BasicBlock2D",
-           "Bottleneck2D"]
+__all__ = [
+    "ResNet2D",
+    "resnet18_2d",
+    "resnet34_2d",
+    "resnet50_2d",
+    "resnet101_2d",
+    "resnet152_2d",
+    "resnext50_32x4d_2d",
+    "resnext101_32x8d_2d",
+    "wide_resnet50_2d",
+    "wide_resnet101_2_2d",
+    "BasicBlock2D",
+    "Bottleneck2D",
+]
 
 
-def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
+def conv3x3(
+    in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1
+) -> nn.Conv2d:
     """3x3 convolution with padding"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=dilation, groups=groups, bias=False, dilation=dilation)
+    return nn.Conv2d(
+        in_planes,
+        out_planes,
+        kernel_size=3,
+        stride=stride,
+        padding=dilation,
+        groups=groups,
+        bias=False,
+        dilation=dilation,
+    )
 
 
 def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
@@ -44,22 +56,22 @@ class BasicBlock2D(nn.Module):
     expansion: int = 1
 
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            stride: int = 1,
-            downsample: Optional[nn.Module] = None,
-            groups: int = 1,
-            base_channels: int = 64,
-            dilation: int = 1,
-            norm_layer: Optional[Callable[..., nn.Module]] = None,
-            activation: Optional[Callable[..., nn.Module]] = nn.ReLU
+        self,
+        in_channels: int,
+        out_channels: int,
+        stride: int = 1,
+        downsample: Optional[nn.Module] = None,
+        groups: int = 1,
+        base_channels: int = 64,
+        dilation: int = 1,
+        norm_layer: Optional[Callable[..., nn.Module]] = None,
+        activation: Optional[Callable[..., nn.Module]] = nn.ReLU,
     ) -> None:
         super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         if groups != 1 or base_channels != 64:
-            raise ValueError('BasicBlock2D only supports groups=1 and base_width=64')
+            raise ValueError("BasicBlock2D only supports groups=1 and base_width=64")
         if dilation > 1:
             raise NotImplementedError("Dilation > 1 not supported in BasicBlock2D")
 
@@ -103,21 +115,21 @@ class Bottleneck2D(nn.Module):
     expansion: int = 4
 
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            stride: int = 1,
-            downsample: Optional[nn.Module] = None,
-            groups: int = 1,
-            base_channels: int = 64,
-            dilation: int = 1,
-            norm_layer: Optional[Callable[..., nn.Module]] = None,
-            activation: Optional[Callable[..., nn.Module]] = nn.ReLU
+        self,
+        in_channels: int,
+        out_channels: int,
+        stride: int = 1,
+        downsample: Optional[nn.Module] = None,
+        groups: int = 1,
+        base_channels: int = 64,
+        dilation: int = 1,
+        norm_layer: Optional[Callable[..., nn.Module]] = None,
+        activation: Optional[Callable[..., nn.Module]] = nn.ReLU,
     ) -> None:
         super().__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
-        width = int(out_channels * (base_channels / 64.)) * groups
+        width = int(out_channels * (base_channels / 64.0)) * groups
 
         # Both self.conv2 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv1x1(in_channels, width)
@@ -160,53 +172,63 @@ class Bottleneck2D(nn.Module):
 
 class ResNet2D(nn.Module):
     def __init__(
-            self,
-            block: str,
-            conv_layers: List[int],
-            in_channels: int,
-            out_dims: int,
-            seq_len_2d: Tuple[int],
-            base_channels: int,
-            use_age: str,
-            fc_stages: int,
-            dropout: float = 0.1,
-            zero_init_residual: bool = False,
-            groups: int = 1,
-            width_per_group: int = 64,
-            norm_layer: Optional[Callable[..., nn.Module]] = None,
-            activation: str = 'relu',
-            base_pool: str = 'max',
-            final_pool: str = 'average',
-            **kwargs
+        self,
+        block: str,
+        conv_layers: List[int],
+        in_channels: int,
+        out_dims: int,
+        seq_len_2d: Tuple[int],
+        base_channels: int,
+        use_age: str,
+        fc_stages: int,
+        dropout: float = 0.1,
+        zero_init_residual: bool = False,
+        groups: int = 1,
+        width_per_group: int = 64,
+        norm_layer: Optional[Callable[..., nn.Module]] = None,
+        activation: str = "relu",
+        base_pool: str = "max",
+        final_pool: str = "average",
+        **kwargs,
     ) -> None:
         super().__init__()
 
-        if block not in ['basic', 'bottleneck']:
-            raise ValueError(f"{self.__class__.__name__}.__init__(block) "
-                             f"receives one of ['basic', 'bottleneck'].")
+        if block not in ["basic", "bottleneck"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(block) "
+                f"receives one of ['basic', 'bottleneck']."
+            )
 
-        if use_age not in ['fc', 'conv', 'embedding', 'no']:
-            raise ValueError(f"{self.__class__.__name__}.__init__(use_age) "
-                             f"receives one of ['fc', 'conv', 'embedding', 'no'].")
+        if use_age not in ["fc", "conv", "embedding", "no"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(use_age) "
+                f"receives one of ['fc', 'conv', 'embedding', 'no']."
+            )
 
-        if final_pool not in ['average', 'max'] or base_pool not in ['average', 'max']:
-            raise ValueError(f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
-                             f"receives one of ['average', 'max'].")
+        if final_pool not in ["average", "max"] or base_pool not in ["average", "max"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(final_pool, base_pool) both "
+                f"receives one of ['average', 'max']."
+            )
 
         if fc_stages < 1:
-            raise ValueError(f"{self.__class__.__name__}.__init__(fc_stages) receives "
-                             f"an integer equal to ore more than 1.")
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(fc_stages) receives "
+                f"an integer equal to ore more than 1."
+            )
 
         self.use_age = use_age
-        if self.use_age == 'conv':
+        if self.use_age == "conv":
             in_channels += 1
-        elif self.use_age == 'embedding':
+        elif self.use_age == "embedding":
             self.age_embedding = torch.nn.Parameter((torch.zeros(1, in_channels, 1, 1)))
-            torch.nn.init.trunc_normal_(self.age_embedding, std=.02)
+            torch.nn.init.trunc_normal_(self.age_embedding, std=0.02)
 
         self.fc_stages = fc_stages
 
-        self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
+        self.nn_act = get_activation_class(
+            activation, class_name=self.__class__.__name__
+        )
 
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -217,75 +239,117 @@ class ResNet2D(nn.Module):
         self.groups = groups
         self.base_channels = width_per_group
 
-        if base_pool == 'average':
+        if base_pool == "average":
             self.base_pool = nn.AvgPool1d
-        elif base_pool == 'max':
+        elif base_pool == "max":
             self.base_pool = nn.MaxPool1d
 
-        if block == 'basic':
+        if block == "basic":
             block = BasicBlock2D
             conv_filter_list = [
-                {'kernel_size': 7},
-                {'kernel_size': 3},  # 3 or 5 to reflect the composition of 9conv and 9conv
-                {'kernel_size': 3},  # 3 or 5 to reflect the composition of 9conv and 9conv
-                {'kernel_size': 3},  # 3 or 5 to reflect the composition of 9conv and 9conv
-                {'kernel_size': 3},  # 3 or 5 to reflect the composition of 9conv and 9conv
+                {"kernel_size": 7},
+                {
+                    "kernel_size": 3
+                },  # 3 or 5 to reflect the composition of 9conv and 9conv
+                {
+                    "kernel_size": 3
+                },  # 3 or 5 to reflect the composition of 9conv and 9conv
+                {
+                    "kernel_size": 3
+                },  # 3 or 5 to reflect the composition of 9conv and 9conv
+                {
+                    "kernel_size": 3
+                },  # 3 or 5 to reflect the composition of 9conv and 9conv
             ]
         else:  # bottleneck case
             block = Bottleneck2D
             conv_filter_list = [
-                {'kernel_size': 7},
-                {'kernel_size': 3},
-                {'kernel_size': 3},
-                {'kernel_size': 3},
-                {'kernel_size': 3},
+                {"kernel_size": 7},
+                {"kernel_size": 3},
+                {"kernel_size": 3},
+                {"kernel_size": 3},
+                {"kernel_size": 3},
             ]
 
         self.seq_len_2d = seq_len_2d
-        self.output_length = program_conv_filters(sequence_length=min(seq_len_2d),
-                                                  conv_filter_list=conv_filter_list,
-                                                  output_lower_bound=4, output_upper_bound=8,
-                                                  stride_to_pool_ratio=0.7,
-                                                  class_name=self.__class__.__name__)
+        self.output_length = program_conv_filters(
+            sequence_length=min(seq_len_2d),
+            conv_filter_list=conv_filter_list,
+            output_lower_bound=4,
+            output_upper_bound=8,
+            stride_to_pool_ratio=0.7,
+            class_name=self.__class__.__name__,
+        )
 
         cf = conv_filter_list[0]
         input_stage = []
-        if cf['pool'] > 1:
-            input_stage.append(self.base_pool(cf['pool']))
-        input_stage.append(nn.Conv2d(in_channels, self.current_channels,
-                                     kernel_size=(cf['kernel_size'], cf['kernel_size']),
-                                     stride=(cf['stride'], cf['stride']), padding=cf['kernel_size']//2, bias=False))
+        if cf["pool"] > 1:
+            input_stage.append(self.base_pool(cf["pool"]))
+        input_stage.append(
+            nn.Conv2d(
+                in_channels,
+                self.current_channels,
+                kernel_size=(cf["kernel_size"], cf["kernel_size"]),
+                stride=(cf["stride"], cf["stride"]),
+                padding=cf["kernel_size"] // 2,
+                bias=False,
+            )
+        )
         input_stage.append(norm_layer(self.current_channels))
         input_stage.append(self.nn_act())
         self.input_stage = nn.Sequential(*input_stage)
 
         cf = conv_filter_list[1]
-        self.conv_stage1 = self._make_conv_stage(block=block, planes=base_channels, blocks=conv_layers[0],
-                                                 stride=cf['stride'], activation=self.nn_act)
+        self.conv_stage1 = self._make_conv_stage(
+            block=block,
+            planes=base_channels,
+            blocks=conv_layers[0],
+            stride=cf["stride"],
+            activation=self.nn_act,
+        )
         cf = conv_filter_list[2]
-        self.conv_stage2 = self._make_conv_stage(block=block, planes=2 * base_channels, blocks=conv_layers[1],
-                                                 stride=cf['stride'], activation=self.nn_act)
+        self.conv_stage2 = self._make_conv_stage(
+            block=block,
+            planes=2 * base_channels,
+            blocks=conv_layers[1],
+            stride=cf["stride"],
+            activation=self.nn_act,
+        )
         cf = conv_filter_list[3]
-        self.conv_stage3 = self._make_conv_stage(block=block, planes=4 * base_channels, blocks=conv_layers[2],
-                                                 stride=cf['stride'], activation=self.nn_act)
+        self.conv_stage3 = self._make_conv_stage(
+            block=block,
+            planes=4 * base_channels,
+            blocks=conv_layers[2],
+            stride=cf["stride"],
+            activation=self.nn_act,
+        )
         cf = conv_filter_list[4]
-        self.conv_stage4 = self._make_conv_stage(block=block, planes=8 * base_channels, blocks=conv_layers[3],
-                                                 stride=cf['stride'], activation=self.nn_act)
+        self.conv_stage4 = self._make_conv_stage(
+            block=block,
+            planes=8 * base_channels,
+            blocks=conv_layers[3],
+            stride=cf["stride"],
+            activation=self.nn_act,
+        )
 
-        if final_pool == 'average':
+        if final_pool == "average":
             self.final_pool = nn.AdaptiveAvgPool2d((1, 1))
-        elif final_pool == 'max':
+        elif final_pool == "max":
             self.final_pool = nn.AdaptiveMaxPool2d((1, 1))
 
         fc_stage = []
-        if self.use_age == 'fc':
+        if self.use_age == "fc":
             self.current_channels = self.current_channels + 1
 
         for i in range(fc_stages - 1):
-            layer = nn.Sequential(nn.Linear(self.current_channels, self.current_channels // 2, bias=False),
-                                  nn.Dropout(p=dropout),
-                                  nn.BatchNorm1d(self.current_channels // 2),
-                                  self.nn_act())
+            layer = nn.Sequential(
+                nn.Linear(
+                    self.current_channels, self.current_channels // 2, bias=False
+                ),
+                nn.Dropout(p=dropout),
+                nn.BatchNorm1d(self.current_channels // 2),
+                self.nn_act(),
+            )
             self.current_channels = self.current_channels // 2
             fc_stage.append(layer)
         fc_stage.append(nn.Linear(self.current_channels, out_dims))
@@ -296,11 +360,11 @@ class ResNet2D(nn.Module):
     def reset_weights(self):
         for m in self.modules():
             if isinstance(m, (nn.Conv1d, nn.Conv2d)):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
-            elif hasattr(m, 'reset_parameters'):
+            elif hasattr(m, "reset_parameters"):
                 m.reset_parameters()
 
         # Zero-initialize the last BN in each residual branch,
@@ -313,8 +377,15 @@ class ResNet2D(nn.Module):
                 elif isinstance(m, BasicBlock2D):
                     nn.init.constant_(m.bn2.weight, 0)  # type: ignore[arg-type]
 
-    def _make_conv_stage(self, block: Type[Union[BasicBlock2D, Bottleneck2D]], planes: int, blocks: int,
-                         stride: int = 1, pre_pool: int = 1, activation=nn.ReLU) -> nn.Sequential:
+    def _make_conv_stage(
+        self,
+        block: Type[Union[BasicBlock2D, Bottleneck2D]],
+        planes: int,
+        blocks: int,
+        stride: int = 1,
+        pre_pool: int = 1,
+        activation=nn.ReLU,
+    ) -> nn.Sequential:
         norm_layer = self._norm_layer
         downsample = None
 
@@ -330,16 +401,33 @@ class ResNet2D(nn.Module):
             conv_layers.append(self.base_pool(pre_pool))
 
         conv_layers.append(
-            block(self.current_channels, planes, stride, downsample, self.groups,
-                  self.base_channels, dilation=1, norm_layer=norm_layer, activation=activation)
+            block(
+                self.current_channels,
+                planes,
+                stride,
+                downsample,
+                self.groups,
+                self.base_channels,
+                dilation=1,
+                norm_layer=norm_layer,
+                activation=activation,
+            )
         )
 
         self.current_channels = planes * block.expansion
         for _ in range(1, blocks):
             conv_layers.append(
-                block(self.current_channels, planes, stride=1, downsample=None,
-                      groups=self.groups, base_channels=self.base_channels,
-                      dilation=1, norm_layer=norm_layer, activation=activation)
+                block(
+                    self.current_channels,
+                    planes,
+                    stride=1,
+                    downsample=None,
+                    groups=self.groups,
+                    base_channels=self.base_channels,
+                    dilation=1,
+                    norm_layer=norm_layer,
+                    activation=activation,
+                )
             )
 
         return nn.Sequential(*conv_layers)
@@ -357,10 +445,10 @@ class ResNet2D(nn.Module):
     def compute_feature_embedding(self, x, age, target_from_last: int = 0):
         N, _, H, W = x.size()
 
-        if self.use_age == 'conv':
+        if self.use_age == "conv":
             age = age.reshape((N, 1, 1, 1)).expand(N, 1, H, W)
             x = torch.cat((x, age), dim=1)
-        elif self.use_age == 'embedding':
+        elif self.use_age == "embedding":
             x = x + self.age_embedding * age.reshape(N, 1, 1, 1)
 
         x = self.input_stage(x)
@@ -373,15 +461,17 @@ class ResNet2D(nn.Module):
         x = self.final_pool(x)
         x = torch.flatten(x, 1)
 
-        if self.use_age == 'fc':
+        if self.use_age == "fc":
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)
 
         if target_from_last == 0:
             x = self.fc_stage(x)
         else:
             if target_from_last > self.fc_stages:
-                raise ValueError(f"{self.__class__.__name__}.compute_feature_embedding(target_from_last) receives "
-                                 f"an integer equal to or smaller than fc_stages={self.fc_stages}.")
+                raise ValueError(
+                    f"{self.__class__.__name__}.compute_feature_embedding(target_from_last) receives "
+                    f"an integer equal to or smaller than fc_stages={self.fc_stages}."
+                )
 
             for l in range(self.fc_stages - target_from_last):
                 x = self.fc_stage[l](x)
@@ -403,89 +493,122 @@ def _resnet_2d(
     conv_layers: List[int],
     pretrained: bool,
     progress: bool,
-    **kwargs: Any
+    **kwargs: Any,
 ) -> ResNet2D:
     model = ResNet2D(block, conv_layers, **kwargs)
     return model
 
 
-def resnet18_2d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet2D:
+def resnet18_2d(
+    pretrained: bool = False, progress: bool = True, **kwargs: Any
+) -> ResNet2D:
     r"""ResNet-18 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet_2d('resnet18_2d', BasicBlock2D, [2, 2, 2, 2], pretrained, progress, **kwargs)
+    return _resnet_2d(
+        "resnet18_2d", BasicBlock2D, [2, 2, 2, 2], pretrained, progress, **kwargs
+    )
 
 
-def resnet34_2d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet2D:
+def resnet34_2d(
+    pretrained: bool = False, progress: bool = True, **kwargs: Any
+) -> ResNet2D:
     r"""ResNet-34 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet_2d('resnet34_2d', BasicBlock2D, [3, 4, 6, 3], pretrained, progress, **kwargs)
+    return _resnet_2d(
+        "resnet34_2d", BasicBlock2D, [3, 4, 6, 3], pretrained, progress, **kwargs
+    )
 
 
-def resnet50_2d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet2D:
+def resnet50_2d(
+    pretrained: bool = False, progress: bool = True, **kwargs: Any
+) -> ResNet2D:
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet_2d('resnet50_2d', Bottleneck2D, [3, 4, 6, 3], pretrained, progress, **kwargs)
+    return _resnet_2d(
+        "resnet50_2d", Bottleneck2D, [3, 4, 6, 3], pretrained, progress, **kwargs
+    )
 
 
-def resnet101_2d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet2D:
+def resnet101_2d(
+    pretrained: bool = False, progress: bool = True, **kwargs: Any
+) -> ResNet2D:
     r"""ResNet-101 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet_2d('resnet101_2d', Bottleneck2D, [3, 4, 23, 3], pretrained, progress, **kwargs)
+    return _resnet_2d(
+        "resnet101_2d", Bottleneck2D, [3, 4, 23, 3], pretrained, progress, **kwargs
+    )
 
 
-def resnet152_2d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet2D:
+def resnet152_2d(
+    pretrained: bool = False, progress: bool = True, **kwargs: Any
+) -> ResNet2D:
     r"""ResNet-152 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet_2d('resnet152_2d', Bottleneck2D, [3, 8, 36, 3], pretrained, progress, **kwargs)
+    return _resnet_2d(
+        "resnet152_2d", Bottleneck2D, [3, 8, 36, 3], pretrained, progress, **kwargs
+    )
 
 
-def resnext50_32x4d_2d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet2D:
+def resnext50_32x4d_2d(
+    pretrained: bool = False, progress: bool = True, **kwargs: Any
+) -> ResNet2D:
     r"""ResNeXt-50 32x4d model from
     `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    kwargs['groups'] = 32
-    kwargs['width_per_group'] = 4
-    return _resnet_2d('resnext50_32x4d_2d', Bottleneck2D, [3, 4, 6, 3],
-                      pretrained, progress, **kwargs)
+    kwargs["groups"] = 32
+    kwargs["width_per_group"] = 4
+    return _resnet_2d(
+        "resnext50_32x4d_2d", Bottleneck2D, [3, 4, 6, 3], pretrained, progress, **kwargs
+    )
 
 
-def resnext101_32x8d_2d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet2D:
+def resnext101_32x8d_2d(
+    pretrained: bool = False, progress: bool = True, **kwargs: Any
+) -> ResNet2D:
     r"""ResNeXt-101 32x8d model from
     `"Aggregated Residual Transformation for Deep Neural Networks" <https://arxiv.org/pdf/1611.05431.pdf>`_.
     Args:
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    kwargs['groups'] = 32
-    kwargs['width_per_group'] = 8
-    return _resnet_2d('resnext101_32x8d_2d', Bottleneck2D, [3, 4, 23, 3],
-                      pretrained, progress, **kwargs)
+    kwargs["groups"] = 32
+    kwargs["width_per_group"] = 8
+    return _resnet_2d(
+        "resnext101_32x8d_2d",
+        Bottleneck2D,
+        [3, 4, 23, 3],
+        pretrained,
+        progress,
+        **kwargs,
+    )
 
 
-def wide_resnet50_2d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet2D:
+def wide_resnet50_2d(
+    pretrained: bool = False, progress: bool = True, **kwargs: Any
+) -> ResNet2D:
     r"""Wide ResNet-50-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_.
     The model is the same as ResNet except for the Bottleneck2D number of channels
@@ -496,12 +619,15 @@ def wide_resnet50_2d(pretrained: bool = False, progress: bool = True, **kwargs: 
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    kwargs['width_per_group'] = 64 * 2
-    return _resnet_2d('wide_resnet50_2d', Bottleneck2D, [3, 4, 6, 3],
-                      pretrained, progress, **kwargs)
+    kwargs["width_per_group"] = 64 * 2
+    return _resnet_2d(
+        "wide_resnet50_2d", Bottleneck2D, [3, 4, 6, 3], pretrained, progress, **kwargs
+    )
 
 
-def wide_resnet101_2_2d(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet2D:
+def wide_resnet101_2_2d(
+    pretrained: bool = False, progress: bool = True, **kwargs: Any
+) -> ResNet2D:
     r"""Wide ResNet-101-2 model from
     `"Wide Residual Networks" <https://arxiv.org/pdf/1605.07146.pdf>`_.
     The model is the same as ResNet except for the Bottleneck2D number of channels
@@ -512,6 +638,12 @@ def wide_resnet101_2_2d(pretrained: bool = False, progress: bool = True, **kwarg
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    kwargs['width_per_group'] = 64 * 2
-    return _resnet_2d('wide_resnet101_2_2d', Bottleneck2D, [3, 4, 23, 3],
-                      pretrained, progress, **kwargs)
+    kwargs["width_per_group"] = 64 * 2
+    return _resnet_2d(
+        "wide_resnet101_2_2d",
+        Bottleneck2D,
+        [3, 4, 23, 3],
+        pretrained,
+        progress,
+        **kwargs,
+    )

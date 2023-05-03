@@ -22,24 +22,24 @@ def generate_ssl_model(config):
     backbone = hydra.utils.instantiate(config)
 
     # Count parameters and set output length
-    config['num_params'] = count_parameters(backbone)
-    config['output_length'] = backbone.get_output_length()
+    config["num_params"] = count_parameters(backbone)
+    config["output_length"] = backbone.get_output_length()
 
     # ssl embedding layer
-    if config['embedding_layer'] == 'pool':
-        config['embedding_layer'] = config['fc_stages']
+    if config["embedding_layer"] == "pool":
+        config["embedding_layer"] = config["fc_stages"]
     else:
-        config['embedding_layer'] = abs(config['embedding_layer'])
+        config["embedding_layer"] = abs(config["embedding_layer"])
 
     # Instantiate SSL model
-    temp_target = config['_target_']
-    config['_target_'] = config['_ssl_target_']
+    temp_target = config["_target_"]
+    config["_target_"] = config["_ssl_target_"]
     model = hydra.utils.instantiate(config, backbone)
-    config['_target_'] = temp_target
+    config["_target_"] = temp_target
 
     # Set device and enable Distributed Data Parallel if necessary
-    device = config['device']
-    if config.get('ddp', False):
+    device = config["device"]
+    if config.get("ddp", False):
         torch.cuda.set_device(device)
         model.cuda(config["device"])
         model = DDP(model, device_ids=[device], find_unused_parameters=True)
@@ -60,7 +60,7 @@ def prepare_and_run_ssl_train(rank, world_size, config):
     set_seed(config, rank)
 
     # setup for distributed training
-    if config.get('ddp', False):
+    if config.get("ddp", False):
         config = initialize_ddp(rank, world_size, config)
 
     # compose dataset
@@ -70,34 +70,40 @@ def prepare_and_run_ssl_train(rank, world_size, config):
     model = generate_ssl_model(config)
 
     # load pretrained model if needed
-    if 'load_pretrained' in config.keys():
+    if "load_pretrained" in config.keys():
         load_pretrained_params(model, config)
 
     # train
-    ssl_train_script(config, model, train_loader, config['preprocess_train'])
+    ssl_train_script(config, model, train_loader, config["preprocess_train"])
 
     # cleanup
-    if config.get('ddp', False):
+    if config.get("ddp", False):
         torch.distributed.destroy_process_group()
 
 
-@hydra.main(config_path='config', config_name='default')
+@hydra.main(config_path="config", config_name="default")
 def my_app(cfg: DictConfig) -> None:
     # initialize the configurations
     # print(OmegaConf.to_yaml(cfg))
-    config = {**OmegaConf.to_container(cfg.data), **OmegaConf.to_container(cfg.train),
-              **OmegaConf.to_container(cfg.ssl),  **OmegaConf.to_container(cfg.model),
-              'cwd': HydraConfig.get().runtime.cwd}
+    config = {
+        **OmegaConf.to_container(cfg.data),
+        **OmegaConf.to_container(cfg.train),
+        **OmegaConf.to_container(cfg.ssl),
+        **OmegaConf.to_container(cfg.model),
+        "cwd": HydraConfig.get().runtime.cwd,
+    }
 
     # check the workstation environment and update some configurations
     check_device_env(config)
 
     # build the dataset and train the model
-    if config.get('ddp', False):
-        mp.spawn(prepare_and_run_ssl_train,
-                 args=(config['ddp_size'], config),
-                 nprocs=config['ddp_size'],
-                 join=True)
+    if config.get("ddp", False):
+        mp.spawn(
+            prepare_and_run_ssl_train,
+            args=(config["ddp_size"], config),
+            nprocs=config["ddp_size"],
+            join=True,
+        )
     else:
         prepare_and_run_ssl_train(rank=None, world_size=None, config=config)
 
