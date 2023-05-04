@@ -5,22 +5,14 @@ import math
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from torch.utils.data.distributed import (
-    DistributedSampler,
-)
+from torch.utils.data.distributed import DistributedSampler
 
 from .caueeg_dataset import CauEegDataset
 from .pipeline import EegRandomCrop
-from .pipeline import (
-    EegNormalizeMeanStd,
-    EegNormalizePerSignal,
-)
+from .pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
 from .pipeline import EegNormalizeAge
 from .pipeline import EegDropChannels
-from .pipeline import (
-    EegAdditiveGaussianNoise,
-    EegMultiplicativeGaussianNoise,
-)
+from .pipeline import EegAdditiveGaussianNoise, EegMultiplicativeGaussianNoise
 from .pipeline import EegAddGaussianNoiseAge
 from .pipeline import EegChannelDropOut
 from .pipeline import EegToTensor, EegToDevice
