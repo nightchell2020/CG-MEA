@@ -12,6 +12,9 @@ from .pipeline import EegRandomCrop
 from .pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
 from .pipeline import EegNormalizeAge
 from .pipeline import EegDropChannels, EegChannelDifference
+=======
+from .pipeline import EegDropChannels
+>>>>>>> 34f11ca04f5deab57b83e0574b3a7296f735d500
 from .pipeline import EegAdditiveGaussianNoise, EegMultiplicativeGaussianNoise
 from .pipeline import EegAddGaussianNoiseAge
 from .pipeline import EegRandomChannelDropOut
