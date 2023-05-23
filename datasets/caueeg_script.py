@@ -11,6 +11,7 @@ from .caueeg_dataset import CauEegDataset
 from .pipeline import EegRandomCrop
 from .pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
 from .pipeline import EegNormalizeAge
+<<<<<<< HEAD
 from .pipeline import EegDropChannels, EegChannelDifference
 =======
 from .pipeline import EegDropChannels
