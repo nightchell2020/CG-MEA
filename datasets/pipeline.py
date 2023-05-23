@@ -397,6 +397,35 @@ class EegDropChannels(object):
         return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
+class EegChannelDifference(object):
+    """Drop the specified channel from EEG signal.
+
+    Args:
+        ch1 (int): Channel index of interest
+        ch2 (int): Channel index of interest
+    """
+
+    def __init__(self, ch1, ch2):
+        self.ch1 = ch1
+        self.ch2 = ch2
+
+    def __call__(self, sample):
+        signal = sample["signal"]
+
+        if isinstance(signal, (list,)):
+            signals = []
+            for s in signal:
+                signals.append(s[self.ch1] - s[self.ch2])
+            sample["signal"] = signals
+        else:
+            sample["signal"] = signal[self.ch1] - signal[self.ch2]
+
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
+
+
 class EegToTensor(object):
     """Convert EEG numpy array in sample to Tensors."""
 
@@ -546,7 +575,7 @@ class EegNormalizeMeanStd(torch.nn.Module):
         return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
-class EegChannelDropOut(torch.nn.Module):
+class EegRandomChannelDropOut(torch.nn.Module):
     """DropOut some channels using the specified ratio.
 
     Args:

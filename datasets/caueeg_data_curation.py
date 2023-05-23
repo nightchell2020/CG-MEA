@@ -1,7 +1,6 @@
 from dataclasses import dataclass, asdict, field
 import datetime
 from dateutil.relativedelta import relativedelta
-import numpy as np
 
 
 @dataclass

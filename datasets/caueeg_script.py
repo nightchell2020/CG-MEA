@@ -5,24 +5,16 @@ import math
 import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
-from torch.utils.data.distributed import (
-    DistributedSampler,
-)
+from torch.utils.data.distributed import DistributedSampler
 
 from .caueeg_dataset import CauEegDataset
 from .pipeline import EegRandomCrop
-from .pipeline import (
-    EegNormalizeMeanStd,
-    EegNormalizePerSignal,
-)
+from .pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
 from .pipeline import EegNormalizeAge
-from .pipeline import EegDropChannels
-from .pipeline import (
-    EegAdditiveGaussianNoise,
-    EegMultiplicativeGaussianNoise,
-)
+from .pipeline import EegDropChannels, EegChannelDifference
+from .pipeline import EegAdditiveGaussianNoise, EegMultiplicativeGaussianNoise
 from .pipeline import EegAddGaussianNoiseAge
-from .pipeline import EegChannelDropOut
+from .pipeline import EegRandomChannelDropOut
 from .pipeline import EegToTensor, EegToDevice
 from .pipeline import EegSpectrogram
 from .pipeline import eeg_collate_fn
@@ -463,33 +455,41 @@ def compose_transforms(config, verbose=False):
         )
     ]
 
-    ###################################
-    # usage of EKG or photic channels #
-    ###################################
-    channel_reduction_list = config.get("channel_reduction_list", [])
+    ###########################################
+    # EEG signal channel configuration        #
+    # (e.g., usage of EKG or photic channels) #
+    ###########################################
+    if config.get("channel_difference", None):
+        channel_difference_list = config.get("channel_difference", None)
+        if len(channel_difference_list) != 2:
+            raise ValueError(f"config['channel_difference'] should be the list of length 2.")
+        transform += [EegChannelDifference(channel_difference_list[0], channel_difference_list[1])]
+        transform_multicrop += [EegChannelDifference(channel_difference_list[0], channel_difference_list[1])]
+    else:
+        channel_reduction_list = config.get("channel_reduction_list", [])
 
-    if config.get("EKG", None) not in [
-        "O",
-        "X",
-        None,
-    ]:
-        raise ValueError(f"Both config['EKG'] should be one of ['O', 'X', None]")
-    elif config.get("EKG", None) == "X":
-        channel_reduction_list.append(config["signal_header"].index("EKG"))
+        if config.get("EKG", None) not in [
+            "O",
+            "X",
+            None,
+        ]:
+            raise ValueError(f"config['EKG'] should be one of ['O', 'X', None].")
+        elif config.get("EKG", None) == "X":
+            channel_reduction_list.append(config["signal_header"].index("EKG"))
 
-    if config.get("photic", None) not in [
-        "O",
-        "X",
-        None,
-    ]:
-        raise ValueError(f"Both config['photic'] should be one of ['O', 'X', None]")
-    elif config.get("photic", None) == "X":
-        channel_reduction_list.append(config["signal_header"].index("Photic"))
+        if config.get("photic", None) not in [
+            "O",
+            "X",
+            None,
+        ]:
+            raise ValueError(f"config['photic'] should be one of ['O', 'X', None].")
+        elif config.get("photic", None) == "X":
+            channel_reduction_list.append(config["signal_header"].index("Photic"))
 
-    channel_reduction_set = set(channel_reduction_list)
+        channel_reduction_set = set(channel_reduction_list)
 
-    transform += [EegDropChannels(sorted([*channel_reduction_set]))]
-    transform_multicrop += [EegDropChannels(sorted([*channel_reduction_set]))]
+        transform += [EegDropChannels(sorted([*channel_reduction_set]))]
+        transform_multicrop += [EegDropChannels(sorted([*channel_reduction_set]))]
 
     ###################
     # numpy to tensor #
@@ -600,7 +600,7 @@ def compose_preprocess(config, train_loader, verbose=True):
     # dropout channel (1D signal) #
     ###############################
     if config.get("channel_dropout", 0.0) > 1e-8:
-        preprocess_train += [EegChannelDropOut(p=config["channel_dropout"])]
+        preprocess_train += [EegRandomChannelDropOut(p=config["channel_dropout"])]
 
     ##############################################################
     # multiplicative Gaussian noise for augmentation (1D signal) #
