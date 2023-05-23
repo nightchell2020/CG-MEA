@@ -415,10 +415,10 @@ class EegChannelDifference(object):
         if isinstance(signal, (list,)):
             signals = []
             for s in signal:
-                signals.append(s[self.ch1] - s[self.ch2])
+                signals.append(s[[self.ch1]] - s[[self.ch2]])
             sample["signal"] = signals
         else:
-            sample["signal"] = signal[self.ch1] - signal[self.ch2]
+            sample["signal"] = signal[[self.ch1]] - signal[[self.ch2]]
 
         return sample
 
