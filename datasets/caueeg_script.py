@@ -14,7 +14,7 @@ from .pipeline import EegNormalizeAge
 from .pipeline import EegDropChannels, EegChannelDifference
 from .pipeline import EegAdditiveGaussianNoise, EegMultiplicativeGaussianNoise
 from .pipeline import EegAddGaussianNoiseAge
-from .pipeline import EegRandomChannelDropOut
+from .pipeline import EegChannelDropOut
 from .pipeline import EegToTensor, EegToDevice
 from .pipeline import EegSpectrogram
 from .pipeline import eeg_collate_fn
@@ -600,7 +600,7 @@ def compose_preprocess(config, train_loader, verbose=True):
     # dropout channel (1D signal) #
     ###############################
     if config.get("channel_dropout", 0.0) > 1e-8:
-        preprocess_train += [EegRandomChannelDropOut(p=config["channel_dropout"])]
+        preprocess_train += [EegChannelDropOut(p=config["channel_dropout"])]
 
     ##############################################################
     # multiplicative Gaussian noise for augmentation (1D signal) #
