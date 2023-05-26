@@ -575,7 +575,7 @@ class EegNormalizeMeanStd(torch.nn.Module):
         return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
-class EegRandomChannelDropOut(torch.nn.Module):
+class EegChannelDropOut(torch.nn.Module):
     """DropOut some channels using the specified ratio.
 
     Args:
