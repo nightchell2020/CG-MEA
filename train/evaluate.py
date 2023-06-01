@@ -32,16 +32,17 @@ def estimate_score(model, sample_batched, preprocess, config):
     # compute output embedding
     output = compute_feature_embedding(model, sample_batched, preprocess, config, target_from_last=0)
 
-    # map depending on the loss function
-    if config["criterion"] == "cross-entropy":
-        score = F.softmax(output, dim=1)
-    elif config["criterion"] == "multi-bce":
-        score = torch.sigmoid(output)
-    elif config["criterion"] == "svm":
-        score = output
-    else:
-        raise ValueError(f"estimate_score(): cannot parse config['criterion']={config['criterion']}.")
-    return score
+    # # map depending on the loss function
+    # if config["criterion"] == "cross-entropy":
+    #     score = F.softmax(output, dim=1)
+    # elif config["criterion"] == "multi-bce":
+    #     score = torch.sigmoid(output)
+    # elif config["criterion"] == "svm":
+    #     score = output
+    # else:
+    #     raise ValueError(f"estimate_score(): cannot parse config['criterion']={config['criterion']}.")
+    # return score
+    return output
 
 
 def calculate_confusion_matrix(pred, target, num_classes):

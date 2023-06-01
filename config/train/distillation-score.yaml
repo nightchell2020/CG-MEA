@@ -1,0 +1,9 @@
+defaults:
+  - base_train
+  - _self_
+
+distil_alpha: 1.0
+distil_type: soft
+distil_tau: 1.0
+distil_teacher: score
+distil_teacher_score: ???  # decided during runtime

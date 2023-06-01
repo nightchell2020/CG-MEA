@@ -68,13 +68,21 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
 
                 # distillation loss computation
                 if config.get("distil_teacher", None):
-                    teacher_output = compute_feature_embedding(
-                        config["distil_teacher_model"],
-                        sample_batched_distil,
-                        config["distil_teacher_preprocess"],
-                        config,
-                        target_from_last=0,
-                    )
+                    if config.get("distil_teacher_model", None):
+                        teacher_output = compute_feature_embedding(
+                            config["distil_teacher_model"],
+                            sample_batched_distil,
+                            config["distil_teacher_preprocess"],
+                            config,
+                            target_from_last=0,
+                        )
+                    elif "distil_teacher_score" in config.keys():
+                        teacher_output = config["distil_teacher_score"][[*list(map(int, sample_batched["serial"]))]]
+                    else:
+                        raise ValueError(
+                            "Any of config['distil_teacher_model'] and config['distil_teacher_score'] is set."
+                        )
+
                     distil_tau = config.get("distil_tau", 1.0)
 
                     if config["criterion"] == "cross-entropy":

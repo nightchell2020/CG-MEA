@@ -129,61 +129,71 @@ def load_pretrained_params(model, config):
 
 def load_distill_teacher(config):
     # load teacher model
-    save_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["distil_teacher"]}/')
-    ckpt = torch.load(os.path.join(save_path, "checkpoint.pt"), map_location=config["device"])
-    model_teacher = hydra.utils.instantiate(ckpt["config"])
-
-    if config.get("ddp", False):
-        model_teacher.cuda(config["device"])
-        model_teacher = DDP(model_teacher, device_ids=[config["device"]])
-        torch.distributed.barrier()
+    if config["distil_teacher"].lower() == "score":
+        ts = torch.load(
+            os.path.join(config.get("cwd", ""), config["distil_teacher_score"]), map_location=config["device"]
+        )
+        teacher_score = torch.zeros((max([int(k) for k in ts.keys()]) + 1, *[*ts.values()][0].shape))
+        for k, v in ts.items():
+            teacher_score[int(k)] = v
+        config["distil_teacher_score"] = teacher_score.to(config["device"])
     else:
-        model_teacher = model_teacher.to(config["device"])
+        save_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["distil_teacher"]}/')
+        ckpt = torch.load(os.path.join(save_path, "checkpoint.pt"), map_location=config["device"])
+        model_teacher = hydra.utils.instantiate(ckpt["config"])
 
-    if ckpt["config"]["ddp"] == config["ddp"]:
-        model_teacher.load_state_dict(ckpt["model_state"])
-    elif ckpt["config"]["ddp"]:
-        model_state_ddp = deepcopy(ckpt["model_state"])
-        model_state = OrderedDict()
-        for k, v in model_state_ddp.items():
-            name = k[7:]  # remove 'module.' of DataParallel/DistributedDataParallel
-            model_state[name] = v
-        model_teacher.load_state_dict(model_state)
-    else:
-        model_teacher.module.load_state_dict(ckpt["model_state"])
+        if config.get("ddp", False):
+            model_teacher.cuda(config["device"])
+            model_teacher = DDP(model_teacher, device_ids=[config["device"]])
+            torch.distributed.barrier()
+        else:
+            model_teacher = model_teacher.to(config["device"])
 
-    model_teacher = model_teacher.requires_grad_(False)
-    model_teacher = model_teacher.eval()
+        if ckpt["config"]["ddp"] == config["ddp"]:
+            model_teacher.load_state_dict(ckpt["model_state"])
+        elif ckpt["config"]["ddp"]:
+            model_state_ddp = deepcopy(ckpt["model_state"])
+            model_state = OrderedDict()
+            for k, v in model_state_ddp.items():
+                name = k[7:]  # remove 'module.' of DataParallel/DistributedDataParallel
+                model_state[name] = v
+            model_teacher.load_state_dict(model_state)
+        else:
+            model_teacher.module.load_state_dict(ckpt["model_state"])
 
-    # distill configuration
-    config["distil_alpha"] = config.get("distil_alpha", 0.5)
-    config["distil_type"] = config.get("distil_type", "hard")
-    if config["distil_type"] == "soft":
-        config["distil_tau"] = config.get("distil_tau", 1.0)
-    config["distil_teacher_preprocess"] = ckpt["config"]["preprocess_test"]
-    config["distil_teacher_model"] = model_teacher
-    config["distil_teacher_criterion"] = ckpt["config"]["criterion"]
+        model_teacher = model_teacher.requires_grad_(False)
+        model_teacher = model_teacher.eval()
 
-    # sanity check
-    if config["distil_type"] not in ["hard", "soft"]:
-        raise ValueError(f"ERROR: Choose the correct option for knowledge distillation: 'soft' or 'hard.'")
-    elif config["distil_type"] == "soft" and config["distil_teacher_criterion"] != config["criterion"]:
-        raise ValueError(
-            f"ERROR: In the case of 'soft' knowledge distillation, "
-            f"the objective functions must be equal between teacher and student models.\n"
-            f"Current state: teacher - {config['distil_teacher_criterion']}"
-            f" / student - {config['criterion']}"
-        )
-    elif config["distil_type"] == "soft" and config["distil_teacher_criterion"] == "svm":
-        raise ValueError(
-            f"ERROR: In our implementation, " f"the SVM classifier does not support for 'soft' knowledge distillation."
-        )
-    elif config["EKG"] != ckpt["config"]["EKG"] or config["photic"] != ckpt["config"]["photic"]:
-        raise ValueError(
-            f"ERROR: The teacher and student networks must have the same EEG channel configuration:\n"
-            f"Current state: teacher - EKG {ckpt['config']['EKG']}, Photic {ckpt['config']['photic']}"
-            f" / student - EKG {config['EKG']}, Photic {config['photic']}."
-        )
+        # distill configuration
+        config["distil_alpha"] = config.get("distil_alpha", 0.5)
+        config["distil_type"] = config.get("distil_type", "hard")
+        if config["distil_type"] == "soft":
+            config["distil_tau"] = config.get("distil_tau", 1.0)
+        config["distil_teacher_preprocess"] = ckpt["config"]["preprocess_test"]
+        config["distil_teacher_model"] = model_teacher
+        config["distil_teacher_criterion"] = ckpt["config"]["criterion"]
+
+        # sanity check
+        if config["distil_type"] not in ["hard", "soft"]:
+            raise ValueError(f"ERROR: Choose the correct option for knowledge distillation: 'soft' or 'hard.'")
+        elif config["distil_type"] == "soft" and config["distil_teacher_criterion"] != config["criterion"]:
+            raise ValueError(
+                f"ERROR: In the case of 'soft' knowledge distillation, "
+                f"the objective functions must be equal between teacher and student models.\n"
+                f"Current state: teacher - {config['distil_teacher_criterion']}"
+                f" / student - {config['criterion']}"
+            )
+        elif config["distil_type"] == "soft" and config["distil_teacher_criterion"] == "svm":
+            raise ValueError(
+                f"ERROR: In our implementation, "
+                f"the SVM classifier does not support for 'soft' knowledge distillation."
+            )
+        elif config["EKG"] != ckpt["config"]["EKG"] or config["photic"] != ckpt["config"]["photic"]:
+            raise ValueError(
+                f"ERROR: The teacher and student networks must have the same EEG channel configuration:\n"
+                f"Current state: teacher - EKG {ckpt['config']['EKG']}, Photic {ckpt['config']['photic']}"
+                f" / student - EKG {config['EKG']}, Photic {config['photic']}."
+            )
 
 
 def prepare_and_run_train(rank, world_size, config):
