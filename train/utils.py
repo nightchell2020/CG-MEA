@@ -1,5 +1,7 @@
 import time
 import wandb
+from torchvision.transforms import Compose
+from torch.nn import Sequential
 
 
 def load_sweep_config(config):
@@ -16,6 +18,16 @@ def load_sweep_config(config):
             cfg_sweep[k] = v
 
     return cfg_sweep
+
+
+def wandb_config_update(config, allow_val_change=True):
+    config_update = {}
+    for k, v in config.items():
+        if isinstance(v, (Compose, Sequential)):
+            config_update[k] = v.__repr__()
+        else:
+            config_update[k] = v
+    wandb.config.update(config_update, allow_val_change=allow_val_change)
 
 
 class TimeElapsed(object):

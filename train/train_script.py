@@ -7,6 +7,7 @@ import wandb
 import pprint
 from datetime import datetime
 
+from .utils import wandb_config_update
 from .train_core import train_multistep
 from optim import get_lr_scheduler
 from .evaluate import check_accuracy
@@ -187,7 +188,7 @@ def train_script(
         scheduler.load_state_dict(checkpoint["scheduler_state"])
         config = checkpoint["config"]
         if main_process and config["use_wandb"]:
-            wandb.config.update(config, allow_val_change=True)
+            wandb_config_update(config, allow_val_change=True)
         i_step = checkpoint["optimizer_state"]["state"][0]["step"]
         if not isinstance(i_step, int):
             i_step = int(i_step.detach().cpu().numpy())
@@ -198,7 +199,7 @@ def train_script(
     if main_process:
         # update configurations
         if config["use_wandb"]:
-            wandb.config.update(config)
+            wandb_config_update(config)
 
             # track gradients and weights statistics if needed
             if config.get("watch_model", False):
