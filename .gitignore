@@ -17,3 +17,5 @@
 *.pyc
 
 nohup.out
+
+package-lock.json
