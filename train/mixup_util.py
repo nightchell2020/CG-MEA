@@ -19,8 +19,8 @@ def mixup_data(x, age, y, alpha=1.0, use_cuda=True):
     mixed_x = lam * x + (1 - lam) * x[index, :]
     mixed_age = lam * age + (1 - lam) * age[index]
     y_a, y_b = y, y[index]
-    return mixed_x, mixed_age, y_a, y_b, lam
+    return mixed_x, mixed_age, y_a, y_b, lam, index
 
 
-def mixup_criterion(criterion, pred, y_a, y_b, lam):
-    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+def mixup_criterion(criterion, pred, y_a, y_b, lam, **kwargs):
+    return lam * criterion(pred, y_a, **kwargs) + (1 - lam) * criterion(pred, y_b, **kwargs)

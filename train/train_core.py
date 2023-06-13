@@ -33,7 +33,7 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
             y = sample_batched["class_label"]
 
             # mixup the mini-batched data
-            x, age, y1, y2, lam = mixup_data(x, age, y, config["mixup"])
+            x, age, y1, y2, lam, mixup_index = mixup_data(x, age, y, config["mixup"])
 
             # mixed precision training if needed
             with autocast(enabled=config.get("mixed_precision", False)):
@@ -69,7 +69,7 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
                 # distillation loss computation
                 if config.get("distil_teacher", None):
                     if config.get("distil_teacher_model", None):
-                        teacher_output = compute_feature_embedding(
+                        output_teacher = compute_feature_embedding(
                             config["distil_teacher_model"],
                             sample_batched_distil,
                             config["distil_teacher_preprocess"],
@@ -77,7 +77,7 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
                             target_from_last=0,
                         )
                     elif "distil_teacher_score" in config.keys():
-                        teacher_output = config["distil_teacher_score"][[*list(map(int, sample_batched["serial"]))]]
+                        output_teacher = config["distil_teacher_score"][[*list(map(int, sample_batched["serial"]))]]
                     else:
                         raise ValueError(
                             "Any of config['distil_teacher_model'] and config['distil_teacher_score'] is set."
@@ -87,11 +87,18 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
 
                     if config["criterion"] == "cross-entropy":
                         if config.get("distil_type") == "hard":
-                            distil_loss = F.cross_entropy(output_kd, teacher_output.argmax(dim=1))
+                            output_teacher = output_teacher.argmax(dim=1)
+                            distil_loss = mixup_criterion(
+                                F.cross_entropy, output_kd, output_teacher, output_teacher[mixup_index], lam
+                            )
                         elif config.get("distil_type") == "soft":
-                            distil_loss = F.kl_div(
+                            output_teacher = F.log_softmax(output_teacher / distil_tau, dim=1)
+                            distil_loss = mixup_criterion(
+                                F.kl_div,
                                 F.log_softmax(output_kd / distil_tau, dim=1),
-                                F.log_softmax(teacher_output / distil_tau, dim=1),
+                                output_teacher,
+                                output_teacher[mixup_index],
+                                lam,
                                 reduction="sum",
                                 log_target=True,
                             )
@@ -100,21 +107,38 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
                     elif config["criterion"] == "multi-bce":
                         if config.get("distil_type") == "hard":
                             teacher_y_oh = F.one_hot(
-                                teacher_output.argmax(dim=1),
+                                output_teacher.argmax(dim=1),
                                 num_classes=output_kd.size(dim=1),
                             )
-                            distil_loss = F.binary_cross_entropy_with_logits(output_kd, teacher_y_oh.float())
+                            loss = mixup_criterion(
+                                F.binary_cross_entropy_with_logits,
+                                output_kd,
+                                teacher_y_oh.float(),
+                                teacher_y_oh[mixup_index].float(),
+                                lam,
+                            )
                         elif config.get("distil_type") == "soft":
-                            distil_loss = F.binary_cross_entropy_with_logits(
+                            output_teacher = (output_teacher / distil_tau).sigmoid()
+                            distil_loss = mixup_criterion(
+                                F.binary_cross_entropy_with_logits,
                                 output_kd / distil_tau,
-                                (teacher_output / distil_tau).sigmoid(),
+                                output_teacher,
+                                output_teacher[mixup_index],
+                                lam,
                                 reduction="sum",
                             )
                             distil_loss = distil_loss * (distil_tau * distil_tau) / output_kd.numel()
 
                     elif config["criterion"] == "svm":
                         if config.get("distil_type") == "hard":
-                            distil_loss = F.multi_margin_loss(output_kd, teacher_output.argmax(dim=1))
+                            output_teacher = output_teacher.argmax(dim=1)
+                            distil_loss = mixup_criterion(
+                                F.multi_margin_loss,
+                                output_kd,
+                                output_teacher,
+                                output_teacher[mixup_index],
+                                lam,
+                            )
 
                     distil_alpha = config["distil_alpha"]
                     loss = (1 - distil_alpha) * loss + distil_alpha * distil_loss

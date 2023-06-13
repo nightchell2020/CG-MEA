@@ -165,10 +165,10 @@ def load_distill_teacher(config):
         model_teacher = model_teacher.eval()
 
         # distill configuration
-        config["distil_alpha"] = config.get("distil_alpha", 0.5)
+        config["distil_alpha"] = config.get("distil_alpha", 0.1)
         config["distil_type"] = config.get("distil_type", "hard")
         if config["distil_type"] == "soft":
-            config["distil_tau"] = config.get("distil_tau", 1.0)
+            config["distil_tau"] = config.get("distil_tau", 3.0)
         config["distil_teacher_preprocess"] = ckpt["config"]["preprocess_test"]
         config["distil_teacher_model"] = model_teacher
         config["distil_teacher_criterion"] = ckpt["config"]["criterion"]
