@@ -1,10 +1,11 @@
 # dataset
 dataset_name: tuab
-dataset_path: local/dataset/TUAB/
+dataset_path: local/dataset/tuab/
 file_format: memmap
 crop_multiple: 4
 test_crop_multiple: 8
 crop_timing_analysis: false
+val_fraction: 15
 
 # preprocessing
 seq_length: 2500  # 250Hz * 10s = 2500 for base

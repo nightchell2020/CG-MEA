@@ -24,7 +24,7 @@ def wandb_config_update(config, allow_val_change=True):
     config_update = {}
     for k, v in config.items():
         if isinstance(v, (Compose, Sequential)):
-            config_update[k] = v.__repr__()
+            config_update[k] = v.__repr__().splitlines()
         else:
             config_update[k] = v
     wandb.config.update(config_update, allow_val_change=allow_val_change)

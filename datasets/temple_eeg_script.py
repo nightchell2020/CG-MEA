@@ -14,13 +14,15 @@ from .pipeline import EegToTensor
 # __all__ = []
 
 
-def load_tuab_task_datasets(dataset_path: str, file_format: str = "edf", transform=None, verbose=False):
+def load_tuab_task_datasets(
+    dataset_path: str, file_format: str = "edf", val_fraction: int = 10, transform=None, verbose=False
+):
     """Load the TUAB datasets for the target benchmark task as PyTorch dataset instances.
 
     Args:
         dataset_path (str): The file path where the dataset files are located.
-        task (str): The target task to load among 'dementia' or 'abnormal'.
         file_format (str): Determines which file format will be used (default: 'edf').
+        val_fraction (int): The denominator determining the proportion of training data used for validation purposes.
         transform (callable): Preprocessing process to apply during loading signals.
         verbose (bool): Whether to print the progress during loading the datasets.
 
@@ -37,7 +39,7 @@ def load_tuab_task_datasets(dataset_path: str, file_format: str = "edf", transfo
         val_list = []
         for pathology in ["abnormal", "normal"]:
             for i, file in enumerate(glob.glob(os.path.join(dataset_path, f"train/{pathology}/*." + extension))):
-                if i % 10 == 0:
+                if i % val_fraction == 0:
                     val_list.append(file)
                 else:
                     train_list.append(file)
@@ -310,6 +312,7 @@ def build_dataset_for_tuab_train(config, verbose=False):
     config_task, train_dataset, val_dataset, test_dataset = load_tuab_task_datasets(
         dataset_path=dataset_path,
         file_format=config["file_format"],
+        val_fraction=config.get("val_fraction", 10),
         transform=transform,
         verbose=verbose,
     )
