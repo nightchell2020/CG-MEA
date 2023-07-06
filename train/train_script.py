@@ -213,7 +213,7 @@ def train_script(
 
     # train and validation routine
     while i_step < config["iterations"]:
-        i_step += history_interval * config.get("ddp_size", 1)
+        i_step += history_interval
 
         # train during 'history_interval' steps
         loss, train_acc = train_multistep(
