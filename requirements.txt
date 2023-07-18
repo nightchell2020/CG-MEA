@@ -2,7 +2,7 @@ hydra-core
 omegaconf
 numpy
 scipy
-pyedflib==0.1.22
+pyedflib
 matplotlib
 openpyxl
 jupyter

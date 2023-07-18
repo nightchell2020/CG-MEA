@@ -726,7 +726,7 @@ def make_dataloader(
         num_workers = 0
         pin_memory = False
     else:
-        num_workers = 0  # A number other than 0 causes an error
+        num_workers = config.get("num_workers", 0)  # A number other than 0 can cause an error
         pin_memory = True
 
     batch_size = config["minibatch"] / config.get("crop_multiple", 1)
