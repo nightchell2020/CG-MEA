@@ -77,7 +77,11 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
                             target_from_last=0,
                         )
                     elif "distil_teacher_score" in config.keys():
-                        output_teacher = config["distil_teacher_score"][[*list(map(int, sample_batched["serial"]))]]
+                        output_teacher = config["distil_teacher_score"][
+                            torch.tensor(list(map(int, sample_batched["serial"])), dtype=torch.long),
+                            sample_batched["crop_timing"],
+                        ]
+                        # output_teacher = config["distil_teacher_score"][[*list(map(int, sample_batched["serial"]))]]
                     else:
                         raise ValueError(
                             "Any of config['distil_teacher_model'] and config['distil_teacher_score'] is set."

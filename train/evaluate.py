@@ -28,20 +28,29 @@ def compute_feature_embedding(model, sample_batched, preprocess, config, target_
 
 
 @torch.no_grad()
-def estimate_score(model, sample_batched, preprocess, config):
-    # compute output embedding
+def estimate_logit(model, sample_batched, preprocess, config):
     output = compute_feature_embedding(model, sample_batched, preprocess, config, target_from_last=0)
+    return output
 
-    # # map depending on the loss function
-    # if config["criterion"] == "cross-entropy":
-    #     score = F.softmax(output, dim=1)
-    # elif config["criterion"] == "multi-bce":
-    #     score = torch.sigmoid(output)
-    # elif config["criterion"] == "svm":
-    #     score = output
-    # else:
-    #     raise ValueError(f"estimate_score(): cannot parse config['criterion']={config['criterion']}.")
-    # return score
+
+@torch.no_grad()
+def logit_to_prob(logit, config):
+    # map depending on the model's loss function
+    if config["criterion"] == "cross-entropy":
+        score = F.softmax(logit, dim=1)
+    elif config["criterion"] == "multi-bce":
+        score = torch.sigmoid(logit)
+    elif config["criterion"] == "svm":
+        score = logit
+    else:
+        raise ValueError(f"logit_to_prob(): cannot parse config['criterion']={config['criterion']}.")
+    return score
+
+
+@torch.no_grad()
+def estimate_class_score(model, sample_batched, preprocess, config):
+    output = compute_feature_embedding(model, sample_batched, preprocess, config, target_from_last=0)
+    output = logit_to_prob(output, config)
     return output
 
 
@@ -111,7 +120,7 @@ def check_accuracy(model, loader, preprocess, config, repeat=1):
     for k in range(repeat):
         for sample_batched in loader:
             # estimate
-            s = estimate_score(model, sample_batched, preprocess, config)
+            s = estimate_class_score(model, sample_batched, preprocess, config)
             y = sample_batched["class_label"]
 
             # calculate accuracy
@@ -142,13 +151,13 @@ def check_accuracy_extended(model, loader, preprocess, config, repeat=1, dummy=1
     # warm-up using dummy round
     for k in range(dummy):
         for sample_batched in loader:
-            _ = estimate_score(model, sample_batched, preprocess, config)
+            _ = estimate_class_score(model, sample_batched, preprocess, config)
 
     for k in range(repeat):
         for sample_batched in loader:
             # estimate
             start_event.record()
-            s = estimate_score(model, sample_batched, preprocess, config)
+            s = estimate_class_score(model, sample_batched, preprocess, config)
             end_event.record()
             torch.cuda.synchronize()
             total_time += start_event.elapsed_time(end_event) / 1000
@@ -195,7 +204,7 @@ def check_accuracy_extended_debug(model, loader, preprocess, config, repeat=1):
     for k in range(repeat):
         for sample_batched in loader:
             # estimate
-            s = estimate_score(model, sample_batched, preprocess, config)
+            s = estimate_class_score(model, sample_batched, preprocess, config)
             y = sample_batched["class_label"]
 
             # classification score for drawing ROC curve
@@ -248,14 +257,22 @@ def check_accuracy_extended_debug(model, loader, preprocess, config, repeat=1):
 
 
 @torch.no_grad()
-def check_accuracy_multicrop(model, loader, preprocess, config, repeat=1):
+def check_accuracy_multicrop(model, loader, preprocess, config, aggregation="prob", repeat=1):
     # for accuracy
     correct, total = (0, 0)
 
     for k in range(repeat):
         for sample_batched in loader:
             # estimate
-            s = estimate_score(model, sample_batched, preprocess, config)
+            if aggregation == "logit":
+                s = estimate_logit(model, sample_batched, preprocess, config)
+            elif aggregation in ["prob", "probability"]:
+                s = estimate_class_score(model, sample_batched, preprocess, config)
+            else:
+                raise ValueError(
+                    f"check_accuracy_multicrop(aggregation): aggregation option must "
+                    f"be one among of ['logit', 'prob', 'probability']."
+                )
             y = sample_batched["class_label"]
             tcm = config["test_crop_multiple"]
 
@@ -287,7 +304,7 @@ def check_accuracy_multicrop(model, loader, preprocess, config, repeat=1):
 
 
 @torch.no_grad()
-def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=1, dummy=1):
+def check_accuracy_multicrop_extended(model, loader, preprocess, config, aggregation="prob", repeat=1, dummy=1):
     # for confusion matrix
     C = config["out_dims"]
     confusion_matrix = np.zeros((C, C), dtype=np.int32)
@@ -305,7 +322,7 @@ def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=
     # warm-up using dummy round
     for k in range(dummy):
         for sample_batched in loader:
-            _ = estimate_score(model, sample_batched, preprocess, config)
+            _ = estimate_class_score(model, sample_batched, preprocess, config)
 
     for k in range(repeat):
         for sample_batched in loader:
@@ -315,7 +332,15 @@ def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=
 
             # estimate
             start_event.record()
-            s = estimate_score(model, sample_batched, preprocess, config)
+            if aggregation == "logit":
+                s = estimate_logit(model, sample_batched, preprocess, config)
+            elif aggregation in ["prob", "probability"]:
+                s = estimate_class_score(model, sample_batched, preprocess, config)
+            else:
+                raise ValueError(
+                    f"check_accuracy_multicrop(aggregation): aggregation option must "
+                    f"be one among of ['logit', 'prob', 'probability']."
+                )
             y = sample_batched["class_label"]
             tcm = config["test_crop_multiple"]
 
@@ -333,6 +358,10 @@ def check_accuracy_multicrop_extended(model, loader, preprocess, config, repeat=
             end_event.record()
             torch.cuda.synchronize()
             total_time += start_event.elapsed_time(end_event) / 1000
+
+            if aggregation == "logit":
+                # s_merge = logit_to_prob(s_merge, config)
+                s_merge = F.softmax(s_merge, dim=1)
 
             s = s_merge
             y = y_merge

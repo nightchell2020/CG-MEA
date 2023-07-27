@@ -133,9 +133,20 @@ def load_distill_teacher(config):
         ts = torch.load(
             os.path.join(config.get("cwd", ""), config["distil_teacher_score"]), map_location=config["device"]
         )
-        teacher_score = torch.zeros((max([int(k) for k in ts.keys()]) + 1, *[*ts.values()][0].shape))
+        dim1 = max([int(k) for k in ts.keys()]) + 1
+        dim2 = max([v.shape[0] for v in ts.values()])
+        dim3 = [*ts.values()][0].shape[1]
+        teacher_score = torch.ones((dim1, dim2, dim3))
         for k, v in ts.items():
-            teacher_score[int(k)] = v
+            teacher_score[int(k), : v.shape[0]] = v
+        teacher_score = torch.log(teacher_score)
+
+        integral = torch.cumsum(teacher_score, dim=1)
+
+        for i in range(integral.shape[1] - config["seq_length"]):
+            teacher_score[:, i, :] = (integral[:, i + config["seq_length"], :] - integral[:, i, :]) / config[
+                "seq_length"
+            ]
         config["distil_teacher_score"] = teacher_score.to(config["device"])
     else:
         save_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["distil_teacher"]}/')
