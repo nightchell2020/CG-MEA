@@ -465,6 +465,8 @@ def compose_transforms(config, verbose=False):
             raise ValueError(f"config['channel_difference'] should be the list of length 2.")
         transform += [EegChannelDifference(channel_difference_list[0], channel_difference_list[1])]
         transform_multicrop += [EegChannelDifference(channel_difference_list[0], channel_difference_list[1])]
+        signal_header = config["signal_header"]
+        config["montage"] = " - ".join([signal_header[i].split("-")[0] for i in channel_difference_list])
     else:
         channel_reduction_list = config.get("channel_reduction_list", [])
 

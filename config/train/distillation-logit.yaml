@@ -5,5 +5,5 @@ defaults:
 distil_alpha: 0.1
 distil_type: soft
 distil_tau: 3.0
-distil_teacher: score  # logit, score, model
+distil_teacher: logit  # logit, score, model
 distil_teacher_logit: ???  # decided during runtime

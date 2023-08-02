@@ -129,25 +129,24 @@ def load_pretrained_params(model, config):
 
 def load_distill_teacher(config):
     # load teacher model
-    if config["distil_teacher"].lower() == "score":
+    if config["distil_teacher"].lower() in ["logit", "score"]:
         ts = torch.load(
-            os.path.join(config.get("cwd", ""), config["distil_teacher_score"]), map_location=config["device"]
+            os.path.join(config.get("cwd", ""), config["distil_teacher_logit"]), map_location=config["device"]
         )
         dim1 = max([int(k) for k in ts.keys()]) + 1
         dim2 = max([v.shape[0] for v in ts.values()])
         dim3 = [*ts.values()][0].shape[1]
-        teacher_score = torch.ones((dim1, dim2, dim3))
+        teacher_logit = torch.ones((dim1, dim2, dim3))
         for k, v in ts.items():
-            teacher_score[int(k), : v.shape[0]] = v
-        teacher_score = torch.log(teacher_score)
+            teacher_logit[int(k), : v.shape[0]] = v
+        if config["distil_teacher"].lower() == "score":
+            teacher_logit = torch.log(teacher_logit) + 1
+        integral = torch.cumsum(teacher_logit, dim=1)
 
-        integral = torch.cumsum(teacher_score, dim=1)
-
-        for i in range(integral.shape[1] - config["seq_length"]):
-            teacher_score[:, i, :] = (integral[:, i + config["seq_length"], :] - integral[:, i, :]) / config[
-                "seq_length"
-            ]
-        config["distil_teacher_score"] = teacher_score.to(config["device"])
+        L = config["seq_length"]
+        for i in range(integral.shape[1] - L):
+            teacher_logit[:, i, :] = (integral[:, i + L, :] - integral[:, i, :]) / L
+        config["distil_teacher_logit"] = teacher_logit.to(config["device"])
     else:
         save_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["distil_teacher"]}/')
         ckpt = torch.load(os.path.join(save_path, "checkpoint.pt"), map_location=config["device"])
@@ -251,7 +250,7 @@ def prepare_and_run_train(rank, world_size, config):
         torch.distributed.destroy_process_group()
 
 
-@hydra.main(config_path="config", config_name="default")
+@hydra.main(version_base="1.1", config_path="config", config_name="default")
 def my_app(cfg: DictConfig) -> None:
     # initialize the configurations
     # print(OmegaConf.to_yaml(cfg))
