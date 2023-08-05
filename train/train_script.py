@@ -2,13 +2,13 @@ import os
 from copy import deepcopy
 import numpy as np
 import torch
-import torch.optim as optim
 import wandb
 import pprint
 from datetime import datetime
 
 from .utils import wandb_config_update
 from .train_core import train_multistep
+from optim import get_optimizer
 from optim import get_lr_scheduler
 from .evaluate import check_accuracy
 from .evaluate import check_accuracy_extended
@@ -43,7 +43,7 @@ def learning_rate_search(
         model.load_state_dict(deepcopy(given_model_state))
         # model.module.reset_weights() if config.get('ddp', False) else model.reset_weights()
 
-        optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=config["weight_decay"])
+        optimizer = get_optimizer(model, config)
         scheduler = get_lr_scheduler(
             optimizer,
             scheduler_type="constant_with_decay",  # constant for search
@@ -156,7 +156,7 @@ def train_script(
     history_interval = max(config["iterations"] // config["num_history"], 1)
 
     # generate the trainers
-    optimizer = optim.AdamW(model.parameters(), lr=config["base_lr"], weight_decay=config["weight_decay"])
+    optimizer = get_optimizer(model, config)
     scheduler = get_lr_scheduler(
         optimizer,
         config["lr_scheduler_type"],
