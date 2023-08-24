@@ -95,10 +95,10 @@ def get_sine_cosine_positional_embedding(seq_len, dim, class_token=False):
 
     embedding_sine = torch.sin(product)
     embedding_cosine = torch.cos(product)
-    embedding = torch.concatenate([embedding_sine, embedding_cosine], dim=1)
+    embedding = torch.cat([embedding_sine, embedding_cosine], dim=1)
 
     if class_token:
-        embedding = torch.concatenate([torch.zeros((1, dim)), embedding], dim=0)
+        embedding = torch.cat([torch.zeros((1, dim)), embedding], dim=0)
 
     return embedding
 
