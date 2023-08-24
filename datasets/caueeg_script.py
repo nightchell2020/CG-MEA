@@ -17,6 +17,7 @@ from .pipeline import EegAddGaussianNoiseAge
 from .pipeline import EegChannelDropOut
 from .pipeline import EegToTensor, EegToDevice
 from .pipeline import EegSpectrogram
+from .pipeline import EegResample
 from .pipeline import eeg_collate_fn
 
 
@@ -531,6 +532,15 @@ def compose_preprocess(config, train_loader, verbose=True):
     #############
     preprocess_train += [EegToDevice(device=config["device"])]
     preprocess_test += [EegToDevice(device=config["device"])]
+
+    ##############
+    # resampling #
+    ##############
+    config["crop_length"] = config["seq_length"]
+    if config.get("resample") is not None:
+        config["seq_length"] = int(config["crop_length"] * config["resample"] / 200)
+        preprocess_train += [EegResample(orig_freq=200, new_freq=config["resample"]).to(config["device"])]
+        preprocess_test += [EegResample(orig_freq=200, new_freq=config["resample"]).to(config["device"])]
 
     ############################
     # data normalization (age) #

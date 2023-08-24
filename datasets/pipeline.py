@@ -822,45 +822,27 @@ class EegResample(torch.nn.Module):
         self,
         orig_freq: int,
         new_freq: int,
-        resampling_method: str = "sinc_interpolation",
+        resampling_method: str = "sinc_interp_hann",
     ):
         super().__init__()
         if resampling_method not in (
-            "sinc_interpolation",
-            "kaiser_best",
-            "kaiser_fast",
+            "sinc_interp_hann",
+            "sinc_interp_kaiser",
         ):
-            raise ValueError('complex_mode must be set to one of ("as_real", "power", "remove")')
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(resampling_method) must be set to one of "
+                f'("sinc_interp_hann", "sinc_interp_kaiser")'
+            )
 
         self.orig_freq = orig_freq
         self.new_freq = new_freq
         self.resampling_method = resampling_method
 
-        if resampling_method == "sinc_interpolation":
-            self.resampler = torchaudio.transforms.Resample(
-                orig_freq=orig_freq,
-                new_freq=new_freq,
-                lowpass_filter_width=16,
-                resampling_method=resampling_method,
-            )
-        elif resampling_method == "kaiser_best":
-            self.resampler = torchaudio.transforms.Resample(
-                orig_freq=orig_freq,
-                new_freq=new_freq,
-                resampling_method="kaiser_window",
-                lowpass_filter_width=64,
-                rolloff=0.9475937167399596,
-                beta=14.769656459379492,
-            )
-        elif resampling_method == "kaiser_fast":
-            self.resampler = torchaudio.transforms.Resample(
-                orig_freq=orig_freq,
-                new_freq=new_freq,
-                resampling_method="kaiser_window",
-                lowpass_filter_width=16,
-                rolloff=0.85,
-                beta=8.555504641634386,
-            )
+        self.resampler = torchaudio.transforms.Resample(
+            orig_freq=orig_freq,
+            new_freq=new_freq,
+            resampling_method=resampling_method,
+        )
 
     def forward(self, sample):
         sample["signal"] = self.resampler(sample["signal"])

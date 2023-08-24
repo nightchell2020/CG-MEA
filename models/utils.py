@@ -115,7 +115,7 @@ def program_conv_filters(
     if not success:
         header = class_name + ", " if len(class_name) > 0 else ""
         raise RuntimeError(
-            f"{header}conv1d_filter_programming() failed to determine "
+            f"{header}conv_filter_programming() failed to determine "
             f"the proper convolution filter parameters. "
             f"The following is the recording for debug: {str_debug}"
         )
