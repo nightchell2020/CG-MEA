@@ -435,7 +435,7 @@ def compose_transforms(config, verbose=False):
     ###############
     transform += [
         EegRandomCrop(
-            crop_length=config["seq_length"],
+            crop_length=config.get("crop_length", config["seq_length"]),
             length_limit=config.get("signal_length_limit", 10**7),
             multiple=config.get("crop_multiple", 1),
             latency=config.get("latency", 0),
@@ -446,7 +446,7 @@ def compose_transforms(config, verbose=False):
     ]
     transform_multicrop += [
         EegRandomCrop(
-            crop_length=config["seq_length"],
+            crop_length=config.get("crop_length", config["seq_length"]),
             length_limit=config.get("signal_length_limit", 10**7),
             multiple=config.get("test_crop_multiple", 8),
             latency=config.get("latency", 0),
@@ -536,7 +536,9 @@ def compose_preprocess(config, train_loader, verbose=True):
     ##############
     # resampling #
     ##############
-    config["crop_length"] = config["seq_length"]
+    if "crop_length" not in config:
+        config["crop_length"] = config["seq_length"]
+
     if config.get("resample") is not None:
         config["seq_length"] = int(config["crop_length"] * config["resample"] / 200)
         preprocess_train += [EegResample(orig_freq=200, new_freq=config["resample"]).to(config["device"])]
@@ -648,7 +650,7 @@ def compose_preprocess(config, train_loader, verbose=True):
             hop_length,
             seq_len_2d,
         ) = calculate_stft_params(
-            seq_length=config["seq_length"],
+            seq_length=config.get("crop_length", config["seq_length"]),
             n_fft=stft_params.pop("n_fft", 0),
             hop_ratio=stft_params.pop("hop_ratio", 1 / 4.0),
             verbose=False,
