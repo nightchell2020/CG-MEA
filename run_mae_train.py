@@ -1,5 +1,8 @@
+import os
 import gc
+from copy import deepcopy
 from omegaconf import DictConfig, OmegaConf
+from collections import OrderedDict
 import hydra
 from hydra.core.hydra_config import HydraConfig
 
@@ -14,7 +17,23 @@ from run_train import generate_model
 from run_train import set_seed
 from run_train import initialize_ddp
 from run_train import compose_dataset
-from run_train import load_pretrained_params
+
+
+def load_pretrained_mae(model, config):
+    save_path = os.path.join(config.get("cwd", ""), f'local/checkpoint/{config["load_pretrained"]}/')
+    ckpt = torch.load(os.path.join(save_path, "checkpoint.pt"), map_location=config["device"])
+
+    # load pretrained model
+    if not config.get("ddp", False):
+        pre_model_state = ckpt["ssl_model_state"]
+    else:
+        pre_model_state_ddp = deepcopy(ckpt["ssl_model_state"])
+        pre_model_state = OrderedDict()
+        for k, v in pre_model_state_ddp.items():
+            name = k[7:]  # remove 'module.' of DataParallel/DistributedDataParallel
+            pre_model_state[name] = v
+
+    model.load_state_dict(pre_model_state)
 
 
 def prepare_and_run_ssl_train(rank, world_size, config):
@@ -38,7 +57,7 @@ def prepare_and_run_ssl_train(rank, world_size, config):
 
     # load pretrained model if needed
     if "load_pretrained" in config.keys():
-        load_pretrained_params(model, config)
+        load_pretrained_mae(model, config)
 
     # train
     ssl_train_script(config, model, train_loader, config["preprocess_train"])
