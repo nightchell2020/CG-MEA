@@ -1,5 +1,6 @@
 from typing import Optional
 import time
+from packaging import version
 
 import numpy as np
 import torch
@@ -837,6 +838,12 @@ class EegResample(torch.nn.Module):
         self.orig_freq = orig_freq
         self.new_freq = new_freq
         self.resampling_method = resampling_method
+
+        if version.parse(torch.__version__) < version.parse("2.0.0"):
+            if resampling_method == "sinc_interp_hann":
+                resampling_method = "sinc_interpolation"
+            elif resampling_method == "sinc_interp_kaiser":
+                resampling_method = "kaiser_window"
 
         self.resampler = torchaudio.transforms.Resample(
             orig_freq=orig_freq,
