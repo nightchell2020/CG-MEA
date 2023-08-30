@@ -53,7 +53,7 @@ class MaskedAutoencoderArtifact(nn.Module):
         art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         art_use_age: bool = False,
         global_pool: bool = True,
-        descending: bool = True,
+        descending: bool = False,
         **kwargs: Any,
     ):
         super().__init__()
@@ -304,9 +304,6 @@ class MaskedAutoencoderArtifact(nn.Module):
         x = eeg.reshape(N, C, l_full, p)
         x = torch.einsum("NClp->NlCp", x)
 
-        # (N, l_full, C, p) -> (N*l, C, p)
-        # x = x[mask > 0.5]
-
         # (N, l_full, C, p) -> (N*l_full, C, p)
         x = x.reshape(N * l_full, C, p)
 
@@ -320,7 +317,7 @@ class MaskedAutoencoderArtifact(nn.Module):
             x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
         else:
             x = self.enc_norm(x)
-            outcome = x[:, 0]
+            x = x[:, 0]
 
         if self.use_age == "fc":
             x = torch.cat((x, age.reshape(-1, 1)), dim=1)

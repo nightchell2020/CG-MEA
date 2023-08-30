@@ -539,7 +539,7 @@ def compose_preprocess(config, train_loader, verbose=True):
     if "crop_length" not in config:
         config["crop_length"] = config["seq_length"]
 
-    if config.get("resample") is not None:
+    if config.get("resample", None):
         config["seq_length"] = int(config["crop_length"] * config["resample"] / 200)
         preprocess_train += [EegResample(orig_freq=200, new_freq=config["resample"]).to(config["device"])]
         preprocess_test += [EegResample(orig_freq=200, new_freq=config["resample"]).to(config["device"])]
