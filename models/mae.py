@@ -249,7 +249,7 @@ class MaskedAutoencoder(nn.Module):
 
     def compute_feature_embedding(self, x, age, target_from_last: int = 0):
         # encoder
-        x, mask, idx_restore = self.forward_encoder(x, age)
+        x = self.forward_encoder(x, age)
 
         # head
         out = self.forward_head(x, age, target_from_last)
