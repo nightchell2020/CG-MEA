@@ -110,6 +110,7 @@ class MaskedAutoencoderPretrain(nn.Module):
         self,
         seq_length: int,
         patch_size: int,
+        mask_ratio: float,
         in_channels: int,
         use_age: str,
         enc_num_heads: int,
@@ -150,6 +151,7 @@ class MaskedAutoencoderPretrain(nn.Module):
 
         self.seq_length = seq_length
         self.patch_size = patch_size
+        self.mask_ratio = mask_ratio
         self.n_patches = seq_length // patch_size
         self.enc_dim = enc_dim
         self.enc_depth = enc_depth
@@ -271,17 +273,18 @@ class MaskedAutoencoderPretrain(nn.Module):
         return self.output_length
 
     def random_masking(self, x, mask_ratio):
-        N, l, D_e = x.size()
-        l_keep = round(l * (1 - mask_ratio))
+        N, l_full, D_e = x.size()
+        l_keep = round(l_full * (1 - mask_ratio))
 
         # random sampling and sorting for masking
-        random_noise = torch.rand(N, l, device=x.device)
+        random_noise = torch.rand(N, l_full, device=x.device)
         idx_shuffle = torch.argsort(random_noise, dim=1)
         idx_keep = idx_shuffle[:, :l_keep]
 
         # masking
+        # (N, l_full, D_e) -> (N, l, D_e)
         x_masked = torch.gather(x, dim=1, index=idx_keep.unsqueeze(-1).repeat(1, 1, D_e))
-        mask = torch.ones((N, l), device=x.device)
+        mask = torch.ones((N, l_full), device=x.device)
         mask[:, :l_keep] = 0
 
         idx_restore = torch.argsort(idx_shuffle, dim=1)
@@ -296,13 +299,13 @@ class MaskedAutoencoderPretrain(nn.Module):
             age = age.reshape((N, 1, 1)).expand(N, 1, L)
             x = torch.cat((eeg, age), dim=1)
 
-        # (N, C, L) -> (N, D_e, l)
+        # (N, C, L) -> (N, D_e, l_full)
         x = self.enc_proj(eeg)
 
         if self.use_age == "embedding":
             x = x + self.age_embedding * age.reshape(N, 1, 1)
 
-        # (N, D_e, l) -> (N, l, D_e)
+        # (N, D_e, l_full) -> (N, l_full, D_e)
         # where N is the batch size, L is the source sequence length, and D is the embedding dimension
         x = x.permute(0, 2, 1)
 
@@ -310,6 +313,7 @@ class MaskedAutoencoderPretrain(nn.Module):
         x = x + self.enc_pos_embed[:, 1:, :]
 
         # random masking
+        # (N, l_full, D_e) -> (N, l, D_e)
         x, mask, idx_restore = self.random_masking(x, mask_ratio)
 
         # class token
@@ -383,17 +387,26 @@ class MaskedAutoencoderPretrain(nn.Module):
         loss = (loss * mask).sum() / mask.sum()
         return loss
 
-    def forward(self, eeg: torch.Tensor, age: torch.Tensor, mask_ratio: float):
+    def mask_and_reconstruct(self, eeg: torch.Tensor, age: torch.Tensor, mask_ratio: float):
         # encoder
-        latent, mask, idx_restore = self.forward_encoder(eeg, age, mask_ratio)
+        x, mask, idx_restore = self.forward_encoder(eeg, age, mask_ratio)
 
         # decoder
-        pred = self.forward_decoder(latent, idx_restore)
+        pred = self.forward_decoder(x, idx_restore)
+
+        return pred, mask
+
+    def forward(self, eeg: torch.Tensor, age: torch.Tensor, mask_ratio: float = None):
+        if mask_ratio is None:
+            mask_ratio = self.mask_ratio
+
+        # forward pass
+        pred, mask = self.mask_and_reconstruct(eeg, age, mask_ratio)
 
         # loss
         loss = self.compute_reconstruction_loss(eeg, pred, mask)
 
-        return loss, pred, mask
+        return loss
 
     def post_update_params(self):
         pass

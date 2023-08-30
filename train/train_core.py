@@ -203,10 +203,7 @@ def ssl_train_multistep(model, loader, preprocess, optimizer, scheduler, amp_sca
             # mixed precision training if needed
             with autocast(enabled=config.get("mixed_precision", False)):
                 # forward pass
-                if "mask_ratio" in config.keys():
-                    loss = model(x, age, config["mask_ratio"])[0]
-                else:
-                    loss = model(x, age)
+                loss = model(x, age)
 
             # backward and update
             if config.get("mixed_precision", False):
