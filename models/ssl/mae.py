@@ -125,6 +125,7 @@ class MaskedAutoencoderPretrain(nn.Module):
         activation: str = "gelu",
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
         norm_pix_loss: bool = False,
+        loss_type: str = "mse",
         **kwargs: Any,
     ):
         super().__init__()
@@ -137,6 +138,11 @@ class MaskedAutoencoderPretrain(nn.Module):
             raise ValueError(
                 f"{self.__class__.__name__}.__init__(seq_length, patch_size) requires seq_length to "
                 f"be multiple of patch_size."
+            )
+
+        if loss_type not in ["mse", "mae", "smooth-l1"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(loss_type) receives one of ['mse', 'mae', 'smooth-l1']."
             )
 
         self.use_age = use_age
@@ -160,6 +166,7 @@ class MaskedAutoencoderPretrain(nn.Module):
         self.dropout = dropout
         self.norm_layer = norm_layer
         self.norm_pix_loss = norm_pix_loss
+        self.loss_type = loss_type
 
         ###########
         # Encoder #
@@ -380,9 +387,21 @@ class MaskedAutoencoderPretrain(nn.Module):
             var = desired.var(dim=-1, keepdim=True)
             desired = (desired - mean) / (var + 1e-6) ** 0.5
 
-        loss = (desired - pred) ** 2
-        loss = loss.mean(dim=-1)
-        loss = (loss * mask).sum() / mask.sum()
+        if self.loss_type == "mse":
+            loss = torch.nn.functional.mse_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        elif self.loss_type == "mae":
+            loss = torch.nn.functional.l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        elif self.loss_type == "smooth-l1":
+            loss = torch.nn.functional.smooth_l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        else:
+            raise ValueError()
+
         return loss
 
     def mask_and_reconstruct(self, eeg: torch.Tensor, age: torch.Tensor, mask_ratio: float):

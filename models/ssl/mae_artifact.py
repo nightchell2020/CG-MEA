@@ -47,11 +47,13 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
         activation: str = "gelu",
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
         norm_pix_loss: bool = False,
+        loss_type: str = "mse",
         art_filter_list: tuple = (9, 9, 9),
         art_dim: int = 64,
         art_dropout: float = 0.0,
         art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         art_use_age: bool = False,
+        art_loss_type: str = "mse",
         **kwargs: Any,
     ):
         super().__init__()
@@ -64,6 +66,14 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
             raise ValueError(
                 f"{self.__class__.__name__}.__init__(seq_length, patch_size) requires seq_length to "
                 f"be multiple of patch_size."
+            )
+        if loss_type not in ["mse", "mae", "smooth-l1"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(loss_type) receives one of ['mse', 'mae', 'smooth-l1']."
+            )
+        if art_loss_type not in ["mse", "mae", "smooth-l1"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(loss_type) receives one of ['mse', 'mae', 'smooth-l1']."
             )
 
         self.use_age = use_age
@@ -87,11 +97,13 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
         self.dropout = dropout
         self.norm_layer = norm_layer
         self.norm_pix_loss = norm_pix_loss
+        self.loss_type = loss_type
 
         self.art_dim = art_dim
         self.art_dropout = art_dropout
         self.art_norm_layer = art_norm_layer
         self.art_use_age = art_use_age
+        self.art_loss_type = art_loss_type
 
         ###########
         # Encoder #
@@ -348,9 +360,21 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
             var = desired.var(dim=-1, keepdim=True)
             desired = (desired - mean) / (var + 1e-6) ** 0.5
 
-        loss = (desired - pred) ** 2
-        loss = loss.mean(dim=-1)
-        loss = (loss * mask).sum() / mask.sum()
+        if self.loss_type == "mse":
+            loss = torch.nn.functional.mse_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        elif self.loss_type == "mae":
+            loss = torch.nn.functional.l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        elif self.loss_type == "smooth-l1":
+            loss = torch.nn.functional.smooth_l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        else:
+            raise ValueError()
+
         return loss
 
     def compute_reconstruction_loss2(self, eeg, pred):
@@ -362,8 +386,18 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
             desired = (desired - mean) / (var + 1e-6) ** 0.5
 
         # (N, l_full, p*C) -> (N, l_full)
-        loss = (desired - pred) ** 2
-        loss = loss.mean(dim=-1)
+        if self.loss_type == "mse":
+            loss = torch.nn.functional.mse_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+        elif self.loss_type == "mae":
+            loss = torch.nn.functional.l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+        elif self.loss_type == "smooth-l1":
+            loss = torch.nn.functional.smooth_l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+        else:
+            raise ValueError()
+
         return loss
 
     def forward_artifact(self, eeg):
@@ -410,7 +444,14 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
         art_out = self.forward_artifact(eeg)
 
         # artifact loss
-        art_loss = torch.nn.functional.smooth_l1_loss(art_out[mask > 0.5], rec_loss[mask > 0.5])
+        if self.art_loss_type == "mse":
+            art_loss = torch.nn.functional.mse_loss(art_out[mask > 0.5], rec_loss[mask > 0.5])
+        elif self.art_loss_type == "mae":
+            art_loss = torch.nn.functional.l1_loss(art_out[mask > 0.5], rec_loss[mask > 0.5])
+        elif self.art_loss_type == "smooth-l1":
+            art_loss = torch.nn.functional.smooth_l1_loss(art_out[mask > 0.5], rec_loss[mask > 0.5])
+        else:
+            raise ValueError()
 
         return art_loss
 
