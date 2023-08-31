@@ -69,9 +69,7 @@ class MaskedAutoencoderArtifact(nn.Module):
             )
 
         self.use_age = use_age
-        if self.use_age == "conv":
-            in_channels += 1
-        elif self.use_age == "embedding":
+        if self.use_age == "embedding":
             self.age_embedding = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
             torch.nn.init.trunc_normal_(self.age_embedding, std=0.02)
 
@@ -106,7 +104,7 @@ class MaskedAutoencoderArtifact(nn.Module):
         ###########
         # Linear projection
         self.enc_proj = nn.Conv1d(
-            in_channels=in_channels,
+            in_channels=in_channels if self.use_age != "conv" else in_channels + 1,
             out_channels=enc_dim,
             kernel_size=patch_size,
             stride=patch_size,
@@ -253,7 +251,7 @@ class MaskedAutoencoderArtifact(nn.Module):
         N, C, L = eeg.size()
         if self.use_age == "conv":
             age = age.reshape((N, 1, 1)).expand(N, 1, L)
-            x = torch.cat((eeg, age), dim=1)
+            eeg = torch.cat((eeg, age), dim=1)
 
         # (N, C, L) -> (N, D_e, l_full)
         x = self.enc_proj(eeg)
