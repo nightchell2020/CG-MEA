@@ -45,7 +45,6 @@ class MaskedAutoencoder(nn.Module):
         attention_dropout: float = 0.0,
         activation: str = "gelu",
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
-        norm_pix_loss: bool = False,
         global_pool: bool = True,
         **kwargs: Any,
     ):
@@ -79,7 +78,6 @@ class MaskedAutoencoder(nn.Module):
         self.attention_dropout = attention_dropout
         self.dropout = dropout
         self.norm_layer = norm_layer
-        self.norm_pix_loss = norm_pix_loss
 
         self.global_pool = global_pool
         self.head_norm_layer = head_norm_layer
@@ -256,6 +254,61 @@ class MaskedAutoencoder(nn.Module):
     def forward(self, eeg: torch.Tensor, age: torch.Tensor, target_from_last: int = 0):
         out = self.compute_feature_embedding(eeg, age, target_from_last)
         return out
+
+    def layer_wise_lr_params(self, weight_decay=0.05, layer_decay=0.75):
+        """
+        Parameter groups for layer-wise lr decay
+        Following BEiT: https://github.com/microsoft/unilm/blob/master/beit/optim_factory.py#L58
+        """
+        param_group_names = {}
+        param_groups = {}
+
+        num_layers = len(self.enc_blocks) + 1
+        layer_scales = list(layer_decay ** (num_layers - i) for i in range(num_layers + 1))
+
+        for n, p in self.named_parameters():
+            if not p.requires_grad:
+                continue
+
+            # no decay: all 1D parameters and model specific ones
+            if p.ndim == 1:
+                g_decay = "no_decay"
+                this_decay = 0.0
+            else:
+                g_decay = "decay"
+                this_decay = weight_decay
+
+            if n in ["class_token", "pos_embed"]:
+                layer_id = 0
+            elif n.startswith("enc_proj"):
+                layer_id = 0
+            elif "blocks" in n:
+                layer_id = int(n.split(".")[1].split("_")[-1]) + 1
+            else:
+                layer_id = num_layers
+
+            group_name = "layer_%d_%s" % (layer_id, g_decay)
+
+            if group_name not in param_group_names:
+                this_scale = layer_scales[layer_id]
+
+                param_group_names[group_name] = {
+                    "lr_scale": this_scale,
+                    "weight_decay": this_decay,
+                    "params": [],
+                }
+                param_groups[group_name] = {
+                    "lr_scale": this_scale,
+                    "weight_decay": this_decay,
+                    "params": [],
+                }
+
+            param_group_names[group_name]["params"].append(n)
+            param_groups[group_name]["params"].append(p)
+
+        # print("parameter groups: \n%s" % json.dumps(param_group_names, indent=2))
+
+        return list(param_groups.values())
 
 
 def mae_b_e768_d512(**kwargs):
