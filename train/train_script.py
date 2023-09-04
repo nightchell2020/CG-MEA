@@ -37,7 +37,7 @@ def learning_rate_search(
     max_log_lr = -6.0 + np.log10(config["minibatch"] * config.get("ddp_size", 1) / 32)
 
     for log_lr in np.linspace(min_log_lr, max_log_lr, num=trials):
-        lr = 10**log_lr
+        config["base_lr"] = 10**log_lr
 
         # recover the given  model state
         model.load_state_dict(deepcopy(given_model_state))
