@@ -52,7 +52,7 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
         art_dim: int = 64,
         art_dropout: float = 0.0,
         art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
-        art_use_age: bool = False,
+        art_use_age: str = "no",
         art_loss_type: str = "mse",
         **kwargs: Any,
     ):
@@ -71,6 +71,10 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
             raise ValueError(
                 f"{self.__class__.__name__}.__init__(loss_type) receives one of ['mse', 'mae', 'smooth-l1']."
             )
+        if art_use_age not in ["conv", "embedding", "no"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(art_use_age) receives one of ['conv', 'embedding', 'no']."
+            )
         if art_loss_type not in ["mse", "mae", "smooth-l1"]:
             raise ValueError(
                 f"{self.__class__.__name__}.__init__(loss_type) receives one of ['mse', 'mae', 'smooth-l1']."
@@ -78,8 +82,8 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
 
         self.use_age = use_age
         if self.use_age == "embedding":
-            self.age_embedding = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
-            torch.nn.init.trunc_normal_(self.age_embedding, std=0.02)
+            self.age_embed = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
+            torch.nn.init.trunc_normal_(self.age_embed, std=0.02)
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.activation = activation
@@ -102,8 +106,11 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
         self.art_dim = art_dim
         self.art_dropout = art_dropout
         self.art_norm_layer = art_norm_layer
-        self.art_use_age = art_use_age
         self.art_loss_type = art_loss_type
+        self.art_use_age = art_use_age
+        if self.art_use_age == "embedding":
+            self.art_age_embed = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
+            torch.nn.init.trunc_normal_(self.art_age_embed, std=0.02)
 
         ###########
         # Encoder #
@@ -183,7 +190,7 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
         for i, cf in enumerate(conv_filter_list):
             layers += [
                 nn.Conv1d(
-                    in_channels=art_dim if i > 0 else in_channels,
+                    in_channels=art_dim if i > 0 else in_channels if self.art_use_age != "conv" else in_channels + 1,
                     out_channels=art_dim,
                     kernel_size=cf["kernel_size"],
                     padding=cf["kernel_size"] // 2,
@@ -281,7 +288,7 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
         x = self.enc_proj(eeg)
 
         if self.use_age == "embedding":
-            x = x + self.age_embedding * age.reshape(N, 1, 1)
+            x = x + self.age_embed * age.reshape(N, 1, 1)
 
         # (N, D_e, l_full) -> (N, l_full, D_e)
         # where N is the batch size, L is the source sequence length, and D is the embedding dimension
@@ -400,18 +407,22 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
 
         return loss
 
-    def forward_artifact(self, eeg):
+    def forward_artifact(self, eeg, age):
         # Reshape the input tensor
         N, C, L = eeg.size()
         p = self.patch_size
         l_full = L // p
 
+        if self.art_use_age == "conv":
+            age = age.reshape((N, 1, 1)).expand(N, 1, L)
+            eeg = torch.cat((eeg, age), dim=1)
+            C = C + 1
+        elif self.art_use_age == "embedding":
+            eeg = eeg + self.art_age_embed * age.reshape(N, 1, 1)
+
         # (N, C, L) -> (N, l_full, C, p)
         x = eeg.reshape(N, C, l_full, p)
         x = torch.einsum("NClp->NlCp", x)
-
-        # (N, l_full, C, p) -> (N*l, C, p)
-        # x = x[mask > 0.5]
 
         # (N, l_full, C, p) -> (N*l_full, C, p)
         x = x.reshape(N * l_full, C, p)
@@ -441,15 +452,15 @@ class MaskedAutoencoderPretrainArtifact(nn.Module):
         rec_loss = self.compute_reconstruction_loss2(eeg, pred)
 
         # forward artifact
-        art_out = self.forward_artifact(eeg)
+        art_out = self.forward_artifact(eeg, age)
 
         # artifact loss
         if self.art_loss_type == "mse":
-            art_loss = torch.nn.functional.mse_loss(art_out[mask > 0.5], rec_loss[mask > 0.5])
+            art_loss = torch.nn.functional.mse_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
         elif self.art_loss_type == "mae":
-            art_loss = torch.nn.functional.l1_loss(art_out[mask > 0.5], rec_loss[mask > 0.5])
+            art_loss = torch.nn.functional.l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
         elif self.art_loss_type == "smooth-l1":
-            art_loss = torch.nn.functional.smooth_l1_loss(art_out[mask > 0.5], rec_loss[mask > 0.5])
+            art_loss = torch.nn.functional.smooth_l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
         else:
             raise ValueError()
 

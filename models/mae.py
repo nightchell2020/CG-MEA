@@ -62,8 +62,8 @@ class MaskedAutoencoder(nn.Module):
 
         self.use_age = use_age
         if self.use_age == "embedding":
-            self.age_embedding = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
-            torch.nn.init.trunc_normal_(self.age_embedding, std=0.02)
+            self.age_embed = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
+            torch.nn.init.trunc_normal_(self.age_embed, std=0.02)
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.activation = activation
@@ -188,7 +188,7 @@ class MaskedAutoencoder(nn.Module):
         x = self.enc_proj(eeg)
 
         if self.use_age == "embedding":
-            x = x + self.age_embedding * age.reshape(N, 1, 1)
+            x = x + self.age_embed * age.reshape(N, 1, 1)
 
         # (N, D_e, l_full) -> (N, l_full, D_e)
         # where N is the batch size, L is the source sequence length, and D is the embedding dimension
@@ -278,7 +278,7 @@ class MaskedAutoencoder(nn.Module):
                 g_decay = "decay"
                 this_decay = weight_decay
 
-            if n in ["class_token", "pos_embed"]:
+            if n in ["class_token", "pos_embed", "age_embed"]:
                 layer_id = 0
             elif n.startswith("enc_proj"):
                 layer_id = 0

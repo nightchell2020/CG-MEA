@@ -50,7 +50,7 @@ class MaskedAutoencoderArtifact(nn.Module):
         art_dim: int = 64,
         art_dropout: float = 0.0,
         art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
-        art_use_age: bool = False,
+        art_use_age: str = "no",
         global_pool: bool = True,
         descending: bool = False,
         **kwargs: Any,
@@ -66,11 +66,15 @@ class MaskedAutoencoderArtifact(nn.Module):
                 f"{self.__class__.__name__}.__init__(seq_length, patch_size) requires seq_length to "
                 f"be multiple of patch_size."
             )
+        if art_use_age not in ["conv", "embedding", "no"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(art_use_age) receives one of ['conv', 'embedding', 'no']."
+            )
 
         self.use_age = use_age
         if self.use_age == "embedding":
-            self.age_embedding = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
-            torch.nn.init.trunc_normal_(self.age_embedding, std=0.02)
+            self.age_embed = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
+            torch.nn.init.trunc_normal_(self.age_embed, std=0.02)
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.activation = activation
@@ -90,6 +94,9 @@ class MaskedAutoencoderArtifact(nn.Module):
         self.art_dropout = art_dropout
         self.art_norm_layer = art_norm_layer
         self.art_use_age = art_use_age
+        if self.art_use_age == "embedding":
+            self.art_age_embed = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
+            torch.nn.init.trunc_normal_(self.art_age_embed, std=0.02)
 
         self.global_pool = global_pool
         self.head_norm_layer = head_norm_layer
@@ -147,7 +154,7 @@ class MaskedAutoencoderArtifact(nn.Module):
         for i, cf in enumerate(conv_filter_list):
             layers += [
                 nn.Conv1d(
-                    in_channels=art_dim if i > 0 else in_channels,
+                    in_channels=art_dim if i > 0 else in_channels if self.art_use_age != "conv" else in_channels + 1,
                     out_channels=art_dim,
                     kernel_size=cf["kernel_size"],
                     padding=cf["kernel_size"] // 2,
@@ -255,7 +262,7 @@ class MaskedAutoencoderArtifact(nn.Module):
         x = self.enc_proj(eeg)
 
         if self.use_age == "embedding":
-            x = x + self.age_embedding * age.reshape(N, 1, 1)
+            x = x + self.age_embed * age.reshape(N, 1, 1)
 
         # (N, D_e, l_full) -> (N, l_full, D_e)
         # where N is the batch size, L is the source sequence length, and D is the embedding dimension
@@ -290,11 +297,18 @@ class MaskedAutoencoderArtifact(nn.Module):
         x = x.reshape(N, l_full, p * C)
         return x
 
-    def forward_artifact(self, eeg):
+    def forward_artifact(self, eeg, age):
         # Reshape the input tensor
         N, C, L = eeg.size()
         p = self.patch_size
         l_full = L // p
+
+        if self.art_use_age == "conv":
+            age = age.reshape((N, 1, 1)).expand(N, 1, L)
+            eeg = torch.cat((eeg, age), dim=1)
+            C = C + 1
+        elif self.art_use_age == "embedding":
+            eeg = eeg + self.art_age_embed * age.reshape(N, 1, 1)
 
         # (N, C, L) -> (N, l_full, C, p)
         x = eeg.reshape(N, C, l_full, p)
@@ -334,7 +348,7 @@ class MaskedAutoencoderArtifact(nn.Module):
 
     def compute_feature_embedding(self, x, age, target_from_last: int = 0):
         # artifact
-        art_out = self.forward_artifact(x)
+        art_out = self.forward_artifact(x, age)
 
         # encoder
         x, mask, idx_restore = self.forward_encoder(x, age, art_out, self.mask_ratio)
