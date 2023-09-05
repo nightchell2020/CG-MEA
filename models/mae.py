@@ -255,6 +255,21 @@ class MaskedAutoencoder(nn.Module):
         out = self.compute_feature_embedding(eeg, age, target_from_last)
         return out
 
+    def finetune_mode(self, mode: str = "finetune"):
+        mode = mode.lower()
+        if mode not in ["finetune", "fc_stage"]:
+            raise ValueError(f"{self.__class__.__name__}.tuning_mode(mode) receives one of ['finetune', 'fc_stage'].")
+
+        if mode == "fc_stage":
+            self.requires_grad(False)
+            self.eval()
+            self.fc_stage.requires_grad_(True)
+            self.fc_stage.train()
+        elif mode == "finetune":
+            self.requires_grad_(True)
+            self.train()
+            self.enc_pos_embed.requires_grad_(False)
+
     def layer_wise_lr_params(self, weight_decay=0.05, layer_decay=0.75):
         """
         Parameter groups for layer-wise lr decay
@@ -278,7 +293,7 @@ class MaskedAutoencoder(nn.Module):
                 g_decay = "decay"
                 this_decay = weight_decay
 
-            if n in ["class_token", "pos_embed", "age_embed"]:
+            if n in ["class_token", "enc_pos_embed", "age_embed"]:
                 layer_id = 0
             elif n.startswith("enc_proj"):
                 layer_id = 0
