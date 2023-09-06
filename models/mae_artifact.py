@@ -369,7 +369,7 @@ class MaskedAutoencoderArtifact(nn.Module):
             )
 
         if mode == "fc_stage":
-            self.requires_grad(False)
+            self.requires_grad_(False)
             self.eval()
             self.fc_stage.requires_grad_(True)
             self.fc_stage.train()
