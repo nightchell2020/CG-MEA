@@ -8,13 +8,10 @@ import numpy as np
 import torch
 
 
-def mixup_data(x, age, y, alpha=1.0, use_cuda=True):
+def mixup_data(x, age, y, alpha, device):
     lam = np.random.beta(alpha, alpha) if alpha > 1e-12 else 1
     batch_size = x.size()[0]
-    if use_cuda:
-        index = torch.randperm(batch_size).cuda()
-    else:
-        index = torch.randperm(batch_size)
+    index = torch.randperm(batch_size).to(device=device)
 
     mixed_x = lam * x + (1 - lam) * x[index, :]
     mixed_age = lam * age + (1 - lam) * age[index]

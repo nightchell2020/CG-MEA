@@ -33,7 +33,7 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
             y = sample_batched["class_label"]
 
             # mixup the mini-batched data
-            x, age, y1, y2, lam, mixup_index = mixup_data(x, age, y, config["mixup"])
+            x, age, y1, y2, lam, mixup_index = mixup_data(x, age, y, config["mixup"], config["device"])
 
             # mixed precision training if needed
             with autocast(enabled=config.get("mixed_precision", False)):
