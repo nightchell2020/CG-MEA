@@ -7,7 +7,7 @@ import hydra
 from hydra.core.hydra_config import HydraConfig
 
 import torch
-from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.nn.parallel import DistributedDataParallel as DDPcon
 import torch.multiprocessing as mp
 
 from train.ssl_train_script import ssl_train_script

@@ -261,7 +261,7 @@ class MaskedAutoencoder(nn.Module):
             raise ValueError(f"{self.__class__.__name__}.tuning_mode(mode) receives one of ['finetune', 'fc_stage'].")
 
         if mode == "fc_stage":
-            self.requires_grad(False)
+            self.requires_grad_(False)
             self.eval()
             self.fc_stage.requires_grad_(True)
             self.fc_stage.train()
