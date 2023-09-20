@@ -8,6 +8,7 @@ crop_timing_analysis: false
 val_fraction: 15
 
 # preprocessing
+sampling_rate: 250
 seq_length: 2500  # 250Hz * 10s = 2500 for base
 latency: 2500
 signal_length_limit: 10000000  # A sufficiently large number for no effect

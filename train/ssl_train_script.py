@@ -154,7 +154,7 @@ def ssl_train_script(config, model, loader, preprocess):
 
     # train and validation routine
     while i_step < config["iterations"]:
-        i_step += history_interval * config.get("ddp_size", 1)
+        i_step += history_interval
 
         # train during 'history_interval' steps
         loss = ssl_train_multistep(

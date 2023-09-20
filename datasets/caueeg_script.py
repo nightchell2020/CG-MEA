@@ -538,11 +538,12 @@ def compose_preprocess(config, train_loader, verbose=True):
     ##############
     if "crop_length" not in config:
         config["crop_length"] = config["seq_length"]
+    sampling_rate = config.get("sampling_rate", 200)
+    config["seq_length"] = math.ceil(config["crop_length"] * config.get("resample", sampling_rate) / sampling_rate)
 
     if config.get("resample", None):
-        config["seq_length"] = int(config["crop_length"] * config["resample"] / 200)
-        preprocess_train += [EegResample(orig_freq=200, new_freq=config["resample"]).to(config["device"])]
-        preprocess_test += [EegResample(orig_freq=200, new_freq=config["resample"]).to(config["device"])]
+        preprocess_train += [EegResample(orig_freq=sampling_rate, new_freq=config["resample"]).to(config["device"])]
+        preprocess_test += [EegResample(orig_freq=sampling_rate, new_freq=config["resample"]).to(config["device"])]
 
     ############################
     # data normalization (age) #

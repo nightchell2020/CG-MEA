@@ -8,6 +8,7 @@ crop_timing_analysis: false
 load_event: false
 
 # preprocessing
+sampling_rate: 200
 seq_length: 2000  # 200Hz * 10s = 2000 for base
 latency: 2000
 signal_length_limit: 10000000  # A sufficiently large number for no effect
