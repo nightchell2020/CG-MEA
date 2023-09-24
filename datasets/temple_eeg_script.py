@@ -231,7 +231,7 @@ def compose_tuab_transforms(config, verbose=False):
     ###############
     transform += [
         EegRandomCrop(
-            crop_length=config["seq_length"],
+            crop_length=config.get("crop_length", config["seq_length"]),
             length_limit=config.get("signal_length_limit", 10**7),
             multiple=config.get("crop_multiple", 1),
             latency=config.get("latency", 0),
@@ -242,7 +242,7 @@ def compose_tuab_transforms(config, verbose=False):
     ]
     transform_multicrop += [
         EegRandomCrop(
-            crop_length=config["seq_length"],
+            crop_length=config.get("crop_length", config["seq_length"]),
             length_limit=config.get("signal_length_limit", 10**7),
             multiple=config.get("test_crop_multiple", 8),
             latency=config.get("latency", 0),
