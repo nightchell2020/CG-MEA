@@ -16,12 +16,12 @@ from ..activation import get_activation_class
 
 
 __all__ = [
-    "MaskedAutoencoderPretrain",
+    "MaskedAutoencoder1DPretrain",
     "get_sine_cosine_positional_embedding",
     "TransformerBlock",
-    "mae_pre_b_e768_d512",
-    "mae_pre_l_e1024_d512",
-    "mae_pre_h_e1280_d512",
+    "mae_1d_pre_b_e768_d512",
+    "mae_1d_pre_l_e1024_d512",
+    "mae_1d_pre_h_e1280_d512",
 ]
 
 
@@ -103,7 +103,7 @@ def get_sine_cosine_positional_embedding(seq_len, dim, class_token=False):
     return embedding
 
 
-class MaskedAutoencoderPretrain(nn.Module):
+class MaskedAutoencoder1DPretrain(nn.Module):
     """MAE as per https://arxiv.org/abs/2111.06377."""
 
     def __init__(
@@ -429,9 +429,9 @@ class MaskedAutoencoderPretrain(nn.Module):
         pass
 
 
-def mae_pre_b_e768_d512(**kwargs):
-    model = MaskedAutoencoderPretrain(
-        arch="mae_b_e768_d512",
+def mae_1d_pre_b_e768_d512(**kwargs):
+    model = MaskedAutoencoder1DPretrain(
+        arch="mae_1d_b_e768_d512",
         enc_num_heads=12,
         enc_dim=768,
         enc_depth=12,
@@ -445,9 +445,9 @@ def mae_pre_b_e768_d512(**kwargs):
     return model
 
 
-def mae_pre_l_e1024_d512(**kwargs):
-    model = MaskedAutoencoderPretrain(
-        arch="mae_l_e1024_d512",
+def mae_1d_pre_l_e1024_d512(**kwargs):
+    model = MaskedAutoencoder1DPretrain(
+        arch="mae_1d_l_e1024_d512",
         enc_num_heads=16,
         enc_dim=1024,
         enc_depth=24,
@@ -461,9 +461,9 @@ def mae_pre_l_e1024_d512(**kwargs):
     return model
 
 
-def mae_pre_h_e1280_d512(**kwargs):
-    model = MaskedAutoencoderPretrain(
-        arch="mae_h_e1280_d512",
+def mae_1d_pre_h_e1280_d512(**kwargs):
+    model = MaskedAutoencoder1DPretrain(
+        arch="mae_1d_h_e1280_d512",
         enc_num_heads=16,
         enc_dim=1280,
         enc_depth=32,

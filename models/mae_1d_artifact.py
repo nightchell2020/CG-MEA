@@ -12,19 +12,20 @@ import math
 import torch
 import torch.nn as nn
 
+from .utils import program_conv_filters
 from .activation import get_activation_class
-from .ssl.mae import TransformerBlock
-from .ssl.mae import get_sine_cosine_positional_embedding
+from .ssl.mae_1d import TransformerBlock
+from .ssl.mae_1d import get_sine_cosine_positional_embedding
 
 __all__ = [
-    "MaskedAutoencoder",
-    "mae_b_e768_d512",
-    "mae_l_e1024_d512",
-    "mae_h_e1280_d512",
+    "MaskedAutoencoder1DArtifact",
+    "mae_1d_art_b_e768_d512",
+    "mae_1d_art_l_e1024_d512",
+    "mae_1d_art_h_e1280_d512",
 ]
 
 
-class MaskedAutoencoder(nn.Module):
+class MaskedAutoencoder1DArtifact(nn.Module):
     """MAE as per https://arxiv.org/abs/2111.06377."""
 
     def __init__(
@@ -45,7 +46,13 @@ class MaskedAutoencoder(nn.Module):
         attention_dropout: float = 0.0,
         activation: str = "gelu",
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        art_filter_list: tuple = (9, 9, 9),
+        art_dim: int = 64,
+        art_dropout: float = 0.0,
+        art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
+        art_use_age: str = "no",
         global_pool: bool = True,
+        descending: bool = False,
         **kwargs: Any,
     ):
         super().__init__()
@@ -58,6 +65,10 @@ class MaskedAutoencoder(nn.Module):
             raise ValueError(
                 f"{self.__class__.__name__}.__init__(seq_length, patch_size) requires seq_length to "
                 f"be multiple of patch_size."
+            )
+        if art_use_age not in ["conv", "embedding", "no"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(art_use_age) receives one of ['conv', 'embedding', 'no']."
             )
 
         self.use_age = use_age
@@ -79,10 +90,19 @@ class MaskedAutoencoder(nn.Module):
         self.dropout = dropout
         self.norm_layer = norm_layer
 
+        self.art_dim = art_dim
+        self.art_dropout = art_dropout
+        self.art_norm_layer = art_norm_layer
+        self.art_use_age = art_use_age
+        if self.art_use_age == "embedding":
+            self.art_age_embed = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
+            torch.nn.init.trunc_normal_(self.art_age_embed, std=0.02)
+
         self.global_pool = global_pool
         self.head_norm_layer = head_norm_layer
         self.fc_stages = fc_stages
         self.out_dims = out_dims
+        self.descending = descending
 
         ###########
         # Encoder #
@@ -118,6 +138,42 @@ class MaskedAutoencoder(nn.Module):
             )
         self.enc_blocks = nn.Sequential(blk)
         self.enc_norm = norm_layer(enc_dim)
+
+        ######################
+        # Artifact estimator #
+        ######################
+        conv_filter_list = [{"kernel_size": k} for k in art_filter_list]
+        program_conv_filters(
+            sequence_length=self.patch_size,
+            conv_filter_list=conv_filter_list,
+            output_lower_bound=2,
+            output_upper_bound=5,
+            class_name=self.__class__.__name__,
+        )
+        layers = []
+        for i, cf in enumerate(conv_filter_list):
+            layers += [
+                nn.Conv1d(
+                    in_channels=art_dim if i > 0 else in_channels if self.art_use_age != "conv" else in_channels + 1,
+                    out_channels=art_dim,
+                    kernel_size=cf["kernel_size"],
+                    padding=cf["kernel_size"] // 2,
+                    stride=cf["stride"],
+                    bias=True,
+                ),
+                self.art_norm_layer(art_dim),
+                self.nn_act(),
+            ]
+        layers += [
+            nn.AdaptiveAvgPool1d(1),
+            nn.Flatten(1),
+            nn.Linear(self.art_dim, self.art_dim // 2, bias=False),
+            nn.Dropout(p=self.art_dropout),
+            self.art_norm_layer(self.art_dim // 2),
+            self.nn_act(),
+            nn.Linear(self.art_dim // 2, 1, bias=True),
+        ]
+        self.art_net = nn.Sequential(*layers)
 
         #######################
         # Classification head #
@@ -177,7 +233,25 @@ class MaskedAutoencoder(nn.Module):
     def get_output_length(self):
         return self.output_length
 
-    def forward_encoder(self, eeg, age):
+    def artifact_masking(self, x, art_out, mask_ratio):
+        N, l_full, D_e = x.size()
+        l_keep = round(l_full * (1 - mask_ratio))
+
+        idx_shuffle = torch.argsort(art_out, dim=1, descending=self.descending)
+        idx_keep = idx_shuffle[:, :l_keep]
+
+        # masking
+        # (N, l_full, D_e) -> (N, l, D_e)
+        x_masked = torch.gather(x, dim=1, index=idx_keep.unsqueeze(-1).repeat(1, 1, D_e))
+        mask = torch.ones((N, l_full), device=x.device)
+        mask[:, :l_keep] = 0
+
+        idx_restore = torch.argsort(idx_shuffle, dim=1)
+        mask = torch.gather(mask, dim=1, index=idx_restore)
+
+        return x_masked, mask, idx_restore
+
+    def forward_encoder(self, eeg, age, art_out, mask_ratio):
         # Reshape and permute the input tensor
         N, C, L = eeg.size()
         if self.use_age == "conv":
@@ -197,8 +271,12 @@ class MaskedAutoencoder(nn.Module):
         # positional encoding
         x = x + self.enc_pos_embed[:, 1:, :]
 
+        # masking according to the predicted loss from artifact network
+        # (N, l_full, D_e) -> (N, l, D_e)
+        x, mask, idx_restore = self.artifact_masking(x, art_out, mask_ratio)
+
         # class token
-        # (N, l_full, D_e) -> (N, l_full + 1, D_e)
+        # (N, l, D_e) -> (N, l + 1, D_e)
         class_token = self.class_token + self.enc_pos_embed[:, :1, :]
         batch_class_token = class_token.expand(N, -1, -1)
         x = torch.cat([batch_class_token, x], dim=1)
@@ -208,7 +286,7 @@ class MaskedAutoencoder(nn.Module):
         x = self.enc_blocks(x)
         # x = self.enc_norm(x)
 
-        return x
+        return x, mask, idx_restore
 
     def patchify(self, eeg):
         N, C, L = eeg.size()
@@ -218,6 +296,31 @@ class MaskedAutoencoder(nn.Module):
         x = torch.einsum("NClp->NlpC", x)
         x = x.reshape(N, l_full, p * C)
         return x
+
+    def forward_artifact(self, eeg, age):
+        # Reshape the input tensor
+        N, C, L = eeg.size()
+        p = self.patch_size
+        l_full = L // p
+
+        if self.art_use_age == "conv":
+            age = age.reshape((N, 1, 1)).expand(N, 1, L)
+            eeg = torch.cat((eeg, age), dim=1)
+            C = C + 1
+        elif self.art_use_age == "embedding":
+            eeg = eeg + self.art_age_embed * age.reshape(N, 1, 1)
+
+        # (N, C, L) -> (N, l_full, C, p)
+        x = eeg.reshape(N, C, l_full, p)
+        x = torch.einsum("NClp->NlCp", x)
+
+        # (N, l_full, C, p) -> (N*l_full, C, p)
+        x = x.reshape(N * l_full, C, p)
+
+        # apply small ConvNet to masked regions
+        out = self.art_net(x)
+        out = out.squeeze().reshape(N, l_full)
+        return out
 
     def forward_head(self, x, age, target_from_last: int = 0):
         if self.global_pool:
@@ -244,8 +347,11 @@ class MaskedAutoencoder(nn.Module):
         return x
 
     def compute_feature_embedding(self, x, age, target_from_last: int = 0):
+        # artifact
+        art_out = self.forward_artifact(x, age)
+
         # encoder
-        x = self.forward_encoder(x, age)
+        x, mask, idx_restore = self.forward_encoder(x, age, art_out, self.mask_ratio)
 
         # head
         out = self.forward_head(x, age, target_from_last)
@@ -257,8 +363,10 @@ class MaskedAutoencoder(nn.Module):
 
     def finetune_mode(self, mode: str = "finetune"):
         mode = mode.lower()
-        if mode not in ["finetune", "fc_stage"]:
-            raise ValueError(f"{self.__class__.__name__}.tuning_mode(mode) receives one of ['finetune', 'fc_stage'].")
+        if mode not in ["finetune", "fc_stage", "from_scratch"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.tuning_mode(mode) receives one of ['finetune', 'fc_stage', 'from_scratch']."
+            )
 
         if mode == "fc_stage":
             self.requires_grad_(False)
@@ -266,6 +374,15 @@ class MaskedAutoencoder(nn.Module):
             self.fc_stage.requires_grad_(True)
             self.fc_stage.train()
         elif mode == "finetune":
+            self.requires_grad_(True)
+            self.train()
+            self.art_net.requires_grad_(False)
+            self.art_net.eval()
+            self.enc_pos_embed.requires_grad_(False)
+            for k, v in self._parameters.items():
+                if k.startswith("art"):
+                    v.requires_grad_(False)
+        elif mode == "from_scratch":
             self.requires_grad_(True)
             self.train()
             self.enc_pos_embed.requires_grad_(False)
@@ -293,7 +410,7 @@ class MaskedAutoencoder(nn.Module):
                 g_decay = "decay"
                 this_decay = weight_decay
 
-            if n in ["class_token", "enc_pos_embed", "age_embed"]:
+            if n in ["class_token", "enc_pos_embed", "age_embed", "art_age_embed"]:
                 layer_id = 0
             elif n.startswith("enc_proj"):
                 layer_id = 0
@@ -321,14 +438,15 @@ class MaskedAutoencoder(nn.Module):
             param_group_names[group_name]["params"].append(n)
             param_groups[group_name]["params"].append(p)
 
+        # import json
         # print("parameter groups: \n%s" % json.dumps(param_group_names, indent=2))
 
         return list(param_groups.values())
 
 
-def mae_b_e768_d512(**kwargs):
-    model = MaskedAutoencoder(
-        arch="mae_b_e768_d512",
+def mae_1d_art_b_e768_d512(**kwargs):
+    model = MaskedAutoencoder1DArtifact(
+        arch="mae_1d_b_e768_d512",
         enc_num_heads=12,
         enc_dim=768,
         enc_depth=12,
@@ -339,9 +457,9 @@ def mae_b_e768_d512(**kwargs):
     return model
 
 
-def mae_l_e1024_d512(**kwargs):
-    model = MaskedAutoencoder(
-        arch="mae_l_e1024_d512",
+def mae_1d_art_l_e1024_d512(**kwargs):
+    model = MaskedAutoencoder1DArtifact(
+        arch="mae_1d_l_e1024_d512",
         enc_num_heads=16,
         enc_dim=1024,
         enc_depth=24,
@@ -352,9 +470,9 @@ def mae_l_e1024_d512(**kwargs):
     return model
 
 
-def mae_h_e1280_d512(**kwargs):
-    model = MaskedAutoencoder(
-        arch="mae_h_e1280_d512",
+def mae_1d_art_h_e1280_d512(**kwargs):
+    model = MaskedAutoencoder1DArtifact(
+        arch="mae_1d_h_e1280_d512",
         enc_num_heads=16,
         enc_dim=1280,
         enc_depth=32,

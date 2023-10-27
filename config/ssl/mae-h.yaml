@@ -1,7 +1,7 @@
 defaults:
   - _self_
 
-_target_: models.ssl.mae.mae_pre_h_e1280_d512
+_target_: models.ssl.mae.mae_1d_pre_h_e1280_d512
 norm_pix_loss: False
 activation: gelu
 minibatch_3090: 128

@@ -12,20 +12,20 @@ import math
 import torch
 import torch.nn as nn
 
-from .utils import program_conv_filters
-from .activation import get_activation_class
-from .ssl.mae import TransformerBlock
-from .ssl.mae import get_sine_cosine_positional_embedding
+from ..utils import program_conv_filters
+from ..activation import get_activation_class
+from .mae_1d import TransformerBlock
+from .mae_1d import get_sine_cosine_positional_embedding
 
 __all__ = [
-    "MaskedAutoencoderArtifact",
-    "mae_art_b_e768_d512",
-    "mae_art_l_e1024_d512",
-    "mae_art_h_e1280_d512",
+    "MaskedAutoencoder1DPretrainArtifact",
+    "mae_1d_pre_art_b_e768_d512",
+    "mae_1d_pre_art_l_e1024_d512",
+    "mae_1d_pre_art_h_e1280_d512",
 ]
 
 
-class MaskedAutoencoderArtifact(nn.Module):
+class MaskedAutoencoder1DPretrainArtifact(nn.Module):
     """MAE as per https://arxiv.org/abs/2111.06377."""
 
     def __init__(
@@ -38,21 +38,22 @@ class MaskedAutoencoderArtifact(nn.Module):
         enc_num_heads: int,
         enc_dim: int,
         enc_depth: int,
+        dec_num_heads: int,
+        dec_dim: int,
+        dec_depth: int,
         mlp_ratio: float,
-        fc_stages: int,
-        out_dims: int,
-        head_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         dropout: float = 0.0,
         attention_dropout: float = 0.0,
         activation: str = "gelu",
         norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        norm_pix_loss: bool = False,
+        loss_type: str = "mse",
         art_filter_list: tuple = (9, 9, 9),
         art_dim: int = 64,
         art_dropout: float = 0.0,
         art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         art_use_age: str = "no",
-        global_pool: bool = True,
-        descending: bool = False,
+        art_loss_type: str = "mse",
         **kwargs: Any,
     ):
         super().__init__()
@@ -66,9 +67,17 @@ class MaskedAutoencoderArtifact(nn.Module):
                 f"{self.__class__.__name__}.__init__(seq_length, patch_size) requires seq_length to "
                 f"be multiple of patch_size."
             )
+        if loss_type not in ["mse", "mae", "smooth-l1"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(loss_type) receives one of ['mse', 'mae', 'smooth-l1']."
+            )
         if art_use_age not in ["conv", "embedding", "no"]:
             raise ValueError(
                 f"{self.__class__.__name__}.__init__(art_use_age) receives one of ['conv', 'embedding', 'no']."
+            )
+        if art_loss_type not in ["mse", "mae", "smooth-l1"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(loss_type) receives one of ['mse', 'mae', 'smooth-l1']."
             )
 
         self.use_age = use_age
@@ -85,24 +94,23 @@ class MaskedAutoencoderArtifact(nn.Module):
         self.n_patches = seq_length // patch_size
         self.enc_dim = enc_dim
         self.enc_depth = enc_depth
+        self.dec_dim = dec_dim
+        self.dec_depth = dec_depth
         self.mlp_ratio = mlp_ratio
         self.attention_dropout = attention_dropout
         self.dropout = dropout
         self.norm_layer = norm_layer
+        self.norm_pix_loss = norm_pix_loss
+        self.loss_type = loss_type
 
         self.art_dim = art_dim
         self.art_dropout = art_dropout
         self.art_norm_layer = art_norm_layer
+        self.art_loss_type = art_loss_type
         self.art_use_age = art_use_age
         if self.art_use_age == "embedding":
             self.art_age_embed = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
             torch.nn.init.trunc_normal_(self.art_age_embed, std=0.02)
-
-        self.global_pool = global_pool
-        self.head_norm_layer = head_norm_layer
-        self.fc_stages = fc_stages
-        self.out_dims = out_dims
-        self.descending = descending
 
         ###########
         # Encoder #
@@ -138,6 +146,34 @@ class MaskedAutoencoderArtifact(nn.Module):
             )
         self.enc_blocks = nn.Sequential(blk)
         self.enc_norm = norm_layer(enc_dim)
+
+        ###########
+        # Decoder #
+        ###########
+        # Linear projection
+        self.dec_proj = nn.Linear(enc_dim, dec_dim, bias=True)
+
+        # Mask token
+        self.mask_token = nn.Parameter(torch.zeros(1, 1, dec_dim), requires_grad=False)
+
+        # Positional embedding (sine-cosine)
+        self.dec_pos_embed = nn.Parameter(torch.zeros(1, self.n_patches + 1, dec_dim), requires_grad=False)
+
+        # Decoder
+        blk: OrderedDict[str, nn.Module] = OrderedDict()
+        for i in range(enc_depth):
+            blk[f"encoder_layer_{i}"] = TransformerBlock(
+                dec_num_heads,
+                dec_dim,
+                round(dec_dim * mlp_ratio),
+                dropout,
+                attention_dropout,
+                self.nn_act,
+                norm_layer,
+            )
+        self.dec_blocks = nn.Sequential(blk)
+        self.dec_norm = norm_layer(dec_dim)
+        self.decoder_pred = nn.Linear(dec_dim, self.patch_size * in_channels, bias=True)  # decoder to patch
 
         ######################
         # Artifact estimator #
@@ -175,26 +211,6 @@ class MaskedAutoencoderArtifact(nn.Module):
         ]
         self.art_net = nn.Sequential(*layers)
 
-        #######################
-        # Classification head #
-        #######################
-        fc_stage = []
-        current_dims = self.enc_dim
-        if self.use_age == "fc":
-            current_dims = current_dims + 1
-
-        for i in range(fc_stages - 1):
-            layer = nn.Sequential(
-                nn.Linear(current_dims, current_dims // 2, bias=False),
-                nn.Dropout(p=dropout),
-                head_norm_layer(current_dims // 2),
-                self.nn_act(),
-            )
-            current_dims = current_dims // 2
-            fc_stage.append(layer)
-        fc_stage.append(nn.Linear(current_dims, out_dims))
-        self.fc_stage = nn.Sequential(*fc_stage)
-
         # initialize params
         self.reset_weights()
 
@@ -204,11 +220,19 @@ class MaskedAutoencoderArtifact(nn.Module):
 
         # tokens
         torch.nn.init.normal_(self.class_token, std=0.02)
+        torch.nn.init.normal_(self.mask_token, std=0.02)
 
         # positional embeddings (sine-cosine)
         self.enc_pos_embed.data.copy_(
             get_sine_cosine_positional_embedding(
                 seq_len=self.n_patches, dim=self.enc_pos_embed.shape[-1], class_token=True
+            )
+            .float()
+            .unsqueeze(0)
+        )
+        self.dec_pos_embed.data.copy_(
+            get_sine_cosine_positional_embedding(
+                seq_len=self.n_patches, dim=self.dec_pos_embed.shape[-1], class_token=True
             )
             .float()
             .unsqueeze(0)
@@ -233,11 +257,13 @@ class MaskedAutoencoderArtifact(nn.Module):
     def get_output_length(self):
         return self.output_length
 
-    def artifact_masking(self, x, art_out, mask_ratio):
+    def random_masking(self, x, mask_ratio):
         N, l_full, D_e = x.size()
         l_keep = round(l_full * (1 - mask_ratio))
 
-        idx_shuffle = torch.argsort(art_out, dim=1, descending=self.descending)
+        # random sampling and sorting for masking
+        random_noise = torch.rand(N, l_full, device=x.device)
+        idx_shuffle = torch.argsort(random_noise, dim=1)
         idx_keep = idx_shuffle[:, :l_keep]
 
         # masking
@@ -251,7 +277,7 @@ class MaskedAutoencoderArtifact(nn.Module):
 
         return x_masked, mask, idx_restore
 
-    def forward_encoder(self, eeg, age, art_out, mask_ratio):
+    def forward_encoder(self, eeg, age, mask_ratio):
         # Reshape and permute the input tensor
         N, C, L = eeg.size()
         if self.use_age == "conv":
@@ -271,9 +297,9 @@ class MaskedAutoencoderArtifact(nn.Module):
         # positional encoding
         x = x + self.enc_pos_embed[:, 1:, :]
 
-        # masking according to the predicted loss from artifact network
+        # random masking
         # (N, l_full, D_e) -> (N, l, D_e)
-        x, mask, idx_restore = self.artifact_masking(x, art_out, mask_ratio)
+        x, mask, idx_restore = self.random_masking(x, mask_ratio)
 
         # class token
         # (N, l, D_e) -> (N, l + 1, D_e)
@@ -284,9 +310,36 @@ class MaskedAutoencoderArtifact(nn.Module):
 
         # encoder stage
         x = self.enc_blocks(x)
-        # x = self.enc_norm(x)
+        x = self.enc_norm(x)
 
         return x, mask, idx_restore
+
+    def forward_decoder(self, x, idx_restore):
+        # linear projection
+        # (N, l + 1, D_e) -> (N, l + 1, D_d)
+        x = self.dec_proj(x)
+
+        # mask tokens
+        # (N, l + 1, D_d) -> (N, l_full + 1, D_d)
+        cls_token = x[:, :1, :]
+        x = x[:, 1:, :]
+        mask_tokens = self.mask_token.repeat(x.shape[0], idx_restore.shape[1] - x.shape[1], 1)
+        x = torch.cat((x, mask_tokens), dim=1)
+        x = torch.gather(x, dim=1, index=idx_restore.unsqueeze(-1).repeat(1, 1, x.shape[2]))
+        x = torch.cat((cls_token, x), dim=1)
+
+        # positional encoding
+        x = x + self.dec_pos_embed
+
+        # decoder stage
+        x = self.dec_blocks(x)
+        x = self.dec_norm(x)
+
+        # predict
+        # (N, l_full + 1, D_d) -> (N, l_full, p*C)
+        x = self.decoder_pred(x[:, 1:, :])
+
+        return x
 
     def patchify(self, eeg):
         N, C, L = eeg.size()
@@ -296,6 +349,63 @@ class MaskedAutoencoderArtifact(nn.Module):
         x = torch.einsum("NClp->NlpC", x)
         x = x.reshape(N, l_full, p * C)
         return x
+
+    def unpatchify(self, x):
+        N, l_full, D = x.size()
+        p = self.patch_size
+        C = D // p
+        x = x.reshape(N, l_full, p, C)
+        x = torch.einsum("NlpC->NClp", x)
+        eeg = x.reshape(N, C, l_full * p)
+        return eeg
+
+    def compute_reconstruction_loss(self, eeg, pred, mask):
+        # (N, C, L) -> (N, l_full, p*C)
+        desired = self.patchify(eeg)
+        if self.norm_pix_loss:
+            mean = desired.mean(dim=-1, keepdim=True)
+            var = desired.var(dim=-1, keepdim=True)
+            desired = (desired - mean) / (var + 1e-6) ** 0.5
+
+        if self.loss_type == "mse":
+            loss = torch.nn.functional.mse_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        elif self.loss_type == "mae":
+            loss = torch.nn.functional.l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        elif self.loss_type == "smooth-l1":
+            loss = torch.nn.functional.smooth_l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+            loss = (loss * mask).sum() / mask.sum()
+        else:
+            raise ValueError()
+
+        return loss
+
+    def compute_reconstruction_loss2(self, eeg, pred):
+        # (N, C, L) -> (N, l_full, p*C)
+        desired = self.patchify(eeg)
+        if self.norm_pix_loss:
+            mean = desired.mean(dim=-1, keepdim=True)
+            var = desired.var(dim=-1, keepdim=True)
+            desired = (desired - mean) / (var + 1e-6) ** 0.5
+
+        # (N, l_full, p*C) -> (N, l_full)
+        if self.loss_type == "mse":
+            loss = torch.nn.functional.mse_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+        elif self.loss_type == "mae":
+            loss = torch.nn.functional.l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+        elif self.loss_type == "smooth-l1":
+            loss = torch.nn.functional.smooth_l1_loss(desired, pred, reduction="none")
+            loss = loss.mean(dim=-1)
+        else:
+            raise ValueError()
+
+        return loss
 
     def forward_artifact(self, eeg, age):
         # Reshape the input tensor
@@ -322,134 +432,53 @@ class MaskedAutoencoderArtifact(nn.Module):
         out = out.squeeze().reshape(N, l_full)
         return out
 
-    def forward_head(self, x, age, target_from_last: int = 0):
-        if self.global_pool:
-            x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
-        else:
-            x = self.enc_norm(x)
-            x = x[:, 0]
-
-        if self.use_age == "fc":
-            x = torch.cat((x, age.reshape(-1, 1)), dim=1)
-
-        if target_from_last == 0:
-            x = self.fc_stage(x)
-        else:
-            if target_from_last > self.fc_stages:
-                raise ValueError(
-                    f"{self.__class__.__name__}.forward_head(target_from_last) receives "
-                    f"an integer equal to or smaller than fc_stages={self.fc_stages}."
-                )
-
-            for l in range(self.fc_stages - target_from_last):
-                x = self.fc_stage[l](x)
-
-        return x
-
-    def compute_feature_embedding(self, x, age, target_from_last: int = 0):
-        # artifact
-        art_out = self.forward_artifact(x, age)
-
+    def mask_and_reconstruct(self, eeg: torch.Tensor, age: torch.Tensor, mask_ratio: float):
         # encoder
-        x, mask, idx_restore = self.forward_encoder(x, age, art_out, self.mask_ratio)
+        x, mask, idx_restore = self.forward_encoder(eeg, age, mask_ratio)
 
-        # head
-        out = self.forward_head(x, age, target_from_last)
-        return out
+        # decoder
+        pred = self.forward_decoder(x, idx_restore)
 
-    def forward(self, eeg: torch.Tensor, age: torch.Tensor, target_from_last: int = 0):
-        out = self.compute_feature_embedding(eeg, age, target_from_last)
-        return out
+        return pred, mask
 
-    def finetune_mode(self, mode: str = "finetune"):
-        mode = mode.lower()
-        if mode not in ["finetune", "fc_stage", "from_scratch"]:
-            raise ValueError(
-                f"{self.__class__.__name__}.tuning_mode(mode) receives one of ['finetune', 'fc_stage', 'from_scratch']."
-            )
+    def forward(self, eeg: torch.Tensor, age: torch.Tensor, mask_ratio: float = None):
+        if mask_ratio is None:
+            mask_ratio = self.mask_ratio
 
-        if mode == "fc_stage":
-            self.requires_grad_(False)
-            self.eval()
-            self.fc_stage.requires_grad_(True)
-            self.fc_stage.train()
-        elif mode == "finetune":
-            self.requires_grad_(True)
-            self.train()
-            self.art_net.requires_grad_(False)
-            self.art_net.eval()
-            self.enc_pos_embed.requires_grad_(False)
-            for k, v in self._parameters.items():
-                if k.startswith("art"):
-                    v.requires_grad_(False)
-        elif mode == "from_scratch":
-            self.requires_grad_(True)
-            self.train()
-            self.enc_pos_embed.requires_grad_(False)
+        # forward pass
+        pred, mask = self.mask_and_reconstruct(eeg, age, mask_ratio)
 
-    def layer_wise_lr_params(self, weight_decay=0.05, layer_decay=0.75):
-        """
-        Parameter groups for layer-wise lr decay
-        Following BEiT: https://github.com/microsoft/unilm/blob/master/beit/optim_factory.py#L58
-        """
-        param_group_names = {}
-        param_groups = {}
+        # reconstruction loss
+        rec_loss = self.compute_reconstruction_loss2(eeg, pred)
 
-        num_layers = len(self.enc_blocks) + 1
-        layer_scales = list(layer_decay ** (num_layers - i) for i in range(num_layers + 1))
+        # forward artifact
+        art_out = self.forward_artifact(eeg, age)
 
-        for n, p in self.named_parameters():
-            if not p.requires_grad:
-                continue
+        # artifact loss
+        if self.art_loss_type == "mse":
+            art_loss = torch.nn.functional.mse_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
+        elif self.art_loss_type == "mae":
+            art_loss = torch.nn.functional.l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
+        elif self.art_loss_type == "smooth-l1":
+            art_loss = torch.nn.functional.smooth_l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
+        else:
+            raise ValueError()
 
-            # no decay: all 1D parameters and model specific ones
-            if p.ndim == 1:
-                g_decay = "no_decay"
-                this_decay = 0.0
-            else:
-                g_decay = "decay"
-                this_decay = weight_decay
+        return art_loss
 
-            if n in ["class_token", "enc_pos_embed", "age_embed", "art_age_embed"]:
-                layer_id = 0
-            elif n.startswith("enc_proj"):
-                layer_id = 0
-            elif "blocks" in n:
-                layer_id = int(n.split(".")[1].split("_")[-1]) + 1
-            else:
-                layer_id = num_layers
-
-            group_name = "layer_%d_%s" % (layer_id, g_decay)
-
-            if group_name not in param_group_names:
-                this_scale = layer_scales[layer_id]
-
-                param_group_names[group_name] = {
-                    "lr_scale": this_scale,
-                    "weight_decay": this_decay,
-                    "params": [],
-                }
-                param_groups[group_name] = {
-                    "lr_scale": this_scale,
-                    "weight_decay": this_decay,
-                    "params": [],
-                }
-
-            param_group_names[group_name]["params"].append(n)
-            param_groups[group_name]["params"].append(p)
-
-        # import json
-        # print("parameter groups: \n%s" % json.dumps(param_group_names, indent=2))
-
-        return list(param_groups.values())
+    def post_update_params(self):
+        pass
 
 
-def mae_art_b_e768_d512(**kwargs):
-    model = MaskedAutoencoderArtifact(
-        arch="mae_b_e768_d512",
+def mae_1d_pre_art_b_e768_d512(**kwargs):
+    model = MaskedAutoencoder1DPretrainArtifact(
+        arch="mae_1d_b_e768_d512",
         enc_num_heads=12,
         enc_dim=768,
         enc_depth=12,
+        dec_num_heads=16,
+        dec_dim=512,
+        dec_depth=8,
         mlp_ratio=4,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs,
@@ -457,12 +486,15 @@ def mae_art_b_e768_d512(**kwargs):
     return model
 
 
-def mae_art_l_e1024_d512(**kwargs):
-    model = MaskedAutoencoderArtifact(
-        arch="mae_l_e1024_d512",
+def mae_1d_pre_art_l_e1024_d512(**kwargs):
+    model = MaskedAutoencoder1DPretrainArtifact(
+        arch="mae_1d_l_e1024_d512",
         enc_num_heads=16,
         enc_dim=1024,
         enc_depth=24,
+        dec_num_heads=16,
+        dec_dim=512,
+        dec_depth=8,
         mlp_ratio=4,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs,
@@ -470,12 +502,15 @@ def mae_art_l_e1024_d512(**kwargs):
     return model
 
 
-def mae_art_h_e1280_d512(**kwargs):
-    model = MaskedAutoencoderArtifact(
-        arch="mae_h_e1280_d512",
+def mae_1d_pre_art_h_e1280_d512(**kwargs):
+    model = MaskedAutoencoder1DPretrainArtifact(
+        arch="mae_1d_h_e1280_d512",
         enc_num_heads=16,
         enc_dim=1280,
         enc_depth=32,
+        dec_num_heads=16,
+        dec_dim=512,
+        dec_depth=8,
         mlp_ratio=4,
         norm_layer=partial(nn.LayerNorm, eps=1e-6),
         **kwargs,

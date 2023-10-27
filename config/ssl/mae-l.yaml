@@ -1,10 +1,10 @@
 defaults:
   - _self_
 
-_target_: models.ssl.mae.mae_pre_l_e1024_d512
+_target_: models.ssl.mae.mae_1d_pre_l_e1024_d512
 norm_pix_loss: False
 activation: gelu
-minibatch_3090: 32
+minibatch_3090: 192
 
 mask_ratio: ???
 patch_size: ???
