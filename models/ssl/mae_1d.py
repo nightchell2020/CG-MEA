@@ -1,6 +1,6 @@
 """
 Inspired from:
-    - Kaiming He et al., “Masked Autoencoders Are Scalable Vision Learners,” arXiv, Nov. 2021, [Online]. Available: https://arxiv.org/abs/2111.06377.
+    - Kaiming He et al., “Masked AutoEncoders Are Scalable Vision Learners,” arXiv, Nov. 2021, [Online]. Available: https://arxiv.org/abs/2111.06377.
     - GitHub page: https://github.com/facebookresearch/mae
 """
 
@@ -53,7 +53,7 @@ class TransformerBlock(nn.Module):
         dropout: float,
         attention_dropout: float,
         nn_act: nn.Module,
-        norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        norm_layer: Callable[..., nn.Module] = partial(nn.LayerNorm, eps=1e-6),
     ):
         super().__init__()
         self.num_heads = num_heads
@@ -123,7 +123,7 @@ class MaskedAutoencoder1DPretrain(nn.Module):
         dropout: float = 0.0,
         attention_dropout: float = 0.0,
         activation: str = "gelu",
-        norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        norm_layer: Callable[..., nn.Module] = partial(nn.LayerNorm, eps=1e-6),
         norm_pix_loss: bool = False,
         loss_type: str = "mse",
         **kwargs: Any,
@@ -147,8 +147,8 @@ class MaskedAutoencoder1DPretrain(nn.Module):
 
         self.use_age = use_age
         if self.use_age == "embedding":
-            self.age_embed = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
-            torch.nn.init.trunc_normal_(self.age_embed, std=0.02)
+            self.age_embed = nn.Parameter((torch.zeros(1, enc_dim, 1)))
+            nn.init.trunc_normal_(self.age_embed, std=0.02)
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.activation = activation
@@ -239,8 +239,8 @@ class MaskedAutoencoder1DPretrain(nn.Module):
         self.apply(self._init_weights)
 
         # tokens
-        torch.nn.init.normal_(self.class_token, std=0.02)
-        torch.nn.init.normal_(self.mask_token, std=0.02)
+        nn.init.normal_(self.class_token, std=0.02)
+        nn.init.normal_(self.mask_token, std=0.02)
 
         # positional embeddings (sine-cosine)
         self.enc_pos_embed.data.copy_(
@@ -265,7 +265,7 @@ class MaskedAutoencoder1DPretrain(nn.Module):
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
         elif isinstance(m, nn.Linear):
-            torch.nn.init.xavier_uniform_(m.weight)
+            nn.init.xavier_uniform_(m.weight)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -388,20 +388,21 @@ class MaskedAutoencoder1DPretrain(nn.Module):
             desired = (desired - mean) / (var + 1e-6) ** 0.5
 
         if self.loss_type == "mse":
-            loss = torch.nn.functional.mse_loss(desired, pred, reduction="none")
+            loss = nn.functional.mse_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
             loss = (loss * mask).sum() / mask.sum()
         elif self.loss_type == "mae":
-            loss = torch.nn.functional.l1_loss(desired, pred, reduction="none")
+            loss = nn.functional.l1_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
             loss = (loss * mask).sum() / mask.sum()
         elif self.loss_type == "smooth-l1":
-            loss = torch.nn.functional.smooth_l1_loss(desired, pred, reduction="none")
+            loss = nn.functional.smooth_l1_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
             loss = (loss * mask).sum() / mask.sum()
         else:
-            raise ValueError()
-
+            raise ValueError(
+                f"{self.__class__.__name__}.compute_reconstruction_loss(): unknown self.loss_type={self.loss_type}."
+            )
         return loss
 
     def mask_and_reconstruct(self, eeg: torch.Tensor, age: torch.Tensor, mask_ratio: float):

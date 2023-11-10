@@ -1,0 +1,13 @@
+defaults:
+  - _self_
+
+_target_: models.ssl.mae_2d.mae_2d_pre_b_e768_d512
+model: 2D-MAE-B
+
+norm_pix_loss: False
+activation: gelu
+minibatch_3090: 256
+
+mask_ratio: ???
+patch_size: ???
+use_age: ???

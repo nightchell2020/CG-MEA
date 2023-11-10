@@ -403,6 +403,7 @@ def calculate_stft_params(
     seq_length,
     n_fft=0,
     hop_ratio=1.0 / 4.0,
+    resample_ratio=1.0,
     verbose=False,
 ):
     if n_fft == 0:
@@ -412,7 +413,7 @@ def calculate_stft_params(
     hop_length = round(n_fft * hop_ratio)
     seq_len_2d = (
         math.floor(n_fft / 2.0) + 1,
-        math.floor(seq_length / hop_length) + 1,
+        math.floor(seq_length / hop_length * resample_ratio) + 1,
     )
 
     if verbose:
@@ -654,6 +655,7 @@ def compose_preprocess(config, train_loader, verbose=True):
             seq_length=config.get("crop_length", config["seq_length"]),
             n_fft=stft_params.pop("n_fft", 0),
             hop_ratio=stft_params.pop("hop_ratio", 1 / 4.0),
+            resample_ratio=config.get("resample", sampling_rate) / sampling_rate,
             verbose=False,
         )
         config["stft_params"] = {

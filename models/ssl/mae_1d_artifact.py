@@ -45,13 +45,13 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         dropout: float = 0.0,
         attention_dropout: float = 0.0,
         activation: str = "gelu",
-        norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        norm_layer: Callable[..., nn.Module] = partial(nn.LayerNorm, eps=1e-6),
         norm_pix_loss: bool = False,
         loss_type: str = "mse",
         art_filter_list: tuple = (9, 9, 9),
         art_dim: int = 64,
         art_dropout: float = 0.0,
-        art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
+        art_norm_layer: Callable[..., nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         art_use_age: str = "no",
         art_loss_type: str = "mse",
         **kwargs: Any,
@@ -82,8 +82,8 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
 
         self.use_age = use_age
         if self.use_age == "embedding":
-            self.age_embed = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
-            torch.nn.init.trunc_normal_(self.age_embed, std=0.02)
+            self.age_embed = nn.Parameter((torch.zeros(1, enc_dim, 1)))
+            nn.init.trunc_normal_(self.age_embed, std=0.02)
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.activation = activation
@@ -109,8 +109,8 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         self.art_loss_type = art_loss_type
         self.art_use_age = art_use_age
         if self.art_use_age == "embedding":
-            self.art_age_embed = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
-            torch.nn.init.trunc_normal_(self.art_age_embed, std=0.02)
+            self.art_age_embed = nn.Parameter((torch.zeros(1, in_channels, 1)))
+            nn.init.trunc_normal_(self.art_age_embed, std=0.02)
 
         ###########
         # Encoder #
@@ -219,8 +219,8 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         self.apply(self._init_weights)
 
         # tokens
-        torch.nn.init.normal_(self.class_token, std=0.02)
-        torch.nn.init.normal_(self.mask_token, std=0.02)
+        nn.init.normal_(self.class_token, std=0.02)
+        nn.init.normal_(self.mask_token, std=0.02)
 
         # positional embeddings (sine-cosine)
         self.enc_pos_embed.data.copy_(
@@ -245,7 +245,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
         elif isinstance(m, nn.Linear):
-            torch.nn.init.xavier_uniform_(m.weight)
+            nn.init.xavier_uniform_(m.weight)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):
@@ -368,15 +368,15 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
             desired = (desired - mean) / (var + 1e-6) ** 0.5
 
         if self.loss_type == "mse":
-            loss = torch.nn.functional.mse_loss(desired, pred, reduction="none")
+            loss = nn.functional.mse_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
             loss = (loss * mask).sum() / mask.sum()
         elif self.loss_type == "mae":
-            loss = torch.nn.functional.l1_loss(desired, pred, reduction="none")
+            loss = nn.functional.l1_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
             loss = (loss * mask).sum() / mask.sum()
         elif self.loss_type == "smooth-l1":
-            loss = torch.nn.functional.smooth_l1_loss(desired, pred, reduction="none")
+            loss = nn.functional.smooth_l1_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
             loss = (loss * mask).sum() / mask.sum()
         else:
@@ -394,13 +394,13 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
 
         # (N, l_full, p*C) -> (N, l_full)
         if self.loss_type == "mse":
-            loss = torch.nn.functional.mse_loss(desired, pred, reduction="none")
+            loss = nn.functional.mse_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
         elif self.loss_type == "mae":
-            loss = torch.nn.functional.l1_loss(desired, pred, reduction="none")
+            loss = nn.functional.l1_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
         elif self.loss_type == "smooth-l1":
-            loss = torch.nn.functional.smooth_l1_loss(desired, pred, reduction="none")
+            loss = nn.functional.smooth_l1_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
         else:
             raise ValueError()
@@ -456,11 +456,11 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
 
         # artifact loss
         if self.art_loss_type == "mse":
-            art_loss = torch.nn.functional.mse_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
+            art_loss = nn.functional.mse_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
         elif self.art_loss_type == "mae":
-            art_loss = torch.nn.functional.l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
+            art_loss = nn.functional.l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
         elif self.art_loss_type == "smooth-l1":
-            art_loss = torch.nn.functional.smooth_l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
+            art_loss = nn.functional.smooth_l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
         else:
             raise ValueError()
 

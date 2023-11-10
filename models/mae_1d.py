@@ -40,11 +40,11 @@ class MaskedAutoencoder1D(nn.Module):
         mlp_ratio: float,
         fc_stages: int,
         out_dims: int,
-        head_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
+        head_norm_layer: Callable[..., nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         dropout: float = 0.0,
         attention_dropout: float = 0.0,
         activation: str = "gelu",
-        norm_layer: Callable[..., torch.nn.Module] = partial(nn.LayerNorm, eps=1e-6),
+        norm_layer: Callable[..., nn.Module] = partial(nn.LayerNorm, eps=1e-6),
         global_pool: bool = True,
         **kwargs: Any,
     ):
@@ -62,8 +62,8 @@ class MaskedAutoencoder1D(nn.Module):
 
         self.use_age = use_age
         if self.use_age == "embedding":
-            self.age_embed = torch.nn.Parameter((torch.zeros(1, enc_dim, 1)))
-            torch.nn.init.trunc_normal_(self.age_embed, std=0.02)
+            self.age_embed = nn.Parameter((torch.zeros(1, enc_dim, 1)))
+            nn.init.trunc_normal_(self.age_embed, std=0.02)
 
         self.nn_act = get_activation_class(activation, class_name=self.__class__.__name__)
         self.activation = activation
@@ -147,7 +147,7 @@ class MaskedAutoencoder1D(nn.Module):
         self.apply(self._init_weights)
 
         # tokens
-        torch.nn.init.normal_(self.class_token, std=0.02)
+        nn.init.normal_(self.class_token, std=0.02)
 
         # positional embeddings (sine-cosine)
         self.enc_pos_embed.data.copy_(
@@ -165,7 +165,7 @@ class MaskedAutoencoder1D(nn.Module):
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
         elif isinstance(m, nn.Linear):
-            torch.nn.init.xavier_uniform_(m.weight)
+            nn.init.xavier_uniform_(m.weight)
             if isinstance(m, nn.Linear) and m.bias is not None:
                 nn.init.constant_(m.bias, 0)
         elif isinstance(m, nn.LayerNorm):

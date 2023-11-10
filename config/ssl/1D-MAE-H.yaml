@@ -1,0 +1,13 @@
+defaults:
+  - _self_
+
+_target_: models.ssl.mae_1d.mae_1d_pre_h_e1280_d512
+model: 1D-MAE-H
+
+norm_pix_loss: False
+activation: gelu
+minibatch_3090: 128
+
+mask_ratio: ???
+patch_size: ???
+use_age: ???
