@@ -99,5 +99,5 @@ class TuhAbnormalDataset(Dataset):
         return signal
 
     def _read_memmap(self, anno):
-        signal = np.memmap(anno["full_path"], dtype="int32", mode="r").reshape(len(self.signal_header), -1)
+        signal = np.memmap(anno["full_path"], dtype="float32", mode="r").reshape(len(self.signal_header), -1)
         return signal
