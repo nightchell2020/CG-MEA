@@ -144,7 +144,7 @@ def train_script(
             preprocess_train=preprocess_train,
             preprocess_test=preprocess_test,
             trials=20,
-            steps=500,
+            steps=config.get("lr_search_steps", 500),
         )
         if main_process:
             draw_lr_search_record(lr_search, use_wandb=config["use_wandb"])
