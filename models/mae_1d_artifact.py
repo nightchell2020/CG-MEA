@@ -6,7 +6,7 @@ Inspired from:
 
 from collections import OrderedDict
 from functools import partial
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 import math
 import torch
@@ -52,7 +52,7 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         art_use_age: str = "no",
         global_pool: bool = True,
-        descending: bool = False,
+        descending: Union(bool, str) = False,
         **kwargs: Any,
     ):
         super().__init__()
@@ -237,9 +237,17 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         N, l_full, D_e = x.size()
         l_keep = round(l_full * (1 - mask_ratio))
 
-        idx_shuffle = torch.argsort(art_out, dim=1, descending=self.descending)
-        idx_keep = idx_shuffle[:, :l_keep]
-
+        if isinstance(self.descending, bool):
+            idx_shuffle = torch.argsort(art_out, dim=1, descending=self.descending)
+            idx_keep = idx_shuffle[:, :l_keep]
+        elif self.descending == "both":
+            idx_shuffle = torch.argsort(art_out, dim=1)
+            l_keep = l_keep // 2
+            idx_keep = idx_shuffle[:, l_keep:-l_keep]
+        else:
+            raise ValueError(
+                f"{self.__class__.__name__}.artifact_masking() has " f"uninterpretable self.decending value."
+            )
         # masking
         # (N, l_full, D_e) -> (N, l, D_e)
         x_masked = torch.gather(x, dim=1, index=idx_keep.unsqueeze(-1).repeat(1, 1, D_e))
