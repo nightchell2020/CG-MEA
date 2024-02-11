@@ -52,7 +52,7 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         art_use_age: str = "no",
         global_pool: bool = True,
-        descending: Union(bool, str) = False,
+        descending: Union[bool, str] = False,
         **kwargs: Any,
     ):
         super().__init__()
