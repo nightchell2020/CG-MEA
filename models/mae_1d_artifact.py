@@ -51,6 +51,7 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         art_dropout: float = 0.0,
         art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         art_use_age: str = "no",
+        art_out_activation: str = "none",
         global_pool: bool = True,
         descending: Union[bool, str] = False,
         **kwargs: Any,
@@ -69,6 +70,10 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         if art_use_age not in ["conv", "embedding", "no"]:
             raise ValueError(
                 f"{self.__class__.__name__}.__init__(art_use_age) receives one of ['conv', 'embedding', 'no']."
+            )
+        if art_out_activation not in ["none", "relu", "softplus"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(art_out_activation) receives one of ['none', 'relu', 'softplus']."
             )
 
         self.use_age = use_age
@@ -93,6 +98,7 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         self.art_dim = art_dim
         self.art_dropout = art_dropout
         self.art_norm_layer = art_norm_layer
+        self.art_out_nn_act = get_activation_class(art_out_activation, class_name=self.__class__.__name__)
         self.art_use_age = art_use_age
         if self.art_use_age == "embedding":
             self.art_age_embed = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
@@ -172,6 +178,7 @@ class MaskedAutoencoder1DArtifact(nn.Module):
             self.art_norm_layer(self.art_dim // 2),
             self.nn_act(),
             nn.Linear(self.art_dim // 2, 1, bias=True),
+            self.art_output_nn_act(),
         ]
         self.art_net = nn.Sequential(*layers)
 
@@ -238,15 +245,15 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         l_keep = round(l_full * (1 - mask_ratio))
 
         if isinstance(self.descending, bool):
-            idx_shuffle = torch.argsort(art_out, dim=1, descending=self.descending)
-            idx_keep = idx_shuffle[:, :l_keep]
+            idx_rank = torch.argsort(art_out, dim=1, descending=self.descending)
+            idx_keep = idx_rank[:, :l_keep]
         elif self.descending == "both":
-            idx_shuffle = torch.argsort(art_out, dim=1)
-            l_keep = l_keep // 2
-            idx_keep = idx_shuffle[:, l_keep:-l_keep]
+            idx_rank = torch.argsort(art_out, dim=1)
+            l_discard = (l_full - l_keep) // 2
+            idx_keep = idx_rank[:, l_discard:-l_discard]
         else:
             raise ValueError(
-                f"{self.__class__.__name__}.artifact_masking() has " f"uninterpretable self.decending value."
+                f"{self.__class__.__name__}.artifact_masking() has " f"uninterpretable self.descending value."
             )
         # masking
         # (N, l_full, D_e) -> (N, l, D_e)
@@ -254,7 +261,7 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         mask = torch.ones((N, l_full), device=x.device)
         mask[:, :l_keep] = 0
 
-        idx_restore = torch.argsort(idx_shuffle, dim=1)
+        idx_restore = torch.argsort(idx_rank, dim=1)
         mask = torch.gather(mask, dim=1, index=idx_restore)
 
         return x_masked, mask, idx_restore

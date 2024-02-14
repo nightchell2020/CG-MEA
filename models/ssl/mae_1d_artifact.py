@@ -53,6 +53,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         art_dropout: float = 0.0,
         art_norm_layer: Callable[..., nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         art_use_age: str = "no",
+        art_out_activation: str = "none",
         art_loss_type: str = "mse",
         **kwargs: Any,
     ):
@@ -75,9 +76,13 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
             raise ValueError(
                 f"{self.__class__.__name__}.__init__(art_use_age) receives one of ['conv', 'embedding', 'no']."
             )
+        if art_out_activation not in ["none", "relu", "softplus"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(art_out_activation) receives one of ['none', 'relu', 'softplus']."
+            )
         if art_loss_type not in ["mse", "mae", "smooth-l1"]:
             raise ValueError(
-                f"{self.__class__.__name__}.__init__(loss_type) receives one of ['mse', 'mae', 'smooth-l1']."
+                f"{self.__class__.__name__}.__init__(art_loss_type) receives one of ['mse', 'mae', 'smooth-l1']."
             )
 
         self.use_age = use_age
@@ -106,6 +111,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         self.art_dim = art_dim
         self.art_dropout = art_dropout
         self.art_norm_layer = art_norm_layer
+        self.art_output_nn_act = get_activation_class(art_out_activation, class_name=self.__class__.__name__)
         self.art_loss_type = art_loss_type
         self.art_use_age = art_use_age
         if self.art_use_age == "embedding":
@@ -208,6 +214,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
             self.art_norm_layer(self.art_dim // 2),
             self.nn_act(),
             nn.Linear(self.art_dim // 2, 1, bias=True),
+            self.art_output_nn_act(),
         ]
         self.art_net = nn.Sequential(*layers)
 
@@ -367,6 +374,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
             var = desired.var(dim=-1, keepdim=True)
             desired = (desired - mean) / (var + 1e-6) ** 0.5
 
+        # (N, l_full, p*C) -> (N, l_full) -> (N, l_mask)
         if self.loss_type == "mse":
             loss = nn.functional.mse_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
@@ -384,7 +392,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
 
         return loss
 
-    def compute_reconstruction_loss2(self, eeg, pred):
+    def compute_reconstruction_loss_without_masking(self, eeg, pred):
         # (N, C, L) -> (N, l_full, p*C)
         desired = self.patchify(eeg)
         if self.norm_pix_loss:
@@ -449,18 +457,24 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         pred, mask = self.mask_and_reconstruct(eeg, age, mask_ratio)
 
         # reconstruction loss
-        rec_loss = self.compute_reconstruction_loss2(eeg, pred)
+        # (N, C, L) -> (N, l_full)
+        rec_loss = self.compute_reconstruction_loss_without_masking(eeg, pred)
 
         # forward artifact
+        # (N, C, L) -> (N, l_full)
         art_out = self.forward_artifact(eeg, age)
 
         # artifact loss
+        # (N, l_full) -> (1)
         if self.art_loss_type == "mse":
-            art_loss = nn.functional.mse_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
+            art_loss = nn.functional.mse_loss((art_out * mask), (rec_loss * mask), reduction="none")
+            art_loss = (art_loss * mask).sum() / mask.sum()
         elif self.art_loss_type == "mae":
-            art_loss = nn.functional.l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
+            art_loss = nn.functional.l1_loss((art_out * mask), (rec_loss * mask), reduction="none")
+            art_loss = (art_loss * mask).sum() / mask.sum()
         elif self.art_loss_type == "smooth-l1":
-            art_loss = nn.functional.smooth_l1_loss(art_out[mask > mask_ratio], rec_loss[mask > mask_ratio])
+            art_loss = nn.functional.smooth_l1_loss((art_out * mask), (rec_loss * mask), reduction="none")
+            art_loss = (art_loss * mask).sum() / mask.sum()
         else:
             raise ValueError()
 

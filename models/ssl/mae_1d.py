@@ -387,6 +387,7 @@ class MaskedAutoencoder1DPretrain(nn.Module):
             var = desired.var(dim=-1, keepdim=True)
             desired = (desired - mean) / (var + 1e-6) ** 0.5
 
+        # (N, l_full, p*C) -> (N, l_full) -> (N, l_mask)
         if self.loss_type == "mse":
             loss = nn.functional.mse_loss(desired, pred, reduction="none")
             loss = loss.mean(dim=-1)
