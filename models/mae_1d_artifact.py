@@ -6,11 +6,13 @@ Inspired from:
 
 from collections import OrderedDict
 from functools import partial
-from typing import Any, Callable, Union
+from typing import Any, Callable
 
 import math
+
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 
 from .utils import program_conv_filters
 from .activation import get_activation_class
@@ -32,7 +34,6 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         self,
         seq_length: int,
         patch_size: int,
-        mask_ratio: float,
         in_channels: int,
         use_age: str,
         enc_num_heads: int,
@@ -52,8 +53,8 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         art_norm_layer: Callable[..., torch.nn.Module] = partial(nn.BatchNorm1d, eps=1e-6),
         art_use_age: str = "no",
         art_out_activation: str = "none",
+        art_patch_usage: dict = None,
         global_pool: bool = True,
-        descending: Union[bool, str] = False,
         **kwargs: Any,
     ):
         super().__init__()
@@ -75,6 +76,13 @@ class MaskedAutoencoder1DArtifact(nn.Module):
             raise ValueError(
                 f"{self.__class__.__name__}.__init__(art_out_activation) receives one of ['none', 'relu', 'softplus']."
             )
+        if art_patch_usage is None:
+            art_patch_usage = {"type": "drop_high", "value": 0.3}
+        elif art_patch_usage.get("type") not in ["drop_high", "drop_low", "drop_ends", "softmax"]:
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(art_patch_use_config['type']) receives one of "
+                f"['drop_high', 'drop_low', 'drop_ends', 'softmax']."
+            )
 
         self.use_age = use_age
         if self.use_age == "embedding":
@@ -86,7 +94,6 @@ class MaskedAutoencoder1DArtifact(nn.Module):
 
         self.seq_length = seq_length
         self.patch_size = patch_size
-        self.mask_ratio = mask_ratio
         self.n_patches = seq_length // patch_size
         self.enc_dim = enc_dim
         self.enc_depth = enc_depth
@@ -103,12 +110,12 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         if self.art_use_age == "embedding":
             self.art_age_embed = torch.nn.Parameter((torch.zeros(1, in_channels, 1)))
             torch.nn.init.trunc_normal_(self.art_age_embed, std=0.02)
+        self.art_patch_usage = art_patch_usage
 
         self.global_pool = global_pool
         self.head_norm_layer = head_norm_layer
         self.fc_stages = fc_stages
         self.out_dims = out_dims
-        self.descending = descending
 
         ###########
         # Encoder #
@@ -240,33 +247,44 @@ class MaskedAutoencoder1DArtifact(nn.Module):
     def get_output_length(self):
         return self.output_length
 
-    def artifact_masking(self, x, art_out, mask_ratio):
+    def artifact_masking(self, x, art_out):
         N, l_full, D_e = x.size()
-        l_keep = round(l_full * (1 - mask_ratio))
 
-        if isinstance(self.descending, bool):
-            idx_rank = torch.argsort(art_out, dim=1, descending=self.descending)
-            idx_keep = idx_rank[:, :l_keep]
-        elif self.descending == "both":
-            idx_rank = torch.argsort(art_out, dim=1)
-            l_discard = (l_full - l_keep) // 2
-            idx_keep = idx_rank[:, l_discard:-l_discard]
+        # ['drop_high', 'drop_low', 'drop_ends', 'softmax']
+        if self.art_patch_usage["type"].startswith("drop"):
+            if self.art_patch_usage["type"] in ["drop_high", "drop_low"]:
+                mask_ratio = self.art_patch_usage["value"]
+                l_keep = round(l_full * (1 - mask_ratio))
+                descending = self.art_patch_usage["type"] == "drop_low"
+                idx_rank = torch.argsort(art_out, dim=1, descending=descending)
+                idx_keep = idx_rank[:, :l_keep]
+            elif self.art_patch_usage["type"] == "drop_ends":
+                mask_ratio = self.art_patch_usage["value"]
+                l_discard = round(l_full * mask_ratio / 2)
+                l_keep = l_full - l_discard * 2
+                l_discard = (l_full - l_keep) // 2
+                idx_rank = torch.argsort(art_out, dim=1)
+                idx_keep = idx_rank[:, l_discard:-l_discard]
+            else:
+                raise NotImplementedError()
+
+            # masking
+            # (N, l_full, D_e) -> (N, l, D_e)
+            x_masked = torch.gather(x, dim=1, index=idx_keep.unsqueeze(-1).repeat(1, 1, D_e))
+            mask = torch.ones((N, l_full), device=x.device)
+            mask[:, :l_keep] = 0
+
+            idx_restore = torch.argsort(idx_rank, dim=1)
+            mask = torch.gather(mask, dim=1, index=idx_restore)
+        elif self.art_patch_usage["type"] == "softmax":
+            mask = torch.zeros((N, l_full), device=x.device)
+            x_masked = x
         else:
-            raise ValueError(
-                f"{self.__class__.__name__}.artifact_masking() has " f"uninterpretable self.descending value."
-            )
-        # masking
-        # (N, l_full, D_e) -> (N, l, D_e)
-        x_masked = torch.gather(x, dim=1, index=idx_keep.unsqueeze(-1).repeat(1, 1, D_e))
-        mask = torch.ones((N, l_full), device=x.device)
-        mask[:, :l_keep] = 0
+            raise NotImplementedError()
 
-        idx_restore = torch.argsort(idx_rank, dim=1)
-        mask = torch.gather(mask, dim=1, index=idx_restore)
+        return x_masked, mask
 
-        return x_masked, mask, idx_restore
-
-    def forward_encoder(self, eeg, age, art_out, mask_ratio):
+    def forward_encoder(self, eeg, age, art_out):
         # Reshape and permute the input tensor
         N, C, L = eeg.size()
         if self.use_age == "conv":
@@ -286,9 +304,9 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         # positional encoding
         x = x + self.enc_pos_embed[:, 1:, :]
 
-        # masking according to the predicted loss from artifact network
+        # rank and mask patches according to the predicted loss from artifact network if needed
         # (N, l_full, D_e) -> (N, l, D_e)
-        x, mask, idx_restore = self.artifact_masking(x, art_out, mask_ratio)
+        x, mask = self.artifact_masking(x, art_out)
 
         # class token
         # (N, l, D_e) -> (N, l + 1, D_e)
@@ -301,7 +319,7 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         x = self.enc_blocks(x)
         # x = self.enc_norm(x)
 
-        return x, mask, idx_restore
+        return x, mask
 
     def patchify(self, eeg):
         N, C, L = eeg.size()
@@ -337,8 +355,18 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         out = out.squeeze().reshape(N, l_full)
         return out
 
-    def forward_head(self, x, age, target_from_last: int = 0):
-        if self.global_pool:
+    def forward_head(self, x, age, art_out, target_from_last: int = 0):
+        if self.art_patch_usage["type"] == "softmax":
+            # uncertainty-based weighted pool without cls token
+            # art_out: (N, l), x: (N, l + 1, D_e)
+            D_e = x.shape[2]
+            x = x[:, 1:, :]  # drop cls token
+            tau = self.art_patch_usage["value"]
+            prob = F.softmax(art_out * tau, dim=1).unsqueeze(-1).repeat(1, 1, D_e)
+            x_out = (x * prob).sum(dim=1)
+            x = x_out
+
+        elif self.global_pool:
             x = x[:, 1:, :].mean(dim=1)  # global pool without cls token
         else:
             x = self.enc_norm(x)
@@ -366,10 +394,10 @@ class MaskedAutoencoder1DArtifact(nn.Module):
         art_out = self.forward_artifact(x, age)
 
         # encoder
-        x, mask, idx_restore = self.forward_encoder(x, age, art_out, self.mask_ratio)
+        x, mask = self.forward_encoder(x, age, art_out)
 
         # head
-        out = self.forward_head(x, age, target_from_last)
+        out = self.forward_head(x, age, art_out, target_from_last)
         return out
 
     def forward(self, eeg: torch.Tensor, age: torch.Tensor, target_from_last: int = 0):
