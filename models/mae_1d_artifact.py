@@ -178,7 +178,7 @@ class MaskedAutoencoder1DArtifact(nn.Module):
             self.art_norm_layer(self.art_dim // 2),
             self.nn_act(),
             nn.Linear(self.art_dim // 2, 1, bias=True),
-            self.art_output_nn_act(),
+            self.art_out_nn_act(),
         ]
         self.art_net = nn.Sequential(*layers)
 

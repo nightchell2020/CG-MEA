@@ -111,7 +111,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         self.art_dim = art_dim
         self.art_dropout = art_dropout
         self.art_norm_layer = art_norm_layer
-        self.art_output_nn_act = get_activation_class(art_out_activation, class_name=self.__class__.__name__)
+        self.art_out_nn_act = get_activation_class(art_out_activation, class_name=self.__class__.__name__)
         self.art_loss_type = art_loss_type
         self.art_use_age = art_use_age
         if self.art_use_age == "embedding":
@@ -214,7 +214,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
             self.art_norm_layer(self.art_dim // 2),
             self.nn_act(),
             nn.Linear(self.art_dim // 2, 1, bias=True),
-            self.art_output_nn_act(),
+            self.art_out_nn_act(),
         ]
         self.art_net = nn.Sequential(*layers)
 
