@@ -83,6 +83,16 @@ class MaskedAutoencoder1DArtifact(nn.Module):
                 f"{self.__class__.__name__}.__init__(art_patch_use_config['type']) receives one of "
                 f"['drop_high', 'drop_low', 'drop_ends', 'softmax']."
             )
+        if (
+            art_patch_usage.get("type").startswith("drop")
+            and art_patch_usage.get("value") < 0
+            or art_patch_usage.get("value") > 1
+        ):
+            raise ValueError(
+                f"{self.__class__.__name__}.__init__(art_patch_use_config['value']) receives "
+                f"the value in the range of [0, 1] when art_patch_use_config['type'] is one of "
+                f"['drop_high', 'drop_low', 'drop_ends']."
+            )
 
         self.use_age = use_age
         if self.use_age == "embedding":
