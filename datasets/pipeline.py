@@ -511,6 +511,21 @@ class EegToDevice(torch.nn.Module):
         return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
 
 
+class EegAverageMontage(torch.nn.Module):
+    def __init__(self, channels):
+        super().__init__()
+        self.channels = channels
+
+    def forward(self, sample):
+        signal = sample["signal"]
+        signal[:, self.channels, :] -= torch.mean(signal[:, self.channels, :], dim=-2, keepdim=True)
+        sample["signal"] = signal
+        return sample
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}{make_variable_repr(self.__dict__)}"
+
+
 class EegNormalizePerSignal(torch.nn.Module):
     """Normalize multichannel EEG signal by its internal statistics."""
 
