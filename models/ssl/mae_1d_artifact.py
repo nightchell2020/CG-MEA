@@ -16,6 +16,7 @@ from ..utils import program_conv_filters
 from ..activation import get_activation_class
 from .mae_1d import TransformerBlock
 from .mae_1d import get_sine_cosine_positional_embedding
+from ..resnet_1d import BasicBlock1D
 
 __all__ = [
     "MaskedAutoencoder1DPretrainArtifact",
@@ -48,6 +49,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         norm_layer: Callable[..., nn.Module] = partial(nn.LayerNorm, eps=1e-6),
         norm_pix_loss: bool = False,
         loss_type: str = "mse",
+        art_resnet: bool = False,
         art_filter_list: tuple = (9, 9, 9),
         art_dim: int = 64,
         art_dropout: float = 0.0,
@@ -108,6 +110,7 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         self.norm_pix_loss = norm_pix_loss
         self.loss_type = loss_type
 
+        self.art_resnet = art_resnet
         self.art_dim = art_dim
         self.art_dropout = art_dropout
         self.art_norm_layer = art_norm_layer
@@ -194,18 +197,46 @@ class MaskedAutoencoder1DPretrainArtifact(nn.Module):
         )
         layers = []
         for i, cf in enumerate(conv_filter_list):
-            layers += [
-                nn.Conv1d(
-                    in_channels=art_dim if i > 0 else in_channels if self.art_use_age != "conv" else in_channels + 1,
-                    out_channels=art_dim,
-                    kernel_size=cf["kernel_size"],
-                    padding=cf["kernel_size"] // 2,
-                    stride=cf["stride"],
-                    bias=True,
-                ),
-                self.art_norm_layer(art_dim),
-                self.nn_act(),
-            ]
+            if i == 0 or not self.art_resnet:
+                layers += [
+                    nn.Conv1d(
+                        in_channels=art_dim
+                        if i > 0
+                        else in_channels
+                        if self.art_use_age != "conv"
+                        else in_channels + 1,
+                        out_channels=art_dim,
+                        kernel_size=cf["kernel_size"],
+                        padding=cf["kernel_size"] // 2,
+                        stride=cf["stride"],
+                        bias=True,
+                    ),
+                    self.art_norm_layer(art_dim),
+                    self.nn_act(),
+                ]
+            else:
+                layers += [
+                    BasicBlock1D(
+                        in_channels=art_dim,
+                        out_channels=art_dim,
+                        kernel_size=cf["kernel_size"],
+                        stride=cf["stride"],
+                        norm_layer=self.art_norm_layer,
+                        activation=self.nn_act,
+                        downsample=None
+                        if cf["stride"] == 1
+                        else nn.Sequential(
+                            nn.Conv1d(
+                                in_channels=art_dim,
+                                out_channels=art_dim,
+                                kernel_size=1,
+                                stride=cf["stride"],
+                                bias=False,
+                            ),
+                            self.art_norm_layer(art_dim),
+                        ),
+                    ),
+                ]
         layers += [
             nn.AdaptiveAvgPool1d(1),
             nn.Flatten(1),
