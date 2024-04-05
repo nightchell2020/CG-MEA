@@ -18,7 +18,7 @@ from .utils import program_conv_filters
 from .activation import get_activation_class
 from .ssl.mae_1d import TransformerBlock
 from .ssl.mae_1d import get_sine_cosine_positional_embedding
-from resnet_1d import BasicBlock1D
+from .resnet_1d import BasicBlock1D
 
 __all__ = [
     "MaskedAutoencoder1DArtifact",
