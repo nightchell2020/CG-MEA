@@ -96,6 +96,15 @@ def train_multistep(model, loader, preprocess, optimizer, scheduler, amp_scaler,
                                 F.cross_entropy, output_kd, teacher_logit, teacher_logit[mixup_index], lam
                             )
                         elif config.get("distil_type") == "soft":
+                            if config.get("distil_logit_stand", False):
+                                #  see https://arxiv.org/pdf/2403.01427
+                                teacher_logit = (teacher_logit - teacher_logit.mean(dim=-1, keepdim=True)) / (
+                                    teacher_logit.std(dim=-1, keepdim=True) + 1e-7
+                                )
+                                output_kd = (output_kd - output_kd.mean(dim=-1, keepdim=True)) / (
+                                    output_kd.std(dim=-1, keepdim=True) + 1e-7
+                                )
+
                             teacher_logit = F.log_softmax(teacher_logit / distil_tau, dim=1)
                             distil_loss = mixup_criterion(
                                 F.kl_div,
