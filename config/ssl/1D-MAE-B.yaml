@@ -1,11 +1,7 @@
 defaults:
   - _self_
 
-#_target_: models.ssl.mae_1d_channel_reduction.mae_1d_pre_b_e768_d512
-_target_: models.ssl.mae_1d_ex.mae_1d_pre_b_e768_d512
-#_target_: models.ssl.mae_1d.mae_1d_pre_b_e768_d512
-_ssl_target_: models.ssl.mae_1d_ex.mae_1d_pre_b_e768_d512
-
+_target_: models.ssl.mae_1d.mae_1d_pre_b_e768_d512
 model: 1D-MAE-B
 
 norm_pix_loss: true

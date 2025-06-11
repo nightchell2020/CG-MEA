@@ -177,16 +177,10 @@ class MaskedAutoencoder1D(nn.Module):
     def get_output_length(self):
         return self.output_length
 
+
     def forward_encoder(self, eeg, age):
         # Reshape and permute the input tensor
         N, C, L = eeg.size()
-        
-        # 무작위로 하나의 채널 선택
-        mask_channel = 0
-        
-        # 선택된 채널을 마스킹 (0으로 설정)
-        eeg[:, mask_channel, :] = 0  # 또는 다른 마스킹 값 사용 가능
-    
         if self.use_age == "conv":
             age = age.reshape((N, 1, 1)).expand(N, 1, L)
             eeg = torch.cat((eeg, age), dim=1)
@@ -198,12 +192,14 @@ class MaskedAutoencoder1D(nn.Module):
             x = x + self.age_embed * age.reshape(N, 1, 1)
 
         # (N, D_e, l_full) -> (N, l_full, D_e)
+        # where N is the batch size, L is the source sequence length, and D is the embedding dimension
         x = x.permute(0, 2, 1)
 
         # positional encoding
         x = x + self.enc_pos_embed[:, 1:, :]
 
         # class token
+        # (N, l_full, D_e) -> (N, l_full + 1, D_e)
         class_token = self.class_token + self.enc_pos_embed[:, :1, :]
         batch_class_token = class_token.expand(N, -1, -1)
         x = torch.cat([batch_class_token, x], dim=1)
@@ -211,41 +207,9 @@ class MaskedAutoencoder1D(nn.Module):
 
         # encoder stage
         x = self.enc_blocks(x)
+        # x = self.enc_norm(x)
 
         return x
-
-    # def forward_encoder(self, eeg, age):
-    #     # Reshape and permute the input tensor
-    #     N, C, L = eeg.size()
-    #     if self.use_age == "conv":
-    #         age = age.reshape((N, 1, 1)).expand(N, 1, L)
-    #         eeg = torch.cat((eeg, age), dim=1)
-
-    #     # (N, C, L) -> (N, D_e, l_full)
-    #     x = self.enc_proj(eeg)
-
-    #     if self.use_age == "embedding":
-    #         x = x + self.age_embed * age.reshape(N, 1, 1)
-
-    #     # (N, D_e, l_full) -> (N, l_full, D_e)
-    #     # where N is the batch size, L is the source sequence length, and D is the embedding dimension
-    #     x = x.permute(0, 2, 1)
-
-    #     # positional encoding
-    #     x = x + self.enc_pos_embed[:, 1:, :]
-
-    #     # class token
-    #     # (N, l_full, D_e) -> (N, l_full + 1, D_e)
-    #     class_token = self.class_token + self.enc_pos_embed[:, :1, :]
-    #     batch_class_token = class_token.expand(N, -1, -1)
-    #     x = torch.cat([batch_class_token, x], dim=1)
-    #     x = x.contiguous()
-
-    #     # encoder stage
-    #     x = self.enc_blocks(x)
-    #     # x = self.enc_norm(x)
-
-    #     return x
 
     def patchify(self, eeg):
         N, C, L = eeg.size()

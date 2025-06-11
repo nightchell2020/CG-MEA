@@ -66,35 +66,23 @@ Similarly, train a model on the training set of *CAUEEG-Abnormal* from scratch u
   python run_mae_train.py data=caueeg-abnormal ssl=1D-MAE-B train=base_train
 ```
 
-Or, you can use [this Jupyter notebook](notebook/02_Train.ipynb).
+Or, you can check [this Jupyter notebook](notebook/06_Pretrain_Self_Supervision_MAE.ipynb).
 
 If you encounter a GPU memory allocation error or wish to adjust the balance between memory usage and training speed, you can specify the minibatch size by adding the `++model.minibatch=INTEGER_NUMBER` option to the command as shown below:
 
 ```bash
-  python run_train.py data=caueeg-dementia model=1D-ResNet-18 train=base_train ++model.minibatch=32
-```
-
-```bash
-  python run_train.py data=caueeg-abnormal model=1D-ResNet-18 train=base_train ++model.minibatch=32
+  python run_mae_train.py data=caueeg-abnormal ssl=1D-MAE-B train=base_train ++model.minibatch=32
 ```
 
 Thanks to [Hydra](https://hydra.cc/) support, the model, hyperparameters, and other training details are easily tuned using or modifying config files.
 
 ```bash
-python run_train.py data=caueeg-dementia model=2D-VGG-19 train=base_train
-```
-
-For speed-up, we recommend using the `PyArrow.feather` file format than using directly `EDF`, which can be done:
-
-```bash
-python ./datasets/convert_file_format.py  # it takes a few minutes
-python run_train.py data=caueeg-dementia model=2D-VGG-19 train=base_train ++data.file_format=feather
+  python run_train.py data=caueeg-dementia model=2D-VGG-19 train=base_train
 ```
 
 ### Evaluation
 
 Evaluation can be conducted using [this Jupyter notebook](notebook/03_Evaluate.ipynb) (or [another notebook](notebook/03_Evaluate_Test_Only.ipynb) for `caueeg-dataset-test-only` case)
 
-To use the pre-trained model, download the checkpoint file from [here](#model-summary), and move it to [local/checkpoint](local/checkpoint/) directory (e.g., `local/checkpoint/1vc80n1f/checkpoint.pt` for the 1D-VGG-19 model on the *CAUEEG-Dementia* benchmark).
 
 ---
