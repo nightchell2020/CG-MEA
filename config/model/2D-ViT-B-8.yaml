@@ -5,4 +5,4 @@ defaults:
 
 _target_: models.vit.vit_b_8
 model: 2D-ViT-B-8
-minibatch_3090: 192
+minibatch_3090: 256

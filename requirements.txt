@@ -1,4 +1,4 @@
-hydra-core
+hydra-core==1.1
 omegaconf
 numpy
 scipy
@@ -12,7 +12,7 @@ ipynbname
 wandb
 pandas
 h5py
-sklearn
+scikit-learn
 plotly
 tqdm
 pyarrow

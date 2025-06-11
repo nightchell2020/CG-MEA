@@ -9,7 +9,9 @@ norm_pix_loss: False
 activation: gelu
 minibatch_3090: 256
 
-mask_ratio: ???
-patch_size: ???
-use_age: ???
+mask_ratio: 0.5
+#mask_ratio: ???
+#patch_size: ???
+patch_size: 8
+use_age: "no"
 fc_stages: 2

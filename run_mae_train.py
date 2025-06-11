@@ -67,7 +67,7 @@ def prepare_and_run_ssl_train(rank, world_size, config):
         torch.distributed.destroy_process_group()
 
 
-@hydra.main(version_base="1.1", config_path="config", config_name="default")
+@hydra.main(config_path="config", config_name="default")
 def my_app(cfg: DictConfig) -> None:
     # initialize the configurations
     # print(OmegaConf.to_yaml(cfg))

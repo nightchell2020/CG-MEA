@@ -5,12 +5,12 @@ seed: 0
 
 # Training iteration
 base_lr: 1e-4
-search_lr: true
+search_lr: false
 search_multiplier: 1.0
-lr_scheduler_type: constant_with_decay
+lr_scheduler_type: cosine_decay_with_warmup_half # constant_with_decay
 warmup_ratio: 0.05
 warmup_min: 3000
-total_samples: 1.0e+8
+total_samples: 1.0e+6
 # iterations: ???  # decided during runtime
 
 # regularization
@@ -23,11 +23,12 @@ num_history: 500
 save_model: true
 
 # wandb
+#use_wandb: false
 use_wandb: true
 draw_result: true
 watch_model: false
 
 # GPU
 # device: ???  decided during runtime
-ddp: false
+ddp: true
 # ddp_size: ???  decided during runtime

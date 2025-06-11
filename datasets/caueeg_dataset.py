@@ -26,7 +26,7 @@ class CauEegDataset(Dataset):
         root_dir: str,
         data_list: list,
         load_event: bool,
-        file_format: str = "edf",
+        file_format: str = "memmap",
         use_prefix_signal: bool = True,
         transform=None,
     ):

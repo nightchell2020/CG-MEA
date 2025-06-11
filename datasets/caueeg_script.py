@@ -6,7 +6,7 @@ import torch
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
-
+import numpy as np
 from .caueeg_dataset import CauEegDataset
 from .pipeline import EegRandomCrop
 from .pipeline import EegNormalizeMeanStd, EegNormalizePerSignal
@@ -50,7 +50,7 @@ def load_caueeg_config(dataset_path: str):
 def load_caueeg_full_dataset(
     dataset_path: str,
     load_event: bool = True,
-    file_format: str = "edf",
+    file_format: str = "memmap",
     transform=None,
 ):
     """Load the whole CAUEEG dataset as a PyTorch dataset instance without considering the target task.
@@ -90,11 +90,28 @@ def load_caueeg_full_dataset(
     return config, eeg_dataset
 
 
+###해준###
+def custom_load_signal(signal, channels_to_use): 
+    # 원래 21개의 채널 중에서 두 개의 채널만 선택
+    twochsig = []
+    signal_1 = signal[0,:].tolist()
+    signal_2 = signal[1,:].tolist()
+
+    twochsig.append(signal_1)
+    twochsig.append(signal_2)
+    
+    finalsig = np.array(twochsig, dtype='int32')
+    
+    # 샘플링 없이 14만 길이 그대로 사용 (샘플링을 건너뜀)
+    return finalsig
+
+
+
 def load_caueeg_task_datasets(
     dataset_path: str,
     task: str,
     load_event: bool = True,
-    file_format: str = "edf",
+    file_format: str = "memmap",
     transform=None,
     verbose=False,
 ):
@@ -215,7 +232,7 @@ def load_caueeg_task_split(
     task: str,
     split: str,
     load_event: bool = True,
-    file_format: str = "edf",
+    file_format: str = "memmap",
     transform=None,
     verbose=False,
 ):
@@ -918,24 +935,25 @@ def build_dataset_for_train(config, verbose=False):
     ) = compose_preprocess(config, train_loader, verbose=verbose)
     config["preprocess_train"] = preprocess_train
     config["preprocess_test"] = preprocess_test
-    config["in_channels"] = preprocess_train(next(iter(train_loader)))["signal"].shape[1]
+    # config["in_channels"] = preprocess_train(next(iter(train_loader)))["signal"].shape[1]
+    config["in_channels"] = 10
     config["out_dims"] = len(config["class_label_to_name"])
 
-    if verbose:
-        for i_batch, sample_batched in enumerate(train_loader):
-            # preprocessing includes to-device operation
-            preprocess_train(sample_batched)
+    # if verbose:
+    #     for i_batch, sample_batched in enumerate(train_loader):
+    #         # preprocessing includes to-device operation
+    #         preprocess_train(sample_batched)
 
-            print(
-                i_batch,
-                sample_batched["signal"].shape,
-                sample_batched["age"].shape,
-                sample_batched["class_label"].shape,
-            )
+    #         print(
+    #             i_batch,
+    #             sample_batched["signal"].shape,
+    #             sample_batched["age"].shape,
+    #             sample_batched["class_label"].shape,
+    #         )
 
-            if i_batch > 3:
-                break
-        print("\n" + "-" * 100 + "\n")
+    #         if i_batch > 3:
+    #             break
+    #     print("\n" + "-" * 100 + "\n")
 
     return (
         train_loader,

@@ -17,6 +17,8 @@ from datasets.caueeg_script import build_dataset_for_train
 from datasets.temple_eeg_script import build_dataset_for_tuab_train
 from models.utils import count_parameters
 
+HYDRA_FULL_ERROR=1
+
 
 def check_device_env(config):
     if not torch.cuda.is_available():
@@ -37,8 +39,10 @@ def check_device_env(config):
             config["minibatch"] = config["minibatch_3090"] // 4
         elif "1070" in device_name:
             config["minibatch"] = config["minibatch_3090"] // 4
-        else:
+        elif "4090" in device_name:
             config["minibatch"] = config["minibatch_3090"]
+        else:
+            config["minibatch"] = 512
             print("*" * 150)
             print(
                 f"- WARNING: this process set the minibatch size as {config['minibatch']}, "
@@ -70,7 +74,9 @@ def set_seed(config, rank):
 def initialize_ddp(rank, world_size, config):
     os.environ["MASTER_ADDR"] = "localhost"
     os.environ["MASTER_PORT"] = "12355"
+    print(f"Rank {rank}: Initializing process group")
     torch.distributed.init_process_group("nccl", rank=rank, world_size=world_size)
+    print(f"Rank {rank}: Process group initialized")
     config = deepcopy(config)
     config["device"] = torch.device(f"cuda:{rank}")
     return config
@@ -85,6 +91,15 @@ def compose_dataset(config):
 
 def generate_model(config):
     model = hydra.utils.instantiate(config)
+    print("------------------------------------------------------------------")
+    print("------------------------------------------------------------------")
+    print("------------------------------------------------------------------")
+    print("Is CUDA available?", torch.cuda.is_available())
+    if torch.cuda.is_available():
+        print("Current device:", torch.cuda.current_device())
+        print("Device name:", torch.cuda.get_device_name(torch.cuda.current_device()))
+    else:
+        print("Using CPU")
     if config.get("ddp", False):
         torch.cuda.set_device(config["device"])
         model.cuda(config["device"])
@@ -218,12 +233,12 @@ def prepare_and_run_train(rank, world_size, config):
     # setup for distributed training
     if config.get("ddp", False):
         config = initialize_ddp(rank, world_size, config)
-
+    # generate the model and update some configurations
+    model = generate_model(config)
     # compose dataset
     train_loader, val_loader, test_loader, multicrop_test_loader = compose_dataset(config)
 
-    # generate the model and update some configurations
-    model = generate_model(config)
+
 
     # load pretrained model if needed
     if "load_pretrained" in config.keys():
@@ -244,13 +259,13 @@ def prepare_and_run_train(rank, world_size, config):
         config["preprocess_train"],
         config["preprocess_test"],
     )
-
+    
     # cleanup
     if config.get("ddp", False):
         torch.distributed.destroy_process_group()
 
 
-@hydra.main(version_base="1.1", config_path="config", config_name="default")
+@hydra.main(config_path="config", config_name="default")
 def my_app(cfg: DictConfig) -> None:
     # initialize the configurations
     # print(OmegaConf.to_yaml(cfg))

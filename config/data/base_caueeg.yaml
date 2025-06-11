@@ -1,20 +1,20 @@
 # dataset
 dataset_name: caueeg-dataset
-dataset_path: local/dataset/caueeg-dataset/
+dataset_path: /media/night/dawn/brain/CAUEEG/caueeg-dataset
 file_format: memmap
-crop_multiple: 4
-test_crop_multiple: 8
+crop_multiple: 1
+test_crop_multiple: 4
 crop_timing_analysis: false
 load_event: false
 
 # preprocessing
 sampling_rate: 200
-seq_length: 2000  # 200Hz * 10s = 2000 for base
+seq_length: 2048 # 20000  # 200Hz * 10s = 2000 for base
 latency: 2000
 signal_length_limit: 10000000  # A sufficiently large number for no effect
 EKG: O
 photic: X
-input_norm: dataset
+input_norm: datapoint # dataset
 
 # augmentation
 awgn: 0.001

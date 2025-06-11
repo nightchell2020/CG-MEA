@@ -276,6 +276,66 @@ class MaskedAutoencoder1DPretrain(nn.Module):
 
     def get_output_length(self):
         return self.output_length
+    
+    # def random_channel_masking(self, x, mask_ratio):
+    #     N, C, L = x.size()  # N: 512, C:20, L:2048
+    #
+    #     # 무작위로 하나의 채널 인덱스를 선택하여 마스킹합니다.
+    #     masked_channel_idx = 0
+    #
+    #     # 마스킹할 채널 인덱스에 대해 마스크를 생성합니다.
+    #     mask = torch.zeros((N, C), device=x.device)  # 모든 채널은 기본적으로 유지
+    #
+    #     mask[:, masked_channel_idx] = 1  # 선택된 채널만 마스킹
+    #
+    #     # 마스킹된 채널을 제외하고 나머지 채널만 남긴 입력 데이터 생성
+    #     x_masked = x.clone()
+    #
+    #     x_masked[:, masked_channel_idx, :] = 0  # 선택된 채널의 데이터를 0으로 설정
+    #
+    #     return x_masked, mask, masked_channel_idx
+    #
+    # def forward_encoder(self, eeg, age, mask_ratio):
+    #     # 채널 마스킹을 수행
+    #     x, mask, masked_channel_idx = self.random_channel_masking(eeg, mask_ratio)
+    #
+    #     # 이후 단계는 기존과 비슷하게 진행되며, 마스킹된 채널을 예측하도록 훈련
+    #     x = self.enc_proj(x)
+    #     x = x.permute(0, 2, 1)  # (N, D_e, l_full)
+    #     x = x + self.enc_pos_embed[:, 1:, :]
+    #
+    #     # class token 추가
+    #     class_token = self.class_token + self.enc_pos_embed[:, :1, :]
+    #     batch_class_token = class_token.expand(x.size(0), -1, -1)
+    #     x = torch.cat([batch_class_token, x], dim=1)
+    #     x = x.contiguous()
+    #
+    #     # 인코더 블록과 정규화
+    #     x = self.enc_blocks(x)
+    #     x = self.enc_norm(x)
+    #
+    #     return x, mask, masked_channel_idx
+    
+    # def forward_decoder(self, x, masked_channel_idx):
+    #     # 디코더의 입력: 인코더 결과 중 마스킹된 채널에 대해 마스크 토큰을 추가하여 예측
+    #     x = self.dec_proj(x)  # 인코더에서 넘어온 차원을 디코더 차원으로 변환
+    #
+    #     # 모든 배치의 첫 번째 채널에 마스크 토큰을 삽입
+    #     N, _, D = x.size()
+    #     mask_tokens = self.mask_token.repeat(N, 1, 1)  # 마스크 토큰 생성
+    #     x[:, masked_channel_idx, :] = mask_tokens[:, masked_channel_idx, :]  # 첫 번째 채널에만 마스크 토큰 삽입
+    #
+    #     # positional encoding 추가
+    #     x = x + self.dec_pos_embed
+    #
+    #     # 디코더 블록과 정규화
+    #     x = self.dec_blocks(x)
+    #     x = self.dec_norm(x)
+    #
+    #     # 디코더 출력에서 마스킹된 채널(첫 번째 채널)만 예측
+    #     pred = x[:, masked_channel_idx, :]  # 첫 번째 채널에 대한 예측값만 추출
+    #     return pred
+
 
     def random_masking(self, x, mask_ratio):
         N, l_full, D_e = x.size()
@@ -323,15 +383,14 @@ class MaskedAutoencoder1DPretrain(nn.Module):
 
         # class token
         # (N, l, D_e) -> (N, l + 1, D_e)
-        class_token = self.class_token + self.enc_pos_embed[:, :1, :]
-        batch_class_token = class_token.expand(N, -1, -1)
-        x = torch.cat([batch_class_token, x], dim=1)
-        x = x.contiguous()
+        class_token = self.class_token + self.enc_pos_embed[:, :1, :]   # (1,1,768)
+        batch_class_token = class_token.expand(N, -1, -1)   # (B,1,768)
+        x = torch.cat([batch_class_token, x], dim=1)    # (B, 64+1, 76        x = x.contiguous()
 
         # encoder stage
         x = self.enc_blocks(x)
         x = self.enc_norm(x)
-
+        # x (48,65,768), mask (48,256), idx_restore(48,256)
         return x, mask, idx_restore
 
     def forward_decoder(self, x, idx_restore):
@@ -378,6 +437,22 @@ class MaskedAutoencoder1DPretrain(nn.Module):
         x = torch.einsum("NlpC->NClp", x)
         eeg = x.reshape(N, C, l_full * p)
         return eeg
+    
+    # def compute_reconstruction_loss(self, eeg, pred, masked_channel_idx):
+    #     # (N, C, L) -> (N, l_full, p*C)로 패치화하여 예측된 데이터와 비교
+    #     desired = self.patchify(eeg)
+    #
+    #     # 선택된 채널만 손실을 계산
+    #     loss = 0
+    #     for i in range(eeg.size(0)):
+    #         # 실제 데이터와 예측된 패치를 비교해 손실 계산
+    #         target = desired[i, masked_channel_idx, :]
+    #         pred_channel = pred[i, masked_channel_idx, :]
+    #         loss += nn.functional.mse_loss(pred_channel, target)
+    #
+    #     # 평균 손실
+    #     loss /= eeg.size(0)
+    #     return loss
 
     def compute_reconstruction_loss(self, eeg, pred, mask):
         # (N, C, L) -> (N, l_full, p*C)
@@ -413,17 +488,19 @@ class MaskedAutoencoder1DPretrain(nn.Module):
         # decoder
         pred = self.forward_decoder(x, idx_restore)
 
-        return pred, mask
+        return pred, mask, idx_restore
 
     def forward(self, eeg: torch.Tensor, age: torch.Tensor, mask_ratio: float = None):
         if mask_ratio is None:
             mask_ratio = self.mask_ratio
 
         # forward pass
-        pred, mask = self.mask_and_reconstruct(eeg, age, mask_ratio)
+        # pred, mask = self.mask_and_reconstruct(eeg, age, mask_ratio)
+        pred, mask, idx_restore = self.mask_and_reconstruct(eeg, age, mask_ratio)
 
         # loss
-        loss = self.compute_reconstruction_loss(eeg, pred, mask)
+        # loss = self.compute_reconstruction_loss(eeg, pred, mask)
+        loss = self.compute_reconstruction_loss(eeg, pred, idx_restore)
 
         return loss
 

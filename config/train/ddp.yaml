@@ -10,7 +10,8 @@ total_samples: 3.0e+8
 num_history: 500
 
 # wandb
-watch_model: false
+use_wandb: true
+watch_model: true
 
 # GPU
 # device: ???  # decided during runtime

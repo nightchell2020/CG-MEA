@@ -8,9 +8,11 @@ total_samples: 50000
 
 # log
 num_history: 5
-save_model: false
+save_model: true
 
 # wandb
 use_wandb: false
 draw_result: true
 watch_model: false
+
+ddp: true

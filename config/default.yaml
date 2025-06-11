@@ -1,9 +1,10 @@
 defaults:
-  - data: base_caueeg
-  - train: base_train
-  - model: base_model
+  - data: caueeg-abnormal
+  - train: tiny-train
+#  - train: base_train
+  - model: 1D-VGG-16
   - optional sweep: optional
-  - optional ssl: optional
+  - optional ssl: 1D-MAE-B # optional
   - _self_
 
 hydra:

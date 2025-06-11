@@ -4,4 +4,6 @@ defaults:
   - _self_
 
 model: 1D-VGG-16
+#in_channels: 10
+#out_dims: 2
 minibatch_3090: 512

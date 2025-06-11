@@ -1,0 +1,17 @@
+defaults:
+  - base_model
+  - _self_
+
+_target_: models.mae_1d_IL.mae_1d_b_e768_d512
+model: 1D-MAE-B
+
+norm_pix_loss: False
+activation: gelu
+minibatch_3090: 256
+
+mask_ratio: 0.5
+#mask_ratio: ???
+#patch_size: ???
+patch_size: 8
+use_age: "no"
+fc_stages: 2

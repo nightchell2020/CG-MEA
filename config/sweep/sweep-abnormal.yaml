@@ -1,5 +1,5 @@
 project: caueeg-abnormal
-entity: ipis-mjkim
+entity: nightchell
 method: random
 program: run_train.py
 command:
